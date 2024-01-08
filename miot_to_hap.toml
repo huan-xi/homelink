@@ -1,0 +1,45 @@
+#米家智能显示器挂灯1s
+#https://home.miot-spec.com/spec?type=urn:miot-spec-v2:device:light:0000A001:yeelink-lamp22:1:0000C802
+["yeelink.light.lamp22"]
+[["yeelink.light.lamp22".mappers]]
+# 分类
+hap_type = "Lightbulb"
+# 状态控制
+power_state = { siid = 2, piid = 1 }
+brightness = { siid = 2, piid = 2 }
+color_temperature = { siid = 2, piid = 3 }
+
+#https://home.miot-spec.com/spec?type=urn:miot-spec-v2:device:outlet:0000A002:chuangmi-212a01:1
+#https://home.miot-spec.com/s/chuangmi.plug.212a01
+["chuangmi.plug.212a01"]
+[["chuangmi.plug.212a01".mappers]]
+#hap_type = "Switch"
+hap_type = "Outlet"
+# 状态控制
+power_state = { siid = 2, piid = 1 }
+
+
+
+#https://home.miot-spec.com/s/zimi.switch.dhkg01
+["zimi.switch.dhkg01"]
+[["zimi.switch.dhkg01".mappers]]
+hap_type = "Switch"
+# 状态控制
+power_state = { siid = 2, piid = 1 }
+
+
+
+# 门窗传感器
+#https://home.miot-spec.com/s/isa.magnet.dw2hl
+["isa.magnet.dw2hl"]
+[["isa.magnet.dw2hl".mappers]]
+hap_type = "ContactSensor"
+# 状态控制
+#https://home.miot-spec.com/s/miaomiaoce.sensor_ht.t1
+#小米米家电子温湿度计Pro
+["miaomiaoce.sensor_ht.t1"]
+[["miaomiaoce.sensor_ht.t1".mappers]]
+hap_type = "TemperatureSensor"
+status_tampered = { siid = 2, piid = 1 }
+
+#TemperatureSensor

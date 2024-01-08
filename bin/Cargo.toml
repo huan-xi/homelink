@@ -1,0 +1,54 @@
+[package]
+name = "bin"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+#env_logger = "0.10.1"
+hex = "0.4.3"
+tokio = { version = "1.35.1", features = ["full"] }
+anyhow = "1.0.76"
+
+md5 = { version = "0.7.0", features = [] }
+aes = { version = "0.7.5", features = [] }
+log = { version = "0.4.20", features = [] }
+packed_struct = "0.10.1"
+#block-modes = "0.9.1"
+block-modes = "0.8"
+miot_spec = { path = "../miot_spec" }
+serde_json = "1.0.108"
+serde = { version = "1.0.193", features = ["derive"] }
+bytes = "1.5.0"
+hap = { path = "/Users/huanxi/tmp/hap-rs" }
+tap = "1.0.1"
+toml = "0.8.8"
+log4rs = {version = "1.2.0",features = ["default"]}
+
+
+axum = "0.7.3"
+axum-extra = "0.9.0"
+axum-server = "0.6.0"
+dashmap = "5.5.3"
+
+sea-orm = {version = "0.12.10",features = ["macros", "runtime-tokio-native-tls","with-chrono"]}
+rand = "0.7.3"
+futures-util = "0.3.30"
+strum = "0.25.0"
+strum_macros = "0.25.3"
+#http = "0.2.11"
+mime = "0.3.17"
+serde-aux = "4.3.1"
+snowdon = "0.2.0"
+once_cell = "1.19.0"
+chrono = "0.4.31"
+evalexpr = "11.3.0"
+#axum-core = "0.3.4"
+#serde_path_to_error = "0.1.15"
+[features]
+default=["sqlite"]
+#default = ["postgres", "mysql", "sqlite"]
+#mysql = ["sea-orm/sqlx-mysql"]
+#postgres = ["sea-orm/sqlx-postgres"]
+sqlite = ["sea-orm/sqlx-sqlite"]

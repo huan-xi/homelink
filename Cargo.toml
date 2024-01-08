@@ -1,0 +1,5 @@
+[workspace]
+members = ["miot_spec", "bin","migration"]
+[profile.dev]
+split-debuginfo = "unpacked"
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

@@ -1,0 +1,29 @@
+refresh_rate: 30 seconds
+appenders:
+  stdout:
+    kind: console
+    encoder:
+#      {f} 文件
+      pattern: "{d(%Y-%m-%d %H:%M:%S)} {M} {L} {h({l})} - {m}{n}"
+  requests:
+    kind: file
+    path: "log/requests.log"
+    encoder:
+      pattern: "{d} - {m}{n}"
+root:
+  level: debug
+  appenders:
+    - stdout
+loggers:
+  miot_spec:
+    level: debug
+  libmdns:
+    level: info
+  hap:
+    level: info
+  paho_mqtt_c:
+    level: info
+  paho_mqtt:
+    level: info
+  hyper:
+    level: info
