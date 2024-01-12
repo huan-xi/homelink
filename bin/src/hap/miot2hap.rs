@@ -21,9 +21,9 @@ use tap::Tap;
 use miot_spec::proto::miio_proto::{MiIOProtocol, MiotSpecDTO};
 use tap::tap::TapFallible;
 use miot_spec::device::miot_spec_device::DeviceInfo;
-use crate::convertor::config::{MappingConfig, Miot2HapMapper};
-use crate::convertor::iot_characteristic::CharacteristicValue;
-use crate::convertor::unit_convertor::UnitConvertor;
+use crate::hap::config::{MappingConfig, Miot2HapMapper};
+use crate::hap::iot_characteristic::CharacteristicValue;
+use crate::hap::unit_convertor::UnitConvertor;
 use crate::db::entity::hap_characteristic::Property;
 use crate::db::entity::prelude::HapServiceModel;
 use crate::init::DevicePointer;
@@ -158,7 +158,7 @@ pub struct ServiceSetter {}
 impl ServiceSetter {
     /// 设置服务名称
     pub(crate) async fn set_service_name(service: &HapServiceModel, name_ch: &mut Option<NameCharacteristic>) -> anyhow::Result<()> {
-        if let Some(name) = service.name.as_ref() {
+        if let Some(name) = service.memo.as_ref() {
             let name = serde_json::Value::String(name.clone());
             name_ch.as_mut().unwrap().set_value(name).await?;
         } else {

@@ -1,5 +1,11 @@
 [workspace]
-members = ["miot_spec", "bin","migration"]
+members = ["miot_spec", "bin", "migration", "hap_metadata","hap-rs"]
+#exclude=["hap-rs/codegen"]
 [profile.dev]
 split-debuginfo = "unpacked"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[workspace.dependencies]
+anyhow = "1.0.76"
+rust-embed = "8.2.0"
+serde_json = "1.0.108"
+serde = { version = "1.0.193", features = ["derive"] }

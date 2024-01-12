@@ -29,7 +29,7 @@ pub async fn list(state: State<AppState>) -> ApiResult<Vec<HapAccessoryResult>> 
 
 pub async fn disable(state: State<AppState>, Path(id): Path<i64>, Query(param): Query<DisableParam>) -> ApiResult<()> {
     let model = HapAccessoryActiveModel {
-        id: Set(id),
+        aid: Set(id),
         disabled: Set(param.disabled),
         ..Default::default()
     };

@@ -1,26 +1,29 @@
 use std::sync::{Arc};
 use std::time::Duration;
 use anyhow::{anyhow, Error};
-use futures_util::future::BoxFuture;
-use futures_util::StreamExt;
+use futures_util::future::{BoxFuture, join};
 use hex::FromHex;
 use crate::device::miot_spec_device::{BaseMiotSpecDevice, DeviceInfo, MiotSpecDevice};
-use crate::proto::miio_proto::MiIOProtocol;
+use crate::proto::miio_proto::{MiIOProtocol, MiotSpecDTO, MiotSpecId};
 use crate::proto::transport::miio_udp_transport::UdpTransport;
 use crate::proto::transport::Transport;
 use futures_util::FutureExt;
 use log::{error, info};
-use paho_mqtt::SslVersion::Default;
 use tap::TapFallible;
 use tokio::sync::RwLock;
+use crate::device::value::{DataEmitter, DataListener, ListenDateType};
 use crate::device::wifi_device::ExitCode::ConnectErr;
-use crate::errors::MiotError;
 
 pub struct WifiDevice {
     pub base: BaseMiotSpecDevice,
     pub info: DeviceInfo,
     ///协议
     proto: Arc<RwLock<Option<Arc<MiIOProtocol>>>>,
+    /// 轮询间隔
+    pub interval: Duration,
+    /// 注册轮询的属性
+    pub registered_property: Arc<RwLock<Vec<MiotSpecId>>>,
+    emitter: Arc<RwLock<DataEmitter<ListenDateType>>>,
 }
 
 #[derive(Debug)]
@@ -34,7 +37,8 @@ pub enum ExitCode {
     ConnectErr,
     Lock,
 }
-impl Into<anyhow::Error> for ExitCode{
+
+impl Into<anyhow::Error> for ExitCode {
     fn into(self) -> Error {
         anyhow::anyhow!("{:?}",self)
     }
@@ -62,10 +66,59 @@ impl MiotSpecDevice for WifiDevice {
         async move {
             let proto = self.connect().await?;
             //开启状态获取
-            proto.start_listen().await;
+            let listen = proto.start_listen();
+            // 开启轮询
+            let poll = async {
+                loop {
+                    tokio::time::sleep(self.interval).await;
+                    if self.emitter.read().await.is_empty() {
+                        continue;
+                    };
+
+                    let proto = match self.get_proto().await {
+                        Ok(p) => {
+                            p
+                        }
+                        Err(e) => {
+                            error!("获取协议失败");
+                            break;
+                        }
+                    };
+
+                    let params = self.registered_property
+                        .read()
+                        .await.iter()
+                        .map(|id| MiotSpecDTO {
+                            did: self.info.did.clone(),
+                            siid: id.siid,
+                            piid: id.piid,
+                            value: None,
+                        }).collect::<Vec<MiotSpecDTO>>();
+                    if params.is_empty() {
+                        continue;
+                    }
+                    if let Ok(results) = proto.get_properties(params, None).await {
+                        for result in results {
+                            self.emitter.clone().write().await.emit(ListenDateType::MiotProp(result)).await;
+                        }
+                    }
+                }
+            };
+            join(listen, poll).await;
             Err(ExitCode::Disconnect)
             // 该表当前设备的状态
             //ExitCode::OK
+        }.boxed()
+    }
+    fn register_property(&self, siid: i32, piid: i32) -> BoxFuture<()> {
+        async move {
+            let mut write = self.registered_property.write().await;
+            write.push(MiotSpecId { siid, piid });
+        }.boxed()
+    }
+    fn add_listener(&self, listener: DataListener<ListenDateType>) -> BoxFuture<()> {
+        async move {
+            self.emitter.clone().write().await.add_listener(listener).await;
         }.boxed()
     }
 }
@@ -99,6 +152,9 @@ impl WifiDevice {
             },
             info,
             proto: Arc::new(RwLock::new(None)),
+            interval: Duration::from_secs(70),
+            registered_property: Arc::new(RwLock::new(Vec::new())),
+            emitter: Arc::new(RwLock::new(DataEmitter::new())),
         })
     }
 }

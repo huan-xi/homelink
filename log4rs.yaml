@@ -16,7 +16,7 @@ root:
     - stdout
 loggers:
   miot_spec:
-    level: debug
+    level: info
   libmdns:
     level: info
   hap:

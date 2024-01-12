@@ -3,14 +3,14 @@ use std::sync::Arc;
 use futures_util::future::{BoxFuture, join_all};
 use log::debug;
 use crate::device::ble::value_types::BleValue;
+use crate::proto::miio_proto::MiotSpecDTO;
 
 ///监听数据的类型
-
 #[derive(Debug, Clone)]
 pub enum ListenDateType {
     /// 蓝牙数据
     BleData(BleValue),
-    Wifi
+    MiotProp(MiotSpecDTO),
 }
 
 // pub trait DataListener<T: Default + Clone + Serialize + Send + Sync>: FnMut(T) -> BoxFuture<'static, anyhow::Result<()>> + 'static + Send + Sync {}
@@ -25,11 +25,14 @@ pub struct DataEmitter<T> {
 }
 
 impl<T> DataEmitter<T>
-    where T:Clone + Send + Sync + Debug {
+    where T: Clone + Send + Sync + Debug {
     pub fn new() -> DataEmitter<T> { DataEmitter { listeners: vec![] } }
 
     pub async fn add_listener(&mut self, listener: DataListener<T>) {
         self.listeners.push(listener);
+    }
+    pub  fn is_empty(&self) -> bool {
+        self.listeners.is_empty()
     }
 
     pub async fn emit(&self, event: T) {

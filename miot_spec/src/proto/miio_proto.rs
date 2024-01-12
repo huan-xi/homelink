@@ -24,6 +24,11 @@ pub struct MiIOProtocol {
 
 unsafe impl Send for MiIOProtocol {}
 
+pub struct MiotSpecId {
+    pub siid: i32,
+    pub piid: i32,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MiotSpecDTO {
     pub did: String,

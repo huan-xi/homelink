@@ -1,5 +1,5 @@
 use serde_json::Value;
-use crate::convertor::unit_convertor::{Convertor, ConvertorParamType};
+use crate::hap::unit_convertor::{Convertor, ConvertorParamType};
 
 pub struct ScaleDownX10Conv;
 impl Convertor for ScaleDownX10Conv {

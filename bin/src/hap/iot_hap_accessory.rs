@@ -1,15 +1,12 @@
 use std::collections::HashMap;
 use std::sync::Arc;
-use dashmap::DashMap;
 use hap::accessory::HapAccessory;
 use hap::HapType;
-use hap::service::accessory_information::AccessoryInformationService;
 use hap::service::HapService;
 use serde::{Serialize, Serializer};
 use serde::ser::SerializeStruct;
 use tokio::sync::Mutex;
 use miot_spec::device::miot_spec_device::MiotSpecDevice;
-use crate::convertor::iot_hap_service::IotHapService;
 
 /// 一个设备可能存在多个配件
 /// 一个配件多个服务，一个服务多个特征值

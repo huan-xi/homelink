@@ -1,9 +1,9 @@
 use sea_orm::{DeriveActiveEnum, EnumIter, FromJsonQueryResult};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use crate::convertor::unit_convertor::eval_expr_convertor::{EvalExprConvertor, EvalExprParam};
-use crate::convertor::unit_convertor::kelvin_to_mired_convertor::KelvinToMiredConvertor;
-use crate::convertor::unit_convertor::scale_down::ScaleDownX10Conv;
+use crate::hap::unit_convertor::eval_expr_convertor::{EvalExprConvertor, EvalExprParam};
+use crate::hap::unit_convertor::kelvin_to_mired_convertor::KelvinToMiredConvertor;
+use crate::hap::unit_convertor::scale_down::ScaleDownX10Conv;
 
 pub mod eval_expr_convertor;
 mod kelvin_to_mired_convertor;
@@ -14,6 +14,8 @@ pub trait Convertor {
     fn from(&self, param: Option<ConvertorParamType>, value: Value) -> anyhow::Result<Value>;
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+pub struct UnitConv(pub Option<UnitConvertor>,pub  Option<ConvertorParamType>);
 
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize, FromJsonQueryResult)]
 #[serde(tag = "type")]

@@ -3,7 +3,7 @@ use hap::accessory::AccessoryCategory;
 use hap::HapType;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use crate::convertor::hap_type::MappingHapType;
+use crate::hap::hap_type::MappingHapType;
 use crate::db::entity::hap_characteristic::Property;
 
 /*#[derive(Clone, Debug, Default, Deserialize, Serialize)]

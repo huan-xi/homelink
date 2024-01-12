@@ -22,7 +22,7 @@ pub struct IotHapService {
     /// Power State characteristic (required).
     // pub power_state: PowerStateCharacteristic,
     // pub name: Option<NameCharacteristic>,
-    characteristic_map: HashMap<u64, Box<dyn HapCharacteristic>>,
+    characteristic_map: HashMap<HapType, Box<dyn HapCharacteristic>>,
 }
 impl IotHapService {
     pub fn new(id: u64, accessory_id: u64,hap_type: HapType) -> Self {
@@ -37,7 +37,7 @@ impl IotHapService {
         }
     }
     pub fn push_characteristic(&mut self, characteristic: Box<dyn HapCharacteristic>) {
-        self.characteristic_map.insert(characteristic.get_id(), characteristic);
+        self.characteristic_map.insert(characteristic.get_type(), characteristic);
     }
 }
 
@@ -92,12 +92,8 @@ impl HapService for IotHapService {
     }
 
     fn get_mut_characteristic(&mut self, hap_type: HapType) -> Option<&mut dyn HapCharacteristic> {
-        for characteristic in self.get_mut_characteristics() {
-            if characteristic.get_type() == hap_type {
-                return Some(characteristic);
-            }
-        }
-        None
+        self.characteristic_map.get_mut(&hap_type)
+            .map(|i| i.as_mut() as &mut dyn HapCharacteristic )
     }
 
     fn get_characteristics(&self) -> Vec<&dyn HapCharacteristic> {
@@ -107,9 +103,7 @@ impl HapService for IotHapService {
     fn get_mut_characteristics(&mut self) -> Vec<&mut dyn HapCharacteristic> {
         self.characteristic_map.iter_mut().map(|mut i| i.1.as_mut() as &mut dyn HapCharacteristic ).collect()
     }
-    fn get_id_mut_characteristic(&mut self, id: u64) -> Option<&mut dyn HapCharacteristic> {
-        self.characteristic_map.get_mut(&id).map(|i| i.as_mut() as &mut dyn HapCharacteristic )
-    }
+
 }
 
 impl Serialize for IotHapService {

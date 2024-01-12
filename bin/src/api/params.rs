@@ -1,55 +1,120 @@
 use std::str::FromStr;
+use anyhow::anyhow;
+use sea_orm::ActiveValue::Set;
 use sea_orm::JsonValue;
-use serde_json::Value;
-use crate::convertor::hap_type::MappingHapType;
+use crate::hap::hap_type::MappingHapType;
 use serde_aux::prelude::deserialize_number_from_string;
-use miot_spec::device::ble::value_types::BleValueType;
-use crate::db::entity::hap_characteristic::{DbBleValueType, MappingMethod, Property};
+use crate::db::entity::hap_characteristic::{BleToSensorParam, DbBleValueType, MappingMethod, MappingParam, MiotSpecParam, Property};
+use serde_aux::prelude::deserialize_option_number_from_string;
+use crate::db::entity::prelude::{HapCharacteristicActiveModel};
+use crate::hap::unit_convertor::{ConvertorParamType, UnitConvertor};
 
-fn deserialize_number_or_string<'de, D>(deserializer: D) -> Result<i64, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-{
-    let value: Value = serde::Deserialize::deserialize(deserializer)?;
-    match value {
-        Value::Number(number) => {
-            if let Some(number) = number.as_i64() {
-                Ok(number)
-            } else {
-                Err(serde::de::Error::custom("Invalid number format"))
+
+#[derive(serde::Deserialize, Debug)]
+pub struct AddServiceParam {
+    pub memo: Option<String>,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    pub accessory_id: i64,
+    pub name: Option<String>,
+    /// 服务类型
+    pub service_type: MappingHapType,
+    pub characteristics: Vec<AddCharacteristicParam>,
+}
+
+
+#[derive(serde::Deserialize, Debug)]
+pub struct AddCharacteristicParam {
+    /*  #[serde(default, deserialize_with = "deserialize_option_number_from_string")]
+      pub cid: Option<i64>,*/
+    pub characteristic_type: MappingHapType,
+    pub mapping_method: MappingMethod,
+    pub mapping_property: Option<Property>,
+    pub name: Option<String>,
+    pub ble_value_type: Option<DbBleValueType>,
+    pub format: String,
+    pub unit: Option<String>,
+    pub min_value: Option<JsonValue>,
+    pub max_value: Option<JsonValue>,
+    pub max_len: Option<JsonValue>,
+    pub unit_convertor: Option<UnitConvertor>,
+    pub convertor_param: Option<ConvertorParamType>,
+    pub fixed_value: Option<String>,
+}
+
+impl AddCharacteristicParam {
+    pub fn into_model(self, service_id: i64) -> anyhow::Result<HapCharacteristicActiveModel> {
+        let mapping_param = match &self.mapping_method {
+            _ => None,
+            MappingMethod::BleToSensor => {
+                Some(MappingParam::BleToSensor(BleToSensorParam {
+                    ble_value_type: match self.ble_value_type.clone() {
+                        None => {
+                            return Err(anyhow!("ble_value_type 不能为空"));
+                        }
+                        Some(s) => {
+                            s
+                        }
+                    },
+                }))
             }
-        }
-        Value::String(string) => i64::from_str(&string).map_err(serde::de::Error::custom),
-        _ => Err(serde::de::Error::custom("Invalid value type")),
+            MappingMethod::MIotSpec => {
+                Some(match self.mapping_property.clone() {
+                    None => {
+                        return Err(anyhow!("mapping_property 不能为空"));
+                    }
+                    Some(s) => {
+                        MappingParam::MIotSpec(MiotSpecParam {
+                            property: s,
+                        })
+                    }
+                })
+            }
+        };
+        Ok(HapCharacteristicActiveModel {
+            cid: Default::default(),
+            characteristic_type: Set(self.characteristic_type),
+            mapping_method: Set(self.mapping_method),
+            mapping_param: Set(mapping_param),
+            name: Set(self.name),
+            format: Set(self.format),
+            unit: Set(self.unit),
+            min_value: Set(self.min_value),
+            max_value: Set(self.max_value),
+            max_len: Set(self.max_len),
+            unit_convertor: Set(self.unit_convertor),
+            service_id: Set(service_id),
+            disabled: Set(false),
+            // fixed_value: Default::default(),
+            convertor_param: Set(self.convertor_param),
+            fixed_value: Set(self.fixed_value),
+        })
     }
 }
 
 
 #[derive(serde::Deserialize, Debug)]
-pub struct AddServiceParam {
-    /// 服务名称可空
-    pub name: Option<String>,
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub accessory_id: i64,
-    /// 服务类型
-    pub service_type: MappingHapType,
-}
-
-#[derive(serde::Deserialize, Debug)]
-pub struct AddCharacteristicParam {
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub service_id: i64,
-    pub characteristic_type: MappingHapType,
-    pub mapping_method: MappingMethod,
-    pub mapping_property: Option<Property>,
-
-    pub ble_value_type: Option<DbBleValueType>,
-    pub format: Option<String>,
-    pub min_value: Option<JsonValue>,
-    pub max_value: Option<JsonValue>,
-}
-
-#[derive(serde::Deserialize, Debug)]
 pub struct DisableParam {
     pub disabled: bool,
+}
+
+#[derive(serde::Deserialize, Debug)]
+pub struct Test {
+    #[serde(default, deserialize_with = "deserialize_option_number_from_string")]
+    pub cid: Option<i32>,
+}
+
+
+#[test]
+pub fn test() {
+    let str = r#"{"characteristic_type":"PowerState","mapping_method":"MIotSpec","service_id":"1194242687084003328","mapping_property":{"siid":"2","piid":"1"},"format":"bool","name":"on"}"#;
+    let param: Test = serde_json::from_str(str).unwrap();
+    println!("{:?}", param);
+}
+
+#[test]
+pub fn test2() {
+    let a = MappingHapType::Name;
+    let str = serde_json::to_string(&a).unwrap();
+    println!("{}", str);
+    println!("{:?}", a);
 }

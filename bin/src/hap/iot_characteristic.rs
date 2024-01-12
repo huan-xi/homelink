@@ -3,15 +3,15 @@ use hap::characteristic::{AsyncCharacteristicCallbacks, Characteristic, Characte
 use hap::{HapType, pointer};
 use hap::characteristic::brightness::BrightnessCharacteristic;
 use hap::characteristic::color_temperature::ColorTemperatureCharacteristic;
+use hap::characteristic::contact_sensor_state::ContactSensorStateCharacteristic;
 use hap::characteristic::current_temperature::CurrentTemperatureCharacteristic;
 use hap::characteristic::hue::HueCharacteristic;
 use hap::characteristic::power_state::PowerStateCharacteristic;
 use hap::characteristic::saturation::SaturationCharacteristic;
-use hap::service::light_sensor::LightSensorService;
 use hap::service::lightbulb::LightbulbService;
 use serde::{Deserialize, Serialize, Serializer};
 use serde_json::json;
-use crate::convertor::hap_type::MappingHapType;
+use crate::hap::hap_type::MappingHapType;
 
 #[derive(Debug, Default, Clone,PartialEq,Eq)]
 pub struct CharacteristicValue {
@@ -75,6 +75,10 @@ impl IotCharacteristic {
             }
             MappingHapType::CurrentTemperature => {
                 Some(Box::new(CurrentTemperatureCharacteristic::new(0, 0)))
+            }
+            MappingHapType::ContactSensor => {
+                // ContactSensorService::new(0, 0);
+                Some(Box::new(ContactSensorStateCharacteristic::new(0, 0)))
             }
             _ => None
         }

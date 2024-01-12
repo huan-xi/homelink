@@ -9,6 +9,23 @@ use crate::api::json_1::to_json_string;
 
 pub type ApiResult<T> = Result<ApiResp<T>, ApiError>;
 
+#[macro_export]
+macro_rules! api_err {
+    () => {
+        crate::api::errors::ApiError::msg("未知错误")
+    };
+    ($($arg:tt)*) => {{
+        crate::api::errors::ApiError::msg(format_args!($($arg)*).to_string())
+    }};
+}
+
+#[macro_export]
+macro_rules! err_msg {
+    ($($arg:tt)*) => {{
+         Err(crate::api_err!($($arg)*))
+    }};
+}
+
 #[derive(Debug, Serialize)]
 pub struct ApiResp<T> {
     pub code: i32,
@@ -19,7 +36,7 @@ pub struct ApiResp<T> {
 
 
 /// 填入到extensions中的数据
-#[derive(Debug,Clone)]
+#[derive(Debug, Clone)]
 pub struct ResJsonString(pub String);
 
 
@@ -57,6 +74,27 @@ impl<T> IntoResponse for ApiResp<T>
         response.extensions_mut().insert(res_json_string);
         response
     }
+}
+
+pub fn err_msg_string<T>(str: String) -> ApiResult<T> {
+    Err(ApiError::Msg(str))
+}
+
+pub fn output_err_msg<T>(str: String) -> ApiResult<T> {
+    Err(ApiError::Msg(str))
+}
+
+pub fn err_msg<T>(str: &'static str) -> ApiResult<T> {
+    Err(ApiError::StrMsg(str))
+}
+
+pub fn ok_data<T>(data: T) -> ApiResult<T> {
+    Ok(ApiResp {
+        code: 200,
+        data: Some(data),
+        total: None,
+        msg: "success".to_string(),
+    })
 }
 
 impl ApiResp<()> {

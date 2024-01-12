@@ -13,8 +13,8 @@ pub enum ApiError {
 }
 
 impl ApiError {
-    pub fn msg(msg: &str) -> Self {
-        ApiError::Msg(msg.to_string())
+    pub fn msg(msg: String) -> Self {
+        ApiError::Msg(msg)
     }
 }
 

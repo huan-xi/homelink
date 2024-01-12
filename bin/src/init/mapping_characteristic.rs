@@ -1,28 +1,42 @@
 use anyhow::anyhow;
 use futures_util::FutureExt;
-use hap::characteristic::{AsyncCharacteristicCallbacks, Characteristic, Format, HapCharacteristic, OnReadFuture, OnUpdateFuture, Perm};
+use hap::characteristic::{AsyncCharacteristicCallbacks, Characteristic, Format, HapCharacteristic, OnReadFuture, OnUpdateFuture, Perm, Unit};
+use hap::HapType;
 use log::{debug, error, info};
+use sea_orm::JsonValue;
 use serde_json::Value;
 use tap::{Tap, TapFallible, TapOptional};
 use miot_spec::device::miot_spec_device::MiotDeviceType;
-use miot_spec::device::value::ListenDateType;
-use miot_spec::device::value::ListenDateType::BleData;
+use miot_spec::device::value::{DataListener, ListenDateType};
+use miot_spec::device::value::ListenDateType::{BleData, MiotProp};
 use miot_spec::proto::miio_proto::MiotSpecDTO;
-use crate::convertor::iot_characteristic::{CharacteristicValue, IotCharacteristic};
-use crate::convertor::miot2hap::Utils;
-use crate::convertor::unit_convertor::UnitConvertor;
+use crate::hap::iot_characteristic::{CharacteristicValue, IotCharacteristic};
+use crate::hap::unit_convertor::{ConvertorParamType, UnitConv, UnitConvertor};
 use crate::db::entity::hap_characteristic::{MappingMethod, MappingParam, Model, Property};
 use crate::db::entity::prelude::HapCharacteristicModel;
 use crate::init::{DevicePointer, HapAccessoryPointer};
 
+
 pub async fn to_characteristic(sid: u64, aid: u64, index: usize, ch: HapCharacteristicModel,
                                device: DevicePointer, accessory: HapAccessoryPointer) -> anyhow::Result<IotCharacteristic> {
+    let format: Format = serde_json::from_str(format!("\"{}\"", ch.format).as_str())
+        .map_err(|e| anyhow!("格式转换错误:{:?}", e))?;
+    let unit: Option<Unit> = match ch.unit.as_ref() {
+        None => { None }
+        Some(i) => {
+            Some(serde_json::from_str(format!("\"{}\"", i).as_str())
+                .map_err(|e| anyhow!("格式转换错误:{:?}", e))?)
+        }
+    };
+
+
     let mut cts = IotCharacteristic(Characteristic::<CharacteristicValue> {
         id: sid + index as u64 + 1,
         accessory_id: aid,
         hap_type: ch.characteristic_type.into(),
         // hap_type: HapType::PowerState,
-        format: Format::default(),
+        format,
+        unit,
         max_value: ch.max_value.clone().map(|i| CharacteristicValue::new(i)),
         min_value: ch.min_value.clone().map(|i| CharacteristicValue::new(i)),
         perms: vec![
@@ -37,25 +51,25 @@ pub async fn to_characteristic(sid: u64, aid: u64, index: usize, ch: HapCharacte
     // 这是属性方法
     set_read_update_method(sid, &mut cts, ch, device, accessory).await?;
 
-
     Ok(cts)
 }
 
+/// 设置特征的读写方法
 async fn set_read_update_method(sid: u64, cts: &mut IotCharacteristic, ch: HapCharacteristicModel, device: DevicePointer, accessory: HapAccessoryPointer) -> anyhow::Result<()> {
-    let cid = cts.get_id();
-
+    // let cid = cts.get_id();
+    let hap_type = cts.get_type();
+    let unit_conv = UnitConv(ch.unit_convertor.clone(), ch.convertor_param.clone());
     match ch.mapping_method {
-        MappingMethod::Unknown => {
-            return Err(anyhow!("不支持的映射方法:{:?}",ch.mapping_method));
+        MappingMethod::None => {
+            //不映射属性
         }
         MappingMethod::MIotSpec => {
             // 设置读写映射
             if let Some(MappingParam::MIotSpec(param)) = ch.mapping_param {
                 let ps = param.property;
-                let conv = ch.unit_convertor;
-                let read = ToChUtils::get_read_func(device.clone(), ps.clone(), conv.clone());
+                let read = ToChUtils::get_read_func(device.clone(), ps.clone(), unit_conv.clone());
                 cts.on_read_async(Some(read));
-                let set = ToChUtils::get_set_func(device.clone(), ps.clone(), conv.clone());
+                let set = ToChUtils::get_set_func(device.clone(), ps.clone(), unit_conv.clone());
                 cts.on_update_async(Some(set));
                 //当前特征值设置
                 if let Ok(Some(v)) = ToChUtils::read_property(ps.clone(), device.clone()).await {
@@ -70,6 +84,12 @@ async fn set_read_update_method(sid: u64, cts: &mut IotCharacteristic, ch: HapCh
                         }
                     }
                 }
+                //设置监听器
+                let did = device.get_info().did.clone();
+                //注册属性事件
+                device.register_property(ps.siid, ps.piid).await;
+                let listener = ToChUtils::get_miot_listener(sid, hap_type, did, accessory.clone(), ps.clone(), unit_conv.clone());
+                device.add_listener(Box::new(listener)).await;
             } else {
                 return Err(anyhow!("映射参数不能为空"));
             }
@@ -117,7 +137,7 @@ async fn set_read_update_method(sid: u64, cts: &mut IotCharacteristic, ch: HapCh
                     let conv_param = ch.convertor_param.clone();
                     let param_c = param.clone();
                     // 捕获设备设置值
-                    let func = move |data: ListenDateType| {
+                    let listener = move |data: ListenDateType| {
                         let accessory_c = accessory_c.clone();
                         let param_cc = param_c.clone();
                         let conv_param = conv_param.clone();
@@ -151,7 +171,7 @@ async fn set_read_update_method(sid: u64, cts: &mut IotCharacteristic, ch: HapCh
                                 match accessory_c.lock()
                                     .await
                                     .get_id_mut_service(sid)
-                                    .and_then(|s| s.get_id_mut_characteristic(cid)) {
+                                    .and_then(|s| s.get_mut_characteristic(hap_type)) {
                                     None => {
                                         return Err(anyhow::anyhow!("特征不存在"));
                                     }
@@ -163,14 +183,7 @@ async fn set_read_update_method(sid: u64, cts: &mut IotCharacteristic, ch: HapCh
                             Ok(())
                         }.boxed()
                     };
-                    device.add_listener(Box::new(func)).await;
-                    // let a = device.accessories.remove(0);
-                    //hs.get_id(); HapType::TemperatureSensor,
-                    //add_listener,
-
-                    // info!("当前温度:{:?}", a);
-
-
+                    device.add_listener(Box::new(listener)).await;
                     //设置默认值
                     cts.0.value = match cts.0.min_value.as_ref() {
                         None => {
@@ -186,6 +199,14 @@ async fn set_read_update_method(sid: u64, cts: &mut IotCharacteristic, ch: HapCh
             } else {
                 return Err(anyhow!("映射参数不能为空"));
             }
+        }
+        _ => {
+            //脚本映射,需要设置读,写,校验脚本
+            // read:
+            // actions:
+            //   action: eval(val/10)
+            //   action: set_ps(val/10)
+            // 读到一个value -> 操作函数[] -> value
         }
     }
 
@@ -204,14 +225,11 @@ fn set_default_for_cts(cts: &mut IotCharacteristic, ch: HapCharacteristicModel) 
       }*/
 
 
-    if ch.format.is_none() && default.is_none() {
-        return Err(anyhow!("服务:{},特征:{},格式不能为空", ch.service_id, ch.cid));
-    };
+    /*  if ch.format.is_none() && default.is_none() {
+          return Err(anyhow!("服务:{},特征:{},格式不能为空", ch.service_id, ch.cid));
+      };*/
 
     if let Some(default) = default {
-        if ch.format.is_none() {
-            cts.0.format = default.get_format();
-        };
         if cts.0.unit.is_none() {
             cts.0.unit = default.get_unit();
         };
@@ -237,6 +255,73 @@ fn set_default_for_cts(cts: &mut IotCharacteristic, ch: HapCharacteristicModel) 
 pub struct ToChUtils {}
 
 impl ToChUtils {
+    pub fn get_miot_listener(sid: u64, hap_type: HapType, did: String, accessory: HapAccessoryPointer,
+                             property: Property,
+                             unit_conv: UnitConv) -> DataListener<ListenDateType> {
+        Box::new(move |data: ListenDateType| {
+            let unit_conv = unit_conv.clone();
+            let accessory = accessory.clone();
+            let did = did.clone();
+            async move {
+                if let MiotProp(res) = data {
+                    if let Some(value) = res.value {
+                        if res.did.as_str() == did.as_str() && res.piid == property.piid && res.siid == property.siid {
+                            // 蓝牙数据设置到特征上
+                            match accessory.lock()
+                                .await
+                                .get_id_mut_service(sid)
+                                .and_then(|s| s.get_mut_characteristic(hap_type)) {
+                                None => {
+                                    return Err(anyhow::anyhow!("特征不存在"));
+                                }
+                                Some(cts) => {
+                                    ///类型转换器,设置值
+                                    let value = Self::conv_from_value(unit_conv, value);
+                                    cts.set_value(value).await?;
+                                }
+                            }
+                        };
+                    };
+                };
+                Err(anyhow!("数据类型错误"))
+            }.boxed()
+        })
+    }
+
+    pub fn conv_from_value(conv: UnitConv, value: JsonValue) -> JsonValue {
+        match conv.0 {
+            None => {
+                value
+            }
+            Some(cv) => {
+                cv.get_convertor()
+                    .from(conv.1, value)
+                    .tap_err(|e| {
+                        error!("单位转换错误:{:?}",e);
+                    })
+                    .unwrap_or(Value::Null)
+            }
+        }
+    }
+
+    pub fn conv_to_value(conv: UnitConv, value: JsonValue) -> JsonValue {
+        match conv.0 {
+            None => {
+                value
+            }
+            Some(uc) => {
+                let old = format!("{:?}", value);
+                let value = uc.get_convertor().to(conv.1, value)
+                    .tap_err(|e| {
+                        error!("To单位转换错误:{:?}",e);
+                    })
+                    .unwrap_or(Value::Null);
+                debug!("set convert value:{:?}=>{:?}", old, value);
+                value
+            }
+        }
+    }
+
     pub async fn read_property(property: Property, dev: DevicePointer) -> anyhow::Result<Option<Value>> {
         dev.get_proto().await.map_err(|e| anyhow::anyhow!("err"))?
             .get_property(MiotSpecDTO {
@@ -247,39 +332,29 @@ impl ToChUtils {
             }).await
     }
 
-    pub fn get_set_func(device: DevicePointer, property_id: Property, conv: Option<UnitConvertor>) -> impl OnUpdateFuture<CharacteristicValue>
+    pub fn get_set_func(device: DevicePointer, property_id: Property, conv: UnitConv) -> impl OnUpdateFuture<CharacteristicValue>
     {
         move |old: CharacteristicValue, new: CharacteristicValue| {
             let dev = device.clone();
             let id = dev.get_info().did.clone();
+            let conv = conv.clone();
             async move {
                 if old == new {
                     return Ok(());
                 };
-                let value = match conv {
-                    None => {
-                        Some(new.value)
-                    }
-                    Some(conv) => {
-                        let new_val = new.value.clone();
-                        let value = conv.get_convertor().to(None, new.value)?;
-                        debug!("set convert value:{:?}=>{:?}", new_val, value);
-                        Some(value)
-                    }
-                };
-                if value.is_none() {
-                    return Ok(());
-                };
+                let value = Self::conv_to_value(conv, new.value);
 
 
                 //读取状态
                 info!("set value:{},{},{:?}",property_id.siid,property_id.piid,value);
-                let proto = dev.get_proto().await.map_err(|e| { anyhow::anyhow!("获取连接协议失败") })?;
+                let proto = dev.get_proto()
+                    .await
+                    .map_err(|e| { anyhow::anyhow!("获取连接协议失败") })?;
                 let res = proto.set_property(MiotSpecDTO {
                     did: id,
                     siid: property_id.siid,
                     piid: property_id.piid,
-                    value,
+                    value: Some(value),
                 }).await.tap_err(|e| {
                     error!("设置属性失败:{}", e);
                 });
@@ -292,13 +367,13 @@ impl ToChUtils {
     /// 获取wifi 设备读取函数
     pub fn get_read_func(device: DevicePointer,
                          property: Property,
-                         convertor: Option<UnitConvertor>) -> impl OnReadFuture<CharacteristicValue>
-    {
+                         conv: UnitConv,
+    ) -> impl OnReadFuture<CharacteristicValue> {
+        let conv = conv.clone();
         move || {
             let dev = device.clone();
             let id = dev.get_info().did.clone();
-            let conv = convertor;
-
+            let conv = conv.clone();
             async move {
                 //读取状态
                 let proto = dev.get_proto()
@@ -314,22 +389,23 @@ impl ToChUtils {
                         error!("属性读取失败:{}", e);
                     }
                 )?;
-                // info!("aa read value:{},{},{:?}",property.siid,property.piid,value);
-                Ok(value.map(|f| {
-                    CharacteristicValue::new(match conv {
-                        None => {
-                            f
-                        }
-                        Some(conv) => {
-                            conv.get_convertor()
-                                .from(None, f)
-                                .unwrap_or(Value::Null)
-                        }
-                    })
-                }).tap(|f| {
-                    info!("read value:{},{},{:?}",property.siid,property.piid,f);
-                }))
+
+                Ok(value
+                    .map(|f| Self::conv_from_value(conv, f))
+                    .map(|f| CharacteristicValue::new(f)))
             }.boxed()
         }
     }
+}
+
+#[test]
+pub fn test() {
+    let f = "\"string\"";
+    let ff = format!("\"{}\"", "string");
+    println!("{}", f);
+
+    // let fmt = serde_json::Value::from(f);
+    let format: Format = serde_json::from_str(f)
+        .map_err(|e| anyhow!("格式转换错误:{:?}", e)).unwrap();
+    println!("{:?}", format);
 }

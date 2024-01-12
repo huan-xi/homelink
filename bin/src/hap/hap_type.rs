@@ -6,10 +6,7 @@ use strum_macros::EnumString;
 
 
 /// HAP service and characteristic type representation.
-#[derive(
-
-EnumIter, DeriveActiveEnum, Copy, Clone, Hash, Debug, PartialEq, Eq, Serialize, Deserialize,
-)]
+#[derive(EnumIter, DeriveActiveEnum, Copy, Clone, Hash, Debug, PartialEq, Eq, Serialize, Deserialize, )]
 #[sea_orm(rs_type = "i32", db_type = "Integer")]
 pub enum MappingHapType {
     Unknown = 1,

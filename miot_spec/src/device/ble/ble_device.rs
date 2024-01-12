@@ -11,7 +11,7 @@ use log::{debug, error, info, warn};
 use packed_struct::derive::PackedStruct;
 use packed_struct::{PackedStruct, PackingError};
 use tokio::sync::RwLock;
-use crate::device::ble::value_types::{BleValue, HumidityValue, TemperatureValue};
+use crate::device::ble::value_types::{BleValue, ContactValue, HumidityValue, TemperatureValue};
 use crate::device::gateway::gateway::OpenMiioGatewayDevice;
 use crate::device::value::{DataListener, DataEmitter, ListenDateType};
 use crate::proto::protocol::RecvMessage;
@@ -102,11 +102,7 @@ impl MiotSpecDevice for BleDevice {
                                                                 //idle_time
                                                                 // let bytes: [u8; 4] = edata.try_into().unwrap();
                                                             }
-                                                            0x1018 => {
-                                                                // # Door Sensor 2: 0 - dark, 1 - light light
-                                                                // # hass: On means light detected, Off means no light
-                                                                // let bytes: [u8; 1] = edata.try_into().unwrap();
-                                                            }
+
                                                             0x4803 => {
                                                                 //电池
                                                                 // let bytes: [u8; 1] = edata.try_into().unwrap();
@@ -118,6 +114,27 @@ impl MiotSpecDevice for BleDevice {
                                                                 // # of the battery, so filter out the false values
                                                                 // let bytes: [u8; 1] = edata.try_into().unwrap();
                                                                 // self.values.clone().write().await.battery.replace(bytes[0]);
+                                                            }
+                                                            0x1018 => {
+                                                                // # Door Sensor 2: 0 - dark, 1 - light light
+                                                                // # hass: On means light detected, Off means no light
+                                                                // let bytes: [u8; 1] = edata.try_into().unwrap();
+                                                            }
+                                                            0x1019 => {
+                                                                //门窗传感器
+                                                                let bytes: [u8; 2] = edata.try_into().unwrap();
+                                                                let val= ContactValue::unpack(&bytes).unwrap();
+                                                                ble_value.contact = Some(val.clone());
+                                                                self.values.clone().write().await.contact.replace(val);
+                                                                /*match bytes[0] {
+                                                                    0 => {//开}
+                                                                    1 => {//关}
+                                                                    2=>{timeout}
+                                                                    3=>{reset}
+                                                                    _ => {
+                                                                        error!("未知的门窗传感器事件:{:?}",bytes)
+                                                                    }
+                                                                }*/
                                                             }
                                                             _ => {
                                                                 warn!("未知的蓝牙事件: {:?}", val)
