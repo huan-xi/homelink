@@ -1,10 +1,10 @@
 use log::info;
 use packed_struct::derive::PackedStruct;
 use packed_struct::PackedStruct;
-use aes::Aes128;
-use block_modes::block_padding::Pkcs7;
+use anyhow::Error;
 use block_modes::{BlockMode, Cbc};
 use serde_json::{Map, Value};
+use crate::proto::transport::udp_iot_spec_proto::Utils;
 
 const HEADER_LEN: usize = 32;
 
@@ -52,6 +52,7 @@ pub trait RecvMessage {
 
 #[derive(Clone, Debug)]
 pub struct JsonMessage {
+    /// json 数据
     pub data: Map<String, Value>,
 }
 
@@ -115,32 +116,20 @@ impl Message {
 }
 
 
-pub struct Utils {}
+#[derive(Debug)]
+pub enum ExitError {
+    /// 连接信息为空
+    ConnectEmpty,
+    /// token 非法
+    InvalidToken,
 
-impl Utils {
-    pub fn key_iv(token: &[u8; 16]) -> (Vec<u8>, Vec<u8>) {
-        let key = md5::compute(token).to_vec();
-        let mut iv_src = key.to_vec();
-        iv_src.extend(token);
-        let iv = md5::compute(iv_src).to_vec();
-        (key, iv)
-    }
-    /// 解密
-    pub fn decrypt(token: &[u8; 16], payload: &[u8]) -> Vec<u8> {
-        if payload.is_empty() {
-            return vec![];
-        };
-        let (key, iv) = Self::key_iv(token);
-        let cipher = Cbc::<Aes128, Pkcs7>::new_from_slices(&key, &iv).unwrap();
-        let mut buf = payload.to_vec();
-        cipher.decrypt(&mut buf).unwrap().to_vec()
-    }
-    /// 加密
-    pub fn encrypt(token: &[u8; 16], payload: &[u8]) -> Vec<u8> {
-        let (key, iv) = Self::key_iv(token);
-        let cipher = Cbc::<Aes128, Pkcs7>::new_from_slices(&key, &iv).unwrap();
-        cipher.encrypt_vec(payload)
-    }
+    Disconnect,
+    ConnectErr,
+    Lock,
 }
 
-
+impl Into<anyhow::Error> for ExitError {
+    fn into(self) -> Error {
+        anyhow::anyhow!("{:?}",self)
+    }
+}

@@ -1,29 +1,34 @@
+use std::process::ExitCode;
 use std::sync::Arc;
+use anyhow::anyhow;
 use futures_util::future::BoxFuture;
 use futures_util::FutureExt;
 use log::{error, info};
-use paho_mqtt::Error::Nul;
 use tap::TapFallible;
+use crate::proto::protocol::ExitError;
 use tokio::sync::RwLock;
-use crate::device::miot_spec_device::{DeviceInfo, MiotSpecDevice};
-use crate::device::wifi_device::ExitCode;
-use crate::proto::miio_proto::MiIOProtocol;
-use crate::proto::transport::gateway_mqtt::OpenMiIOMqttTransport;
-use crate::proto::transport::Transport;
+use crate::device::miot_spec_device::{BaseMiotSpecDevice, DeviceInfo, MiotSpecDevice};
+use crate::proto::miio_proto::{MiotSpecProtocolPointer};
+use crate::proto::transport::open_miio_mqtt_proto::OpenMiIOMqttSpecProtocol;
 
 /// 连接网关的mqtt
 
 pub struct OpenMiioGatewayDevice {
     info: DeviceInfo,
-    proto: Arc<RwLock<Option<Arc<MiIOProtocol>>>>,
-    // listener: Arc<RwLock<Vec<i32>>>,
+    proto: Arc<RwLock<Option<MiotSpecProtocolPointer>>>,
+    base: BaseMiotSpecDevice,
 }
 
 impl MiotSpecDevice for OpenMiioGatewayDevice {
     fn get_info(&self) -> &DeviceInfo {
         &self.info
     }
-    fn get_proto(&self) -> BoxFuture<Result<Arc<MiIOProtocol>, ExitCode>> {
+
+    fn get_base(&self) -> &BaseMiotSpecDevice {
+        &self.base
+    }
+
+    fn get_proto(&self) -> BoxFuture<Result<MiotSpecProtocolPointer, ExitError>> {
         async move {
             let read = self.proto.clone();
             let read = read.read().await;
@@ -35,44 +40,36 @@ impl MiotSpecDevice for OpenMiioGatewayDevice {
         }.boxed()
     }
 
-    fn run(&self) -> BoxFuture<Result<(), ExitCode>> {
+    fn run(&self) -> BoxFuture<Result<(), ExitError>> {
         async move {
             let p_arc = self.connect().await?;
             p_arc.start_listen().await;
-            Err(ExitCode::Disconnect)
+            Err(ExitError::Disconnect)
         }.boxed()
     }
 }
 
 impl OpenMiioGatewayDevice {
     //获取连接
-    async fn connect(&self) -> Result<Arc<MiIOProtocol>, ExitCode> {
+    async fn connect(&self) -> Result<MiotSpecProtocolPointer, ExitError> {
         let mut write = self.proto.write().await;
-
         if let Some(s) = write.clone() {
             return Ok(s);
         }
-
-        let ip = self.info.localip.clone().ok_or(ExitCode::ConnectEmpty)?;
-        // let wifi_device = WifiDevice::new(info);
-        let transport = OpenMiIOMqttTransport::new(ip.as_str(), 1883)
+        let ip = self.info.localip.clone().ok_or(ExitError::ConnectEmpty)?;
+        let proto = OpenMiIOMqttSpecProtocol::new(ip.as_str(), 1883)
             .await
             .tap_err(|e| error!("连接网关失败,ip:{}: {:?}", ip,e))
-            .map_err(|_| ExitCode::ConnectErr)?;
-        let proto = MiIOProtocol::new(Transport::OpenMiIOMqtt(transport))
-            .await.map_err(|_| ExitCode::ConnectErr)?;
+            .map_err(|_| ExitError::ConnectErr)?;
         let p_arc = Arc::new(proto);
         write.replace(p_arc.clone());
         info!("连接网关 mqtt: {} 成功", ip);
         Ok(p_arc)
     }
     pub async fn new(info: DeviceInfo) -> anyhow::Result<Self> {
-        let ip = info.localip.clone().expect("网关设备ip不能为空");
-        // let wifi_device = WifiDevice::new(info);
-        // let transport = OpenMiIOMqttTransport::new(ip.as_str(), 1883).await?;
-        // let proto = MiIOProtocol::new(Transport::OpenMiIOMqtt(transport)).await?;
+        let _ = info.localip.clone()
+            .ok_or(anyhow!("网关设备ip不能为空"))?;
 
-
-        Ok(Self { info, proto: Arc::new(RwLock::new(None)) })
+        Ok(Self { info, proto: Arc::new(RwLock::new(None)), base: Default::default() })
     }
 }
