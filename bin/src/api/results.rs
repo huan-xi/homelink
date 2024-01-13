@@ -1,6 +1,6 @@
 use serde_json::Value;
 use hap_metadata::metadata::HapCharacteristic;
-use crate::db::entity::prelude::{HapAccessoryModel, HapBridge, HapBridgeModel, IotDeviceModel};
+use crate::db::entity::prelude::{HapAccessoryModel, HapBridgeEntity, HapBridgeModel, IotDeviceModel};
 
 #[derive(Debug, serde::Serialize)]
 pub struct HapAccessoryResult {

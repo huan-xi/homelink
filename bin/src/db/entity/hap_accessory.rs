@@ -2,6 +2,8 @@
 
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
+use hap::HapType;
+use crate::hap::hap_type::MappingHapType;
 
 #[derive(Copy, Clone, Default, Debug, DeriveEntity)]
 pub struct Entity;
@@ -18,8 +20,9 @@ pub struct Model {
     pub device_id: i64,
     pub bridge_id: i64,
     pub disabled: bool,
-    pub hap_type: Option<i32>,
+    pub hap_type: Option<MappingHapType>,
     pub name: Option<String>,
+    pub memo: Option<String>,
     pub info: Option<String>,
 }
 
@@ -31,6 +34,7 @@ pub enum Column {
     Disabled,
     HapType,
     Name,
+    Memo,
     Info,
 }
 
@@ -61,6 +65,7 @@ impl ColumnTrait for Column {
             Self::Disabled => ColumnType::Boolean.def(),
             Self::HapType => ColumnType::Integer.def().null(),
             Self::Name => ColumnType::String(None).def().null(),
+            Self::Memo => ColumnType::String(None).def().null(),
             Self::Info => ColumnType::String(None).def().null(),
             Self::Aid => ColumnType::Integer.def().null(),
         }

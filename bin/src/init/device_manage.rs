@@ -1,10 +1,74 @@
 use std::ops::Deref;
-use std::sync::Arc;
-use dashmap::mapref::one::Ref;
-use futures_util::future::{BoxFuture, join_all};
+use std::sync::{Arc};
 use futures_util::FutureExt;
 use log::{error, info};
-use crate::init::DevicePointer;
+use sea_orm::JsonValue;
+use miot_spec::device::miot_spec_device::{MiotSpecDevice};
+use miot_spec::device::MiotDevicePointer;
+use crate::init::{DevicePointer};
+
+#[derive(Clone)]
+pub struct DeviceWithJsEngine {
+    device: MiotDevicePointer,
+    // js_engine: Arc<Mutex<Option<boa_engine::Context<'static>>>>,
+}
+
+impl Deref for DeviceWithJsEngine {
+    type Target = Arc<dyn MiotSpecDevice + Send + Sync>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.device
+    }
+}
+
+impl DeviceWithJsEngine {
+    pub fn new(device: Arc<dyn MiotSpecDevice + Send + Sync>) -> Self {
+        Self {
+            device,
+            // js_engine: Arc::new(Mutex::new(None)),
+        }
+    }
+    pub async fn eval_js(&self, script: String) -> anyhow::Result<JsonValue> {
+        todo!();
+     /*   let source = Source::from_bytes(script.as_str());
+        let mut js_engine_lock = self.js_engine
+            .lock()
+            .map_err(|e| anyhow!("获取js引擎失败:{:?}", e))?;
+
+        let val = match js_engine_lock.as_mut() {
+            None => {
+                //初始化js引擎
+
+                // let context = boa_engine::Context::default();
+                let context = init_js_engine(self.device.clone());
+                js_engine_lock.replace(context);
+                js_engine_lock.as_mut().unwrap()
+            }
+            Some(js_engine) => {
+                js_engine
+            }
+        }.eval(source).map_err(|e| anyhow!("js执行错误:{:?}", e))?;
+        drop(js_engine_lock);
+        json_value_from_js_value(val)*/
+    }
+
+    /*pub async fn get_js_engine(&self) -> boa_engine::Context<'static> {
+        //不存在就初始化
+        let js_engine = self.js_engine.read().await;
+        if js_engine.is_none() {
+            drop(js_engine);
+            let mut js_engine = self.js_engine.write().await;
+            if js_engine.is_none() {
+                info!("初始化设备:{}js引擎", self.device.get_info().did);
+                let js_engine = boa_engine::Context::default();
+                *js_engine = Some(js_engine);
+            }
+        } else {
+
+        }
+    }*/
+}
+
 
 pub struct DeviceTask {
     dev: DevicePointer,
@@ -36,8 +100,12 @@ impl IotDeviceManagerInner {
         //执行任务
         tokio::spawn(async move {
             let task = async move {
-                let res = dev_c.run().await;
-                error!("设备连接断开:{:?},res:{:?}", dev_c.get_info().did, res);
+                loop {
+                    let res = dev_c.run().await;
+                    error!("设备连接断开:{:?},res:{:?}", dev_c.get_info().did, res);
+                    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                    info!("设备重连:{}", dev_c.get_info().did);
+                }
             };
             loop {
                 tokio::select! {
@@ -107,5 +175,3 @@ impl Deref for IotDeviceManager {
         &self.inner
     }
 }
-
-

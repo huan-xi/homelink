@@ -29,15 +29,21 @@ pub fn api() -> Router<AppState> {
               Router::new()
                   .route("/list", get(controller::iot_device::list))
                   .route("/disable/:id", put(controller::iot_device::disable))
+                  // .route("/", post(controller::iot_device::add_device))
               ,
-              // .route("/", post(controller::iot_device::add_device)),
+        )
+        .nest("/hap_bridge",
+              Router::new()
+                  .route("/list", get(controller::hap_bridge::list))
+                  .route("/disable/:id", put(controller::hap_bridge::disable))
+              ,
         )
         .nest("/hap_accessory",
               Router::new()
                   .route("/list", get(controller::hap_accessory::list))
+                  .route("/", post(controller::hap_accessory::add))
                   .route("/disable/:id", put(controller::hap_accessory::disable))
               ,
-              // .route("/", post(controller::iot_device::add_device)),
         )
         .nest("/hap_metadata",
               Router::new()

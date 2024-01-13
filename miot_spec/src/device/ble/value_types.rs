@@ -4,10 +4,13 @@ use serde_json::Value;
 use tap::Tap;
 use num_enum::TryFromPrimitive;
 use std::convert::TryFrom;
+use anyhow::anyhow;
+use futures_util::TryStreamExt;
 use log::error;
 use packed_struct::PackedStruct;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Copy,Eq, PartialEq, Clone, TryFromPrimitive,Hash)]
+#[derive(Debug, Copy, Eq, PartialEq, Clone, TryFromPrimitive, Hash,Serialize,Deserialize)]
 #[repr(u64)]
 pub enum BleValueType {
     /// 温度
@@ -16,15 +19,19 @@ pub enum BleValueType {
     Temperature = 0x1004,
     Kettle = 0x1005,
     Humidity = 0x1006,
-    Battery = 2,
+    Battery = 0x100a,
     ContactValue = 3,
 }
 
 impl BleValueType {
     pub fn unpack(&self, edata: Vec<u8>) -> anyhow::Result<serde_json::Value> {
         Ok(match self {
+            BleValueType::Battery => {
+                Value::Null
+            }
             _ => {
-                let bytes: [u8; 2] = edata.try_into().unwrap();
+                let bytes: [u8; 2] = edata.try_into()
+                    .map_err(|e| anyhow!("数据转换错误:{:?}",e))?;
                 ValueLsbI16::unpack(&bytes)?.into()
             }
         })
@@ -34,10 +41,13 @@ impl BleValueType {
 
 #[derive(Default, Debug, Clone)]
 pub struct BleValue {
-    value_map: HashMap<BleValueType, Value>,
+    pub value_map: HashMap<BleValueType, Value>,
 }
 
 impl BleValue {
+    pub fn extend(&mut self, other: Self) {
+        self.value_map.extend(other.value_map);
+    }
     pub fn set_value(&mut self, key: BleValueType, val: Value) {
         self.value_map.insert(key, val);
     }

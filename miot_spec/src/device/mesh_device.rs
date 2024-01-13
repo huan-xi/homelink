@@ -12,14 +12,14 @@ pub struct MeshDevice {
     base: BaseMiotSpecDevice,
     gateway: Arc<OpenMiioGatewayDevice>,
 }
-
+#[async_trait::async_trait]
 impl MiotSpecDevice for MeshDevice {
     fn get_info(&self) -> &DeviceInfo { &self.info }
     fn get_base(&self) -> &BaseMiotSpecDevice {
         &self.base
     }
-    fn get_proto(&self) -> BoxFuture<Result<MiotSpecProtocolPointer, ExitError>> {
-        self.gateway.get_proto()
+    async fn get_proto(&self) -> Result<MiotSpecProtocolPointer, ExitError> {
+        self.gateway.get_proto().await
     }
 
     fn run(&self) -> BoxFuture<Result<(), ExitError>> {

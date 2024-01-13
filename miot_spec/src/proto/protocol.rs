@@ -125,6 +125,7 @@ pub enum ExitError {
 
     Disconnect,
     ConnectErr,
+    BltConnectErr,
     Lock,
 }
 

@@ -10,7 +10,7 @@ pub use super::iot_device::Column as IotDeviceColumn;
 pub use super::iot_device::ActiveModel as IotDeviceActiveModel;
 
 
-pub use super::hap_bridge::Entity as HapBridge;
+pub use super::hap_bridge::Entity as HapBridgeEntity;
 pub use super::hap_bridge::Column as HapBridgeColumn;
 pub use super::hap_bridge::Model as HapBridgeModel;
 pub use super::hap_bridge::ActiveModel as HapBridgeActiveModel;

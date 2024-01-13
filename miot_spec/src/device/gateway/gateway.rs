@@ -18,7 +18,7 @@ pub struct OpenMiioGatewayDevice {
     proto: Arc<RwLock<Option<MiotSpecProtocolPointer>>>,
     base: BaseMiotSpecDevice,
 }
-
+#[async_trait::async_trait]
 impl MiotSpecDevice for OpenMiioGatewayDevice {
     fn get_info(&self) -> &DeviceInfo {
         &self.info
@@ -28,16 +28,14 @@ impl MiotSpecDevice for OpenMiioGatewayDevice {
         &self.base
     }
 
-    fn get_proto(&self) -> BoxFuture<Result<MiotSpecProtocolPointer, ExitError>> {
-        async move {
-            let read = self.proto.clone();
-            let read = read.read().await;
-            if let Some(s) = read.clone() {
-                return Ok(s);
-            }
-            drop(read);
-            self.connect().await
-        }.boxed()
+    async fn get_proto(&self) -> Result<MiotSpecProtocolPointer, ExitError> {
+        let read = self.proto.clone();
+        let read = read.read().await;
+        if let Some(s) = read.clone() {
+            return Ok(s);
+        }
+        drop(read);
+        self.connect().await
     }
 
     fn run(&self) -> BoxFuture<Result<(), ExitError>> {

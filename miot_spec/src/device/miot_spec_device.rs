@@ -3,9 +3,10 @@ use futures_util::future::BoxFuture;
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 use crate::device::ble::ble_device::BleDevice;
-use crate::device::emitter::{DataEmitter, DataListener, ListenDateType};
-use crate::proto::miio_proto::{MiotSpecId, MiotSpecProtocolPointer};
+use crate::device::emitter::{DataEmitter, DataListener, EventType};
+use crate::proto::miio_proto::{MiotSpecDTO, MiotSpecId, MiotSpecProtocolPointer};
 use futures_util::FutureExt;
+use serde_json::Value;
 use crate::proto::protocol::ExitError;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, )]
@@ -35,7 +36,7 @@ pub struct BaseMiotSpecDevice {
     pub status: RwLock<DeviceStatus>,
     /// 注册轮询的属性
     pub registered_property: Arc<RwLock<Vec<MiotSpecId>>>,
-    pub(crate) emitter: Arc<RwLock<DataEmitter<ListenDateType>>>,
+    pub(crate) emitter: Arc<RwLock<DataEmitter<EventType>>>,
 
 }
 
@@ -56,35 +57,49 @@ pub enum MiotDeviceType<'a> {
     Mesh,
 }
 
-
+#[async_trait::async_trait]
 pub trait MiotSpecDevice {
     fn get_info(&self) -> &DeviceInfo;
     fn get_base(&self) -> &BaseMiotSpecDevice;
 
-    fn get_proto(&self) -> BoxFuture<Result<MiotSpecProtocolPointer, ExitError>>;
+    async fn get_proto(&self) -> Result<MiotSpecProtocolPointer, ExitError>;
+
+    /// 设置设备属性
+    async fn set_property(&self, siid: i32, piid: i32, value: Value) -> anyhow::Result<()> {
+        let did = self.get_info().did.clone();
+        let proto = self.get_proto()
+            .await
+            .map_err(Into::<anyhow::Error>::into)?;
+        proto.set_property(MiotSpecDTO { did, siid, piid, value: Some(value) }).await?;
+        Ok(())
+    }
+    /// 读取设备属性
+    async fn read_property(&self, siid: i32, piid: i32) -> anyhow::Result<Option<Value>> {
+        let did = self.get_info().did.clone();
+        let proto = self.get_proto()
+            .await
+            .map_err(Into::<anyhow::Error>::into)?;
+        let value = proto.get_property(MiotSpecDTO { did, siid, piid, value: None }).await?;
+        Ok(value)
+    }
 
     /// 创建连接并且 监听
     fn run(&self) -> BoxFuture<Result<(), ExitError>>;
-    fn get_device_type(&self) -> MiotDeviceType { todo!(); }
+
+    /// 获取设备类型
+    fn get_device_type(&self) -> MiotDeviceType { todo!("无法获取设备类型"); }
 
     /// 注册属性事件
-    fn register_property(&self, siid: i32, piid: i32) -> BoxFuture<()> where
-        Self:  Send + Sync {
-        async move {
-            let mut write = self.get_base().registered_property.write().await;
-            write.push(MiotSpecId { siid, piid });
-        }.boxed()
+    async fn register_property(&self, siid: i32, piid: i32) {
+        let mut write = self.get_base().registered_property.write().await;
+        write.push(MiotSpecId { siid, piid });
     }
+
     /// 添加指定格式的数据监听器
-    fn emit(&self, event: ListenDateType) -> BoxFuture<()> where Self: Sync{
-        async move {
-            self.get_base().emitter.write()
-                .await.emit(event).await;
-        }.boxed()
+    async fn emit(&self, event: EventType) {
+        self.get_base().emitter.write().await.emit(event).await
     }
-    fn add_listener(&self, listener: DataListener<ListenDateType>) -> BoxFuture<()> where Self: Sync{
-        async move {
-            self.get_base().emitter.write().await.add_listener(listener).await;
-        }.boxed()
+    async fn add_listener(&self, listener: DataListener<EventType>) {
+        self.get_base().emitter.write().await.add_listener(listener).await
     }
 }

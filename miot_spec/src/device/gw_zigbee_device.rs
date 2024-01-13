@@ -12,6 +12,7 @@ pub struct ZigbeeDevice {
     base: BaseMiotSpecDevice,
     gateway: Arc<OpenMiioGatewayDevice>,
 }
+#[async_trait::async_trait]
 impl MiotSpecDevice for ZigbeeDevice {
 
     fn get_info(&self) -> &DeviceInfo { &self.info }
@@ -20,8 +21,9 @@ impl MiotSpecDevice for ZigbeeDevice {
         &self.base
     }
 
-    fn get_proto(&self) -> BoxFuture<Result<MiotSpecProtocolPointer, ExitError>> {
-        self.gateway.get_proto() }
+    async fn get_proto(&self) -> Result<MiotSpecProtocolPointer, ExitError> {
+        self.gateway.get_proto().await
+    }
 
     fn run(&self) -> BoxFuture<Result<(), ExitError>> {
         todo!()

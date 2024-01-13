@@ -1,16 +1,15 @@
 use std::fmt::Debug;
 use std::sync::Arc;
 use futures_util::future::{BoxFuture, join_all};
-use log::debug;
+use log::{debug, info};
 use crate::device::ble::value_types::BleValue;
 use crate::proto::miio_proto::MiotSpecDTO;
 
 ///监听数据的类型
 #[derive(Debug, Clone)]
-pub enum ListenDateType {
-    /// 蓝牙数据
-    BleData(BleValue),
-    MiotProp(MiotSpecDTO),
+pub enum EventType {
+    /// 属性设置事件
+    SetProperty(MiotSpecDTO),
 }
 
 // pub trait DataListener<T: Default + Clone + Serialize + Send + Sync>: FnMut(T) -> BoxFuture<'static, anyhow::Result<()>> + 'static + Send + Sync {}
@@ -31,13 +30,11 @@ impl<T> DataEmitter<T>
     pub async fn add_listener(&mut self, listener: DataListener<T>) {
         self.listeners.push(listener);
     }
-    pub  fn is_empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.listeners.is_empty()
     }
 
     pub async fn emit(&self, event: T) {
-        debug!("emitting event: {:?}", event);
-
         join_all(self.listeners.iter().map(|listener| listener(event.clone()))).await;
     }
 }

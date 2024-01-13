@@ -1,20 +1,6 @@
-use std::iter::Map;
-use hap::accessory::AccessoryCategory;
-use hap::HapType;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use crate::hap::hap_type::MappingHapType;
 use crate::db::entity::hap_characteristic::Property;
-
-/*#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub struct Property {
-    pub siid: i32,
-    pub piid: i32,
-    pub min_value: Option<Value>,
-    pub max_value: Option<Value>,
-    pub step: Option<Value>,
-    //单位
-}*/
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct MappingConfig {

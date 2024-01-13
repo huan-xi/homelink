@@ -1,8 +1,9 @@
+use std::collections::HashMap;
 use std::mem;
 use std::sync::{Arc};
 use std::time::Duration;
 use anyhow::anyhow;
-use futures_util::future::{BoxFuture, join_all};
+use futures_util::future::{BoxFuture, join_all, ok};
 use crate::device::miot_spec_device::{BaseMiotSpecDevice, DeviceInfo, MiotDeviceType, MiotSpecDevice};
 use futures_util::FutureExt;
 use hex::FromHex;
@@ -13,10 +14,11 @@ use serde_json::Value;
 use tokio::sync::RwLock;
 use crate::device::ble::value_types::{BleValue, BleValueType, ValueLsbI16};
 use crate::device::gateway::gateway::OpenMiioGatewayDevice;
-use crate::device::emitter::{DataListener, DataEmitter, ListenDateType};
+use crate::device::emitter::{DataListener, DataEmitter, EventType};
 use crate::device::MiotDevicePointer;
-use crate::proto::miio_proto::MiotSpecProtocolPointer;
+use crate::proto::miio_proto::{MiotSpecDTO, MiotSpecId, MiotSpecProtocolPointer};
 use crate::proto::protocol::{ExitError, RecvMessage};
+use crate::proto::transport::ble_mapping_proto::BleMappingProto;
 
 /// https://tasmota.github.io/docs/Bluetooth/
 /// 低功耗蓝牙设备
@@ -30,10 +32,12 @@ pub struct BleDevice {
     gateway: MiotDevicePointer,
     // 值
     values: Arc<RwLock<BleValue>>,
+    spec_map: bimap::BiMap<MiotSpecId, BleValueType>,
     // 传输协议
-    // proto: MiotSpecProtocolPointer,
+    proto: Arc<RwLock<Option<MiotSpecProtocolPointer>>>,
 }
 
+#[async_trait::async_trait]
 impl MiotSpecDevice for BleDevice {
     fn get_info(&self) -> &DeviceInfo { &self.info }
 
@@ -41,8 +45,22 @@ impl MiotSpecDevice for BleDevice {
         &self.base
     }
 
-    fn get_proto(&self) -> BoxFuture<Result<MiotSpecProtocolPointer, ExitError>> {
-        self.gateway.get_proto()
+    async fn get_proto(&self) -> Result<MiotSpecProtocolPointer, ExitError> {
+        return Err(ExitError::BltConnectErr);
+    }
+    // read_property
+    async fn read_property(&self, siid: i32, piid: i32) -> anyhow::Result<Option<Value>> {
+        if let Some(val) = self.spec_map.get_by_left(&MiotSpecId::new(siid, piid)) {
+            let read = self.values.read().await;
+            if let Some(val) = read.get_value(val.clone()) {
+                return Ok(Some(val));
+            }
+        };
+        Ok(None)
+    }
+
+    async fn set_property(&self, siid: i32, piid: i32, value: Value) -> anyhow::Result<()> {
+        Ok(())
     }
     /// 1.同步网关的状态
     fn run(&self) -> BoxFuture<Result<(), ExitError>> {
@@ -64,7 +82,7 @@ impl MiotSpecDevice for BleDevice {
 
                             if Some(self.info.did.as_str()) == did {
                                 //获取evt
-                                Self::get_value_from_param(v);
+                                self.set_value_from_param(v).await;
                             }
                         }
                     }
@@ -73,28 +91,28 @@ impl MiotSpecDevice for BleDevice {
             Ok(())
         }.boxed()
     }
-
     fn get_device_type(&self) -> MiotDeviceType {
         return MiotDeviceType::Ble(self);
     }
 }
 
 impl BleDevice {
-    pub fn new(info: DeviceInfo, gateway: Arc<OpenMiioGatewayDevice>) -> Self {
+    pub fn new(info: DeviceInfo, gateway: Arc<OpenMiioGatewayDevice>, spec_map: bimap::BiMap<MiotSpecId, BleValueType>) -> Self {
         //网关上设置一个监听器,监听属于我的消息
         //蓝牙协议
-
         Self {
             info,
             base: BaseMiotSpecDevice {
                 ..BaseMiotSpecDevice::default()
             },
             gateway,
+            spec_map,
             values: Default::default(),
+            proto: Arc::new(Default::default()),
         }
     }
 
-    fn get_value_from_param(param: &Value) -> Option<BleValue> {
+    async fn set_value_from_param(&self, param: &Value) {
         let evt_vec = param.as_object()
             .and_then(|i| i.get("evt"))
             .and_then(|i| i.as_array());
@@ -113,15 +131,30 @@ impl BleDevice {
                                 ble_value.set_value(tp, val);
                             }
                             Err(err) => {
-                                error!("解析蓝牙事件数据错误错误:{:?}", err);
+                                error!("解析蓝牙事件数据错误错误:{:?},eid:0x{:x}", err, eid);
                             }
                         };
                     }
                 }
             }
-            return Some(ble_value);
+            //  数据提交
+            self.values.write().await.extend(ble_value.clone());
+            for (tp, value) in ble_value.value_map.into_iter() {
+                match self.spec_map.get_by_right(&tp) {
+                    None => {
+                        debug!("emit empty:{:?}", tp);
+                    }
+                    Some(ps) => {
+                        self.emit(EventType::SetProperty(MiotSpecDTO {
+                            did: self.info.did.clone(),
+                            siid: ps.siid,
+                            piid: ps.piid,
+                            value: Some(value),
+                        })).await;
+                    }
+                };
+            }
         }
-        None
     }
     /// 值映射
     fn mapping_value(eid: u64, edata: Vec<u8>) -> anyhow::Result<(BleValueType, serde_json::Value)> {

@@ -3,7 +3,6 @@ use std::sync::{Arc, mpsc};
 use std::time::Duration;
 use axum::body::HttpBody;
 use axum::Router;
-use hap::server::{IpServer, Server};
 use log::{error, info};
 use sea_orm::{ColumnTrait, ConnectOptions, Database, DatabaseConnection, EntityTrait, QueryFilter};
 use bin::api::router;

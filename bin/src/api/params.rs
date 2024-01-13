@@ -6,7 +6,8 @@ use crate::hap::hap_type::MappingHapType;
 use serde_aux::prelude::deserialize_number_from_string;
 use crate::db::entity::hap_characteristic::{BleToSensorParam, DbBleValueType, MappingMethod, MappingParam, MiotSpecParam, Property};
 use serde_aux::prelude::deserialize_option_number_from_string;
-use crate::db::entity::prelude::{HapCharacteristicActiveModel};
+use hap::HapType;
+use crate::db::entity::prelude::{HapAccessoryActiveModel, HapCharacteristicActiveModel};
 use crate::hap::unit_convertor::{ConvertorParamType, UnitConvertor};
 
 
@@ -18,14 +19,41 @@ pub struct AddServiceParam {
     pub name: Option<String>,
     /// 服务类型
     pub service_type: MappingHapType,
-    pub characteristics: Vec<AddCharacteristicParam>,
+    pub characteristics: Vec<CharacteristicParam>,
+}
+
+#[derive(serde::Deserialize, Debug)]
+pub struct AddHapAccessoryParam {
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    device_id: i64,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    bridge_id: i64,
+    name: Option<String>,
+    memo: Option<String>,
+    disabled: Option<bool>,
+    hap_type: Option<MappingHapType>,
+}
+
+impl AddHapAccessoryParam {
+    pub fn into_model(self) -> anyhow::Result<HapAccessoryActiveModel> {
+        Ok(HapAccessoryActiveModel {
+            aid: Default::default(),
+            device_id: Set(self.device_id),
+            bridge_id: Set(self.bridge_id),
+            name: Set(self.name),
+            memo: Set(self.memo),
+            disabled: Set(self.disabled.unwrap_or(false)),
+            hap_type: Set(self.hap_type),
+            info: Default::default(),
+        })
+    }
 }
 
 
 #[derive(serde::Deserialize, Debug)]
-pub struct AddCharacteristicParam {
-    /*  #[serde(default, deserialize_with = "deserialize_option_number_from_string")]
-      pub cid: Option<i64>,*/
+pub struct CharacteristicParam {
+    #[serde(default, deserialize_with = "deserialize_option_number_from_string")]
+    pub cid: Option<i64>,
     pub characteristic_type: MappingHapType,
     pub mapping_method: MappingMethod,
     pub mapping_property: Option<Property>,
@@ -41,23 +69,11 @@ pub struct AddCharacteristicParam {
     pub fixed_value: Option<String>,
 }
 
-impl AddCharacteristicParam {
+impl CharacteristicParam {
     pub fn into_model(self, service_id: i64) -> anyhow::Result<HapCharacteristicActiveModel> {
         let mapping_param = match &self.mapping_method {
-            _ => None,
-            MappingMethod::BleToSensor => {
-                Some(MappingParam::BleToSensor(BleToSensorParam {
-                    ble_value_type: match self.ble_value_type.clone() {
-                        None => {
-                            return Err(anyhow!("ble_value_type 不能为空"));
-                        }
-                        Some(s) => {
-                            s
-                        }
-                    },
-                }))
-            }
-            MappingMethod::MIotSpec => {
+
+            MappingMethod::PropMapping => {
                 Some(match self.mapping_property.clone() {
                     None => {
                         return Err(anyhow!("mapping_property 不能为空"));
@@ -69,6 +85,7 @@ impl AddCharacteristicParam {
                     }
                 })
             }
+            _ => None,
         };
         Ok(HapCharacteristicActiveModel {
             cid: Default::default(),

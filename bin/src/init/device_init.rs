@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 use anyhow::anyhow;
 use log::error;
@@ -11,6 +12,7 @@ use crate::init::{DeviceMap, DevicePointer};
 use sea_orm::QueryFilter;
 use miot_spec::device::mesh_device::MeshDevice;
 use crate::init::device_manage::IotDeviceManager;
+use crate::StdDefault;
 
 /// 初始化hap 设备 init_iot_device
 pub async fn init_iot_devices(conn: &DatabaseConnection) -> anyhow::Result<IotDeviceManager> {
@@ -67,8 +69,8 @@ pub async fn init_iot_devices(conn: &DatabaseConnection) -> anyhow::Result<IotDe
     let manage = IotDeviceManager::new();
     list.into_iter()
         .for_each(|(id, dev)| {
-        manage.push_device(id, dev);
-    });
+            manage.push_device(id, dev);
+        });
     Ok(manage)
 }
 
@@ -76,15 +78,17 @@ async fn init_children_device(dev: IotDeviceModel, gw: Arc<OpenMiioGatewayDevice
     return match dev.device_type {
         IotDeviceType::MiBleDevice => {
             if let Some(DeviceParam::BleParam(param)) = dev.params {
-                let ble_dev = BleDevice::new(param, gw.clone());
-                return Ok(Arc::new(ble_dev));
+                // param.mapping
+                let mapping = param.get_mapping();
+                let ble_dev = BleDevice::new(param.info, gw.clone(), mapping);
+                return Ok(DevicePointer::new(Arc::new(ble_dev)));
             }
             Err(anyhow!("初始化设备失败，参数类型错误"))
         }
         IotDeviceType::MiMeshDevice => {
             if let Some(DeviceParam::MeshParam(param)) = dev.params {
                 let ble_dev = MeshDevice::new(param, gw.clone());
-                return Ok(Arc::new(ble_dev));
+                return Ok(DevicePointer::new(Arc::new(ble_dev)));
             }
             Err(anyhow!("初始化设备失败，参数类型错误"))
         }
@@ -99,7 +103,7 @@ async fn init_mi_device(dev: IotDeviceModel) -> anyhow::Result<(DevicePointer, O
     return match dev.device_type {
         IotDeviceType::MiWifiDevice => {
             if let Some(DeviceParam::WifiDeviceParam(param)) = dev.params {
-                return Ok((Arc::new(WifiDevice::new(param).await?), None));
+                return Ok((DevicePointer::new(Arc::new(WifiDevice::new(param).await?)), None));
             }
             Err(anyhow!("初始化设备失败，参数类型错误"))
         }
@@ -107,7 +111,7 @@ async fn init_mi_device(dev: IotDeviceModel) -> anyhow::Result<(DevicePointer, O
             if let Some(DeviceParam::MiGatewayParam(param)) = dev.params {
                 let dev = OpenMiioGatewayDevice::new(param).await?;
                 let dev = Arc::new(dev);
-                return Ok((dev.clone(), Some(dev)));
+                return Ok((DevicePointer::new(dev.clone()), Some(dev)));
             }
             Err(anyhow!("初始化设备失败，参数类型错误"))
         }

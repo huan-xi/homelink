@@ -13,16 +13,13 @@ use hap::storage::{FileStorage, Storage};
 use log::{debug, error, info};
 use rand::Rng;
 use sea_orm::{ColIdx, ColumnTrait, DatabaseConnection, EntityTrait, JsonValue, ModelTrait, QueryFilter};
-use tap::TapFallible;
-use tokio::sync::Mutex;
-use hap::characteristic::{CharacteristicCallbacks, HapCharacteristic};
+use hap::characteristic::{HapCharacteristic};
 use hap::characteristic::configured_name::ConfiguredNameCharacteristic;
-use hap::characteristic::name::NameCharacteristic;
-use miot_spec::device::miot_spec_device::{MiotDeviceType, MiotSpecDevice};
+use miot_spec::device::miot_spec_device::{MiotSpecDevice};
 use crate::config::cfgs::Configs;
 use crate::hap::iot_characteristic::IotCharacteristic;
 use crate::hap::iot_hap_accessory::{IotDeviceAccessory, IotHapAccessory};
-use crate::db::entity::prelude::{HapAccessoryColumn, HapAccessoryEntity, HapAccessoryModel, HapBridge, HapBridgeColumn, HapCharacteristicEntity, HapCharacteristicModel, HapServiceColumn, HapServiceEntity, HapServiceModel};
+use crate::db::entity::prelude::{HapAccessoryColumn, HapAccessoryEntity, HapAccessoryModel, HapBridgeEntity, HapBridgeColumn, HapCharacteristicEntity, HapCharacteristicModel, HapServiceColumn, HapServiceEntity, HapServiceModel};
 use crate::init::{DevicePointer, FuturesMutex, HapAccessoryPointer};
 use crate::hap::iot_hap_service::IotHapService;
 use crate::init::device_manage::{IotDeviceManager, IotDeviceManagerInner};
@@ -44,7 +41,7 @@ pub fn rand_num() -> u32 {
 
 pub async fn init_hap(conn: &DatabaseConnection, config: &Configs, iot_device_map: IotDeviceManager) -> anyhow::Result<HapManage> {
     let manage = HapManage::new();
-    let bridges = HapBridge::find()
+    let bridges = HapBridgeEntity::find()
         .filter(HapBridgeColumn::Disabled.eq(false))
         .all(conn).await?;
     // let mut servers = Vec::new();
@@ -189,7 +186,7 @@ async fn init_hap_accessory<'a>(conn: &DatabaseConnection, device: DevicePointer
 
 /// 服务映射
 /// cid 自增的 每次+特征的长度
-async fn add_service(aid: u64, cid: u64, service_chs: (HapServiceModel, Vec<HapCharacteristicModel>), device: Arc<dyn MiotSpecDevice + Send + Sync>,
+async fn add_service(aid: u64, cid: u64, service_chs: (HapServiceModel, Vec<HapCharacteristicModel>), device: DevicePointer,
                      accessory: HapAccessoryPointer) -> anyhow::Result<usize> {
     let service = service_chs.0;
     let chs = service_chs.1;
@@ -206,32 +203,35 @@ async fn add_service(aid: u64, cid: u64, service_chs: (HapServiceModel, Vec<HapC
         }).collect();
 
     let chs_list = join_all(chs).await;
-    let len = chs_list.len() as u64;
+    let mut success = false;
     for ch in chs_list.into_iter() {
         match ch {
             Ok(cts) => {
-                // 设置名称
-                if let Some(n) = service.name.clone() {
-                    let id = cid + len + 1;
-                    let mut name = ConfiguredNameCharacteristic::new(id, aid);
-                    name.set_value(JsonValue::String(n)).await?;
-                    hap_service.push_characteristic(Box::new(name));
-                };
-
                 hap_service.push_characteristic(Box::new(cts));
+                success = true;
             }
             Err(e) => {
                 error!("转换失败特征:{:?}", e);
             }
         }
     }
-
     // for (index, ch) in chs.into_iter().enumerate() {}
-
     let len = hap_service.get_characteristics().len();
-    if len > 0 {
-        accessory.lock().await.push_service(Box::new(hap_service));
+    // 设置名称
+    if let Some(n) = service.name.clone() {
+        if !n.is_empty() {
+            let id = cid + len as u64 + 1;
+            let mut name = ConfiguredNameCharacteristic::new(id, aid);
+            name.set_value(JsonValue::String(n)).await?;
+            hap_service.push_characteristic(Box::new(name));
+        }
     };
+
+    if success {
+        accessory.lock().await.push_service(Box::new(hap_service));
+    } else {
+        error!("服务:{:?}没有可用的特征", service);
+    }
     Ok(len)
 }
 

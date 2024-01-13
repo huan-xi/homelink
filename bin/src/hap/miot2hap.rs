@@ -18,7 +18,7 @@ use hap::service::switch::SwitchService;
 use log::{debug, error, info};
 use serde_json::Value;
 use tap::Tap;
-use miot_spec::proto::miio_proto::{MiIOProtocol, MiotSpecDTO};
+use miot_spec::proto::miio_proto::{MiotSpecDTO, MiotSpecProtocolPointer};
 use tap::tap::TapFallible;
 use miot_spec::device::miot_spec_device::DeviceInfo;
 use crate::hap::config::{MappingConfig, Miot2HapMapper};
@@ -167,7 +167,7 @@ impl ServiceSetter {
         Ok(())
     }
 
-    pub fn set_power_state<T>(hs: &mut T, info: &DeviceInfo, proto: Arc<MiIOProtocol>, ps: &Property)
+    pub fn set_power_state<T>(hs: &mut T, info: &DeviceInfo, proto: MiotSpecProtocolPointer, ps: &Property)
         where
             T: AsyncCharacteristicCallbacks<bool> + 'static,
     {
@@ -185,7 +185,7 @@ impl Utils {
 
 
     pub fn get_read_func_1<T>(did: String,
-                              prop: Arc<MiIOProtocol>,
+                              prop: MiotSpecProtocolPointer,
                               property: Property,
                               conv: fn(Value) -> Option<T>) -> impl OnReadFuture<T>
         where T: std::default::Default + std::clone::Clone + serde::Serialize + std::marker::Send + std::marker::Sync + 'static {
@@ -214,7 +214,7 @@ impl Utils {
     // new.into()
 
     /// did 设备id
-    pub fn get_set_func_1<T>(did: String, prop: Arc<MiIOProtocol>, property_id: Property) -> impl OnUpdateFuture<T>
+    pub fn get_set_func_1<T>(did: String, prop: MiotSpecProtocolPointer, property_id: Property) -> impl OnUpdateFuture<T>
         where
             T: Into<Value> + Clone + Send + Debug + Sync + 'static + std::default::Default + serde::ser::Serialize, {
         Self::get_set_func_conv(did, prop, property_id, |i: T| i.into())
@@ -222,7 +222,7 @@ impl Utils {
 
     /// PropertyId 转set func
     /// 获取设置属性的函数
-    pub fn get_set_func_conv<T>(did: String, prop: Arc<MiIOProtocol>, property_id: Property, conv: fn(T) -> Value) -> impl OnUpdateFuture<T>
+    pub fn get_set_func_conv<T>(did: String, prop: MiotSpecProtocolPointer, property_id: Property, conv: fn(T) -> Value) -> impl OnUpdateFuture<T>
         where
             T: Into<Value> + Clone + Send + Debug + Sync + 'static + std::default::Default + serde::ser::Serialize, {
         move |old: T, new: T| {

@@ -8,7 +8,7 @@ use futures_util::FutureExt;
 use log::{error, info};
 use tap::TapFallible;
 use tokio::sync::RwLock;
-use crate::device::emitter::{DataEmitter, DataListener, ListenDateType};
+use crate::device::emitter::{DataEmitter, DataListener, EventType};
 use crate::proto::protocol::ExitError;
 use crate::proto::protocol::ExitError::ConnectErr;
 use crate::proto::transport::udp_iot_spec_proto::UdpMiotSpecProtocol;
@@ -23,24 +23,22 @@ pub struct WifiDevice {
 
 }
 
-
+#[async_trait::async_trait]
 impl MiotSpecDevice for WifiDevice {
     fn get_info(&self) -> &DeviceInfo { &self.info }
     fn get_base(&self) -> &BaseMiotSpecDevice {
         &self.base
     }
 
-    fn get_proto(&self) -> BoxFuture<Result<MiotSpecProtocolPointer, ExitError>> {
-        async move {
-            // 等待设备运行
-            let read = self.proto.clone();
-            let read = read.read().await;
-            if let Some(s) = read.clone() {
-                return Ok(s);
-            }
-            drop(read);
-            self.connect().await
-        }.boxed()
+    async fn get_proto(&self) -> Result<MiotSpecProtocolPointer, ExitError> {
+        // 等待设备运行
+        let read = self.proto.clone();
+        let read = read.read().await;
+        if let Some(s) = read.clone() {
+            return Ok(s);
+        }
+        drop(read);
+        self.connect().await
     }
     /// 连接协议,并且监听
     fn run(&self) -> BoxFuture<Result<(), ExitError>> {
@@ -80,7 +78,7 @@ impl MiotSpecDevice for WifiDevice {
                     }
                     if let Ok(results) = proto.get_properties(params, None).await {
                         for result in results {
-                            self.base.emitter.clone().write().await.emit(ListenDateType::MiotProp(result)).await;
+                            self.base.emitter.clone().write().await.emit(EventType::SetProperty(result)).await;
                         }
                     }
                 }

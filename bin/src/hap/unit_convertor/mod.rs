@@ -10,12 +10,21 @@ mod kelvin_to_mired_convertor;
 mod scale_down;
 
 pub trait Convertor {
+    /// 转成目标值 hap 的值
+    ///
     fn to(&self, param: Option<ConvertorParamType>, value: Value) -> anyhow::Result<Value>;
+    ///
     fn from(&self, param: Option<ConvertorParamType>, value: Value) -> anyhow::Result<Value>;
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
-pub struct UnitConv(pub Option<UnitConvertor>,pub  Option<ConvertorParamType>);
+pub struct UnitConv(pub Option<UnitConvertor>, pub Option<ConvertorParamType>);
+
+impl Default for UnitConv {
+    fn default() -> Self {
+        Self(None, None)
+    }
+}
 
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize, FromJsonQueryResult)]
 #[serde(tag = "type")]
