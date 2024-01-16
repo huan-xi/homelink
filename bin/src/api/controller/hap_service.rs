@@ -98,10 +98,6 @@ pub async fn disable(state: State<AppState>, Path(id): Path<i64>, Query(param): 
         ..Default::default()
     };
     model.update(state.conn()).await?;
-    if !param.disabled {
-        state.hap_manager()
-            .await?
-            .refresh_accessory_config(service.accessory_id as u64).await;
-    }
+    state.hap_manager.refresh_accessory_config(service.accessory_id as u64).await;
     Ok(ApiResp::with_data(()))
 }

@@ -39,7 +39,7 @@ pub fn rand_num() -> u32 {
     random_number
 }
 
-pub async fn init_hap(conn: &DatabaseConnection, config: &Configs, iot_device_map: IotDeviceManager) -> anyhow::Result<HapManage> {
+pub async fn init_hap(conn: &DatabaseConnection, config: &Configs, iot_device_manager:HapManage,iot_device_map: IotDeviceManager) -> anyhow::Result<()> {
     let manage = HapManage::new();
     let bridges = HapBridgeEntity::find()
         .filter(HapBridgeColumn::Disabled.eq(false))
@@ -94,7 +94,7 @@ pub async fn init_hap(conn: &DatabaseConnection, config: &Configs, iot_device_ma
         server.configuration_number_incr().await;
         manage.push_server(bid, server, accessories);
     }
-    Ok(manage)
+    Ok(())
 }
 
 pub struct AccessoryRelation {

@@ -4,12 +4,17 @@ use futures_util::future::{BoxFuture, join_all};
 use log::{debug, info};
 use crate::device::ble::value_types::BleValue;
 use crate::proto::miio_proto::MiotSpecDTO;
+use crate::proto::protocol::JsonMessage;
 
 ///监听数据的类型
 #[derive(Debug, Clone)]
 pub enum EventType {
+    /// 属性更新事件
+    UpdateProperty(MiotSpecDTO),
     /// 属性设置事件
     SetProperty(MiotSpecDTO),
+    /// 网关消息
+    GatewayMsg(JsonMessage),
 }
 
 // pub trait DataListener<T: Default + Clone + Serialize + Send + Sync>: FnMut(T) -> BoxFuture<'static, anyhow::Result<()>> + 'static + Send + Sync {}

@@ -10,6 +10,7 @@ use hap::accessory::lightbulb::LightbulbAccessory;
 use hap::accessory::outlet::OutletAccessory;
 use hap::accessory::switch::SwitchAccessory;
 use hap::accessory::temperature_sensor::TemperatureSensorAccessory;
+use crate::db::entity::hap_service::Property
 use hap::characteristic::{AsyncCharacteristicCallbacks, CharacteristicCallbacks, HapCharacteristic, HapCharacteristicSetup, OnReadFuture, OnUpdateFuture, Unit};
 use hap::characteristic::name::NameCharacteristic;
 use hap::futures::future::BoxFuture;
@@ -21,9 +22,7 @@ use tap::Tap;
 use miot_spec::proto::miio_proto::{MiotSpecDTO, MiotSpecProtocolPointer};
 use tap::tap::TapFallible;
 use miot_spec::device::miot_spec_device::DeviceInfo;
-use crate::hap::config::{MappingConfig, Miot2HapMapper};
-use crate::hap::iot_characteristic::CharacteristicValue;
-use crate::hap::unit_convertor::UnitConvertor;
+
 use crate::db::entity::hap_characteristic::Property;
 use crate::db::entity::prelude::HapServiceModel;
 use crate::init::DevicePointer;

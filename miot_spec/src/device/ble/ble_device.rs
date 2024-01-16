@@ -48,6 +48,10 @@ impl MiotSpecDevice for BleDevice {
     async fn get_proto(&self) -> Result<MiotSpecProtocolPointer, ExitError> {
         return Err(ExitError::BltConnectErr);
     }
+    async fn set_property(&self, siid: i32, piid: i32, value: Value) -> anyhow::Result<()> {
+        Ok(())
+    }
+
     // read_property
     async fn read_property(&self, siid: i32, piid: i32) -> anyhow::Result<Option<Value>> {
         if let Some(val) = self.spec_map.get_by_left(&MiotSpecId::new(siid, piid)) {
@@ -58,16 +62,14 @@ impl MiotSpecDevice for BleDevice {
         };
         Ok(None)
     }
-
-    async fn set_property(&self, siid: i32, piid: i32, value: Value) -> anyhow::Result<()> {
-        Ok(())
-    }
     /// 1.同步网关的状态
     fn run(&self) -> BoxFuture<Result<(), ExitError>> {
         async move {
-            let gw_proto = self.gateway.get_proto().await?;
-            let mut recv = gw_proto.recv();
-            while let Ok(msg) = recv.recv().await {
+            // let gw_proto = self.gateway.get_proto().await?;
+            // let mut recv = gw_proto.recv();
+            let mut recv = self.gateway.get_event_recv().await;
+
+            while let Ok(EventType::GatewayMsg(msg)) = recv.recv().await {
                 /// 收到数据
                 let data = msg.get_json_data();
                 if let Some(method) = data.get("method") {
@@ -145,7 +147,7 @@ impl BleDevice {
                         debug!("emit empty:{:?}", tp);
                     }
                     Some(ps) => {
-                        self.emit(EventType::SetProperty(MiotSpecDTO {
+                        self.emit(EventType::UpdateProperty(MiotSpecDTO {
                             did: self.info.did.clone(),
                             siid: ps.siid,
                             piid: ps.piid,

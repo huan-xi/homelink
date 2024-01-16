@@ -4,53 +4,21 @@ use std::time::Duration;
 use axum::body::HttpBody;
 use axum::Router;
 use log::{error, info};
-use sea_orm::{ColumnTrait, ConnectOptions, Database, DatabaseConnection, EntityTrait, QueryFilter};
+use tokio::sync::oneshot;
 use bin::api::router;
 use bin::api::state::{AppState, AppStateInner};
 use bin::config::cfgs::Configs;
+use bin::config::context::{APP_CONTEXT, ApplicationContext, get_app_context};
+use bin::db::init::db_conn;
 use bin::init;
 use bin::init::device_init::init_iot_devices;
+use bin::init::device_manage::IotDeviceManager;
+use bin::init::hap_manage::HapManage;
+use bin::js_engine::ext::env::{EnvContext, EnvContextBuilder};
+use bin::js_engine::init_js_engine::init_js_engine;
 use hap_metadata::hap_metadata;
-use miot_spec::device::miot_spec_device::{DeviceInfo, MiotSpecDevice};
 
-
-pub async fn db_conn() -> DatabaseConnection {
-    /*   let link = match CFG.database.link.clone() {
-           None => {
-               let p = CFG.server.data_dir.as_str();
-               match fs::metadata(p) {
-                   Ok(f) => {
-                       assert!(f.is_dir(), "数据目录不是目录");
-                   }
-                   Err(e) => {
-                       fs::create_dir_all(p).expect(format!("创建数据目录:{:?}失败", p).as_str());
-                   }
-               }
-               let path = std::fs::canonicalize(CFG.server.data_dir.as_str()).unwrap();
-               let schema = format!("sqlite://{}/data.db?mode=rwc", path.to_str().unwrap());
-               println!("设置默认数据:{}", schema);
-               schema
-           }
-           Some(str) => str.clone(),
-       };
-
-       open_db(link).await*/
-    let path = std::fs::canonicalize("/Users/huanxi/project/home-gateway/data").unwrap();
-    let schema = format!("sqlite://{}/data.db?mode=rwc", path.to_str().unwrap());
-    open_db(schema).await
-}
-
-pub async fn open_db(schema: String) -> DatabaseConnection {
-    let mut opt = ConnectOptions::new(schema);
-    opt.max_connections(1000)
-        .min_connections(5)
-        .connect_timeout(Duration::from_secs(8))
-        .idle_timeout(Duration::from_secs(8))
-        .sqlx_logging(false);
-    let db = Database::connect(opt).await.expect("数据库打开失败");
-    info!("Database connected");
-    db
-}
+pub fn init_context() {}
 
 /// 先创建http服务
 /// 创建homekit 服务
@@ -61,21 +29,48 @@ async fn main() -> anyhow::Result<()> {
     log4rs::init_file("log4rs.yaml", Default::default()).unwrap();
     //读取配置
     let config = Configs::init();
+
+
     let addr = SocketAddr::new([0, 0, 0, 0].into(), 5514);
     let conn = db_conn().await;
     let hap_metadata = Arc::new(hap_metadata()?);
     // 初始化hap 服务器
-    let app_state = AppState::new(conn.clone(), hap_metadata.clone());
+    let iot_device_manager = IotDeviceManager::new();
+    let hap_manager = HapManage::new();
+    let app_state = AppState::new(conn.clone(), hap_metadata.clone(),
+                                  iot_device_manager.clone(),
+                                  hap_manager.clone());
 
     let app = Router::new()
         .nest("/api", router::api())
         .with_state(app_state.clone());
 
+    // 初始化js 引擎
+    //初始化js 引擎
+    let js_engine = init_js_engine(EnvContext {
+        info: "home gateway".to_string(),
+        version: "v1.0.0.0".to_string(),
+        main_channel: None,
+        conn: conn.clone(),
+        dev_manager: iot_device_manager.clone(),
+        hap_manager: hap_manager.clone(),
+    })?;
+    APP_CONTEXT.set(ApplicationContext {
+        config: config.clone(),
+        conn,
+        js_engine,
+        hap_metadata,
+        device_manager: iot_device_manager.clone(),
+        hap_manager,
+    }).unwrap();
+    let context = get_app_context();
+
+
     let api_server =
-        axum_server::Server::bind(addr.clone())
+        axum::Server::bind(&addr)
             .serve(app.into_make_service());
     info!("api_server start at :{:?}", addr);
-    let (mut api_server_ch_send, api_server_ch) = tokio::sync::oneshot::channel::<bool>();
+    let (mut api_server_ch_send, api_server_ch) = oneshot::channel::<bool>();
     tokio::spawn(async move {
         if let Err(e) = api_server.await {
             error!("api_server error:{:?}", e);
@@ -84,15 +79,18 @@ async fn main() -> anyhow::Result<()> {
         let _ = api_server_ch_send.send(false);
     });
 
+
     // 初始化iot设备
-    let iot_device_manager = init_iot_devices(&conn).await?;
-    app_state.device_manager.write().await.replace(iot_device_manager.clone());
+    init_iot_devices(&conn, iot_device_manager.clone()).await?;
     // 初始化hap设备
-    let hap_manager = init::hap_init::init_hap(&conn, &config, iot_device_manager.clone()).await?;
-    app_state.hap_manager.write().await.replace(hap_manager.clone());
+    init::hap_init::init_hap(&conn, &config, hap_manager.clone(), iot_device_manager.clone()).await?;
+
     api_server_ch.await?;
+    context.js_engine.close()?;
+
     // 服务停止
     drop(app_state);
+    // let _ = js_tx.send(0);
     iot_device_manager.close().await;
     hap_manager.close().await;
     Ok(())

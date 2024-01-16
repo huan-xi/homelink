@@ -27,7 +27,7 @@ pub struct Server {
     pub api_prefix: String,
     /// dab 前缀
     // pub dav_prefix: String,
-    /// 数据存储目录
+    /// 数据存储目录 /data
     pub data_dir: String,
 }
 

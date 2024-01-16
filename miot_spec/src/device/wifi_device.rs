@@ -7,6 +7,7 @@ use crate::proto::miio_proto::{MiotSpecProtocolPointer, MiotSpecDTO, MiotSpecId}
 use futures_util::FutureExt;
 use log::{error, info};
 use tap::TapFallible;
+use tokio::select;
 use tokio::sync::RwLock;
 use crate::device::emitter::{DataEmitter, DataListener, EventType};
 use crate::proto::protocol::ExitError;
@@ -53,7 +54,6 @@ impl MiotSpecDevice for WifiDevice {
                     if self.base.emitter.read().await.is_empty() {
                         continue;
                     };
-
                     let proto = match self.get_proto().await {
                         Ok(p) => {
                             p
@@ -78,12 +78,18 @@ impl MiotSpecDevice for WifiDevice {
                     }
                     if let Ok(results) = proto.get_properties(params, None).await {
                         for result in results {
-                            self.base.emitter.clone().write().await.emit(EventType::SetProperty(result)).await;
+                            self.base.emitter.clone().write().await.emit(EventType::UpdateProperty(result)).await;
                         }
                     }
                 }
             };
-            join(listen, poll).await;
+            loop {
+                select! {
+                    _ = listen => break,
+                    _ = poll => break,
+                }
+            }
+            // join(listen, poll).await;
             Err(ExitError::Disconnect)
             // 该表当前设备的状态
             //ExitCode::OK

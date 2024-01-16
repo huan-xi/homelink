@@ -1,3 +1,4 @@
+use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
 use hex::FromHex;
@@ -9,6 +10,7 @@ use crate::proto::protocol::JsonMessage;
 
 // pub type MiotSpecProtocolPointer = Arc<Box<dyn MiotSpecProtocol + Send + Sync + 'static>>;
 pub type MiotSpecProtocolPointer = Arc<dyn MiotSpecProtocol + Send + Sync + 'static>;
+pub type MsgCallback = Box<dyn Fn(JsonMessage) + Send + Sync>;
 
 /// 米家协议 发送和接收miio 指令
 #[async_trait::async_trait]
@@ -22,7 +24,9 @@ pub trait MiotSpecProtocol {
     /// 等待结果
     async fn await_result<'a>(&'a self, id: u64, timeout_val: Option<Duration>) -> anyhow::Result<JsonMessage>;
     /// 开始监听
-    async fn start_listen(&self) -> ();
+    async fn start_listen(&self);
+
+
     async fn get_property_timeout(&self, param: MiotSpecDTO, timeout_val: Option<Duration>) -> anyhow::Result<Option<Value>> {
         let mut values = self.get_properties(vec![param], timeout_val).await?;
         if values.len() == 0 {
@@ -83,6 +87,7 @@ pub struct MiotSpecId {
     pub siid: i32,
     pub piid: i32,
 }
+
 impl MiotSpecId {
     pub fn new(siid: i32, piid: i32) -> Self {
         Self {

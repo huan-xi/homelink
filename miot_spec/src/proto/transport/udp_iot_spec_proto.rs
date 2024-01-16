@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use std::sync::atomic::{ AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use aes::Aes128;
 use async_trait::async_trait;
@@ -11,7 +11,7 @@ use serde_json::{Map, Value};
 use tokio::net::UdpSocket;
 use tokio::sync::broadcast::{Receiver, Sender};
 use tokio::time::timeout;
-use crate::proto::miio_proto::{MiotSpecDTO, MiotSpecProtocol, MiotSpecProtocolPointer};
+use crate::proto::miio_proto::{MiotSpecDTO, MiotSpecProtocol, MiotSpecProtocolPointer, MsgCallback};
 use crate::proto::protocol;
 use crate::proto::protocol::{JsonMessage, Message, MessageHeader};
 use crate::utils::timestamp;
@@ -107,9 +107,9 @@ impl MiotSpecProtocol for UdpMiotSpecProtocol {
         Ok(())
     }
 
-    fn recv(&self) -> Receiver<JsonMessage> {
-        self.msg_sender.subscribe()
-    }
+   fn recv(&self) -> Receiver<JsonMessage> {
+            self.msg_sender.subscribe()
+        }
 
 
     async fn await_result(&self, id: u64, timeout_val: Option<Duration>) -> anyhow::Result<JsonMessage> {
@@ -136,7 +136,7 @@ impl MiotSpecProtocol for UdpMiotSpecProtocol {
         res
     }
 
-    async fn start_listen(&self) -> () {
+    async fn start_listen(&self){
         let mut buf = [0u8; 65535];
         let sender = self.msg_sender.clone();
         info!("设备id:{},开始监听消息udp",self.device_id);

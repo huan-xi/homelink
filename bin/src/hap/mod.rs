@@ -1,4 +1,4 @@
-pub mod miot2hap;
+// pub mod miot2hap;
 #[deprecated]
 pub  mod config;
 pub mod hap_type;

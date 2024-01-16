@@ -30,15 +30,10 @@ pub enum MappingMethod {
     /// 当前设备读取属性
     /// 读取数值-> dev.get_ps()
     JsScript = 3,
-    /// 模式开关映射
-    /// 将n个模式对应成n个开关
-    /// 开则将a属性设置成指定的模式
-    /// 关着将b属性设置指定值 需要监听两个属性的变化
-    SpecSwitchMode = 4,
 }
 
 
-#[derive(Clone, Debug,Copy, PartialEq, Eq, Default, Deserialize, Serialize, FromJsonQueryResult)]
+#[derive(Clone, Debug, Copy, PartialEq, Eq, Default, Deserialize, Serialize, FromJsonQueryResult)]
 pub struct Property {
     #[serde(deserialize_with = "deserialize_number_from_string")]
     pub siid: i32,
@@ -52,8 +47,14 @@ pub struct Property {
 pub enum MappingParam {
     /// miot spec 设备转控制器
     MIotSpec(MiotSpecParam),
+    JsScript(JsScriptParam),
     /// 低功耗蓝牙设备转传感器
     BleToSensor(BleToSensorParam),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+pub struct JsScriptParam {
+    pub script: String,
 }
 
 

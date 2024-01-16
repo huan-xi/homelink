@@ -1,16 +1,26 @@
+use std::fs;
 use std::ops::Deref;
+use std::path::PathBuf;
 use std::sync::{Arc};
+use dashmap::DashMap;
+use deno_runtime::deno_fetch::reqwest::Url;
 use futures_util::FutureExt;
 use log::{error, info};
 use sea_orm::JsonValue;
+use tap::TapFallible;
 use miot_spec::device::miot_spec_device::{MiotSpecDevice};
 use miot_spec::device::MiotDevicePointer;
+use crate::config::context::get_app_context;
 use crate::init::{DevicePointer};
+use crate::js_engine::init_js_engine::EngineEvent;
+
+pub struct JsModule {}
 
 #[derive(Clone)]
 pub struct DeviceWithJsEngine {
     device: MiotDevicePointer,
-    // js_engine: Arc<Mutex<Option<boa_engine::Context<'static>>>>,
+    /// 特征 cid 和 对应的module
+    mapping_js_map: Arc<DashMap<i64, JsModule>>,
 }
 
 impl Deref for DeviceWithJsEngine {
@@ -25,31 +35,51 @@ impl DeviceWithJsEngine {
     pub fn new(device: Arc<dyn MiotSpecDevice + Send + Sync>) -> Self {
         Self {
             device,
-            // js_engine: Arc::new(Mutex::new(None)),
+            mapping_js_map: Default::default(),
         }
     }
-    pub async fn eval_js(&self, script: String) -> anyhow::Result<JsonValue> {
+
+    /// 初始化js模块,获取通道
+    pub fn init_js_module() {}
+    /// 执行js,与js通信
+    pub async fn eval_js(&self, cid: i64, script: &str) -> anyhow::Result<()> {
+        let a = self.mapping_js_map.get_mut(&cid);
+        if a.is_some() {
+            return Ok(());
+        }
+        //输出到文件
+        let context = get_app_context();
+        let dir = context.config.server.data_dir.as_str();
+        let js_file = PathBuf::from(format!("{}/js_scripts/mapping/mapping_{}.js", dir, cid));
+        fs::create_dir_all(js_file.parent().unwrap())?;
+        fs::write(js_file.as_path(), script)?;
+        let url = Url::parse(js_file.as_path().to_str()?)?;
+
+        context.js_engine.send_event(EngineEvent::ExecuteSideModule(url)).await
+            .tap_err(|e| error!("执行js错误"))?;
+
+
         todo!();
-     /*   let source = Source::from_bytes(script.as_str());
-        let mut js_engine_lock = self.js_engine
-            .lock()
-            .map_err(|e| anyhow!("获取js引擎失败:{:?}", e))?;
+        /*   let source = Source::from_bytes(js_scripts.as_str());
+           let mut js_engine_lock = self.js_engine
+               .lock()
+               .map_err(|e| anyhow!("获取js引擎失败:{:?}", e))?;
 
-        let val = match js_engine_lock.as_mut() {
-            None => {
-                //初始化js引擎
+           let val = match js_engine_lock.as_mut() {
+               None => {
+                   //初始化js引擎
 
-                // let context = boa_engine::Context::default();
-                let context = init_js_engine(self.device.clone());
-                js_engine_lock.replace(context);
-                js_engine_lock.as_mut().unwrap()
-            }
-            Some(js_engine) => {
-                js_engine
-            }
-        }.eval(source).map_err(|e| anyhow!("js执行错误:{:?}", e))?;
-        drop(js_engine_lock);
-        json_value_from_js_value(val)*/
+                   // let context = boa_engine::Context::default();
+                   let context = init_js_engine(self.device.clone());
+                   js_engine_lock.replace(context);
+                   js_engine_lock.as_mut().unwrap()
+               }
+               Some(js_engine) => {
+                   js_engine
+               }
+           }.eval(source).map_err(|e| anyhow!("js执行错误:{:?}", e))?;
+           drop(js_engine_lock);
+           json_value_from_js_value(val)*/
     }
 
     /*pub async fn get_js_engine(&self) -> boa_engine::Context<'static> {

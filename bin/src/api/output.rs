@@ -1,11 +1,10 @@
 use std::fmt::Debug;
-use axum::body;
-use axum::body::Body;
+use axum::body::{Body, BoxBody};
 use axum::http::{header, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Response};
 use serde::Serialize;
 use crate::api::errors::ApiError;
-use crate::api::json_1::to_json_string;
+use crate::api::json::to_json_string;
 
 pub type ApiResult<T> = Result<ApiResp<T>, ApiError>;
 
@@ -56,11 +55,14 @@ impl<T> IntoResponse for ApiResp<T>
         let json_string = match to_json_string(&data) {
             Ok(v) => v,
             Err(e) => {
+
                 let body = Body::from(e.to_string());
+                let box_body = axum::body::boxed(body);
+                // let body = Body::from(e.to_string());
                 return Response::builder()
                     .status(StatusCode::INTERNAL_SERVER_ERROR)
                     .header("content-type", "application/json")
-                    .body(body)
+                    .body(box_body)
                     .unwrap();
             }
         };

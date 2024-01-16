@@ -1,18 +1,19 @@
 use anyhow::anyhow;
 use futures_util::FutureExt;
-use hap::characteristic::{AsyncCharacteristicCallbacks, Characteristic, Format, HapCharacteristic, OnReadFuture, OnUpdateFuture, Perm, Unit};
+use hap::characteristic::{AsyncCharacteristicCallbacks, Characteristic, CharacteristicCallbacks, Format, HapCharacteristic, OnReadFuture, OnUpdateFuture, Perm, Unit};
 use hap::HapType;
 use log::{debug, error, info};
 use sea_orm::JsonValue;
 use serde_json::Value;
 use tap::{Tap, TapFallible, TapOptional};
 use miot_spec::device::emitter::{DataListener, EventType};
-use miot_spec::device::emitter::EventType::{SetProperty};
+use miot_spec::device::emitter::EventType::{UpdateProperty};
 use crate::hap::iot_characteristic::{CharacteristicValue, IotCharacteristic};
 use crate::hap::unit_convertor::{ConvertorParamType, UnitConv, UnitConvertor};
 use crate::db::entity::hap_characteristic::{MappingMethod, MappingParam, Model, Property};
 use crate::db::entity::prelude::HapCharacteristicModel;
 use crate::init::{DevicePointer, HapAccessoryPointer};
+use crate::js_engine::init_mapping_characteristic_module::init_mapping_characteristic_module;
 
 
 pub async fn to_characteristic(sid: u64, aid: u64, index: usize, ch: HapCharacteristicModel,
@@ -70,6 +71,11 @@ async fn set_read_update_method(sid: u64, cts: &mut IotCharacteristic, ch: HapCh
     match ch.mapping_method {
         MappingMethod::None => {
             //不映射属性
+            cts.on_read(Some(|| Ok(None)));
+            cts.on_update(Some(|old: &CharacteristicValue, new: &CharacteristicValue| {
+                info!("set to iot value:{:?}", new.value);
+                Ok(())
+            }));
         }
         MappingMethod::PropMapping => {
             // 设置读写映射
@@ -90,6 +96,26 @@ async fn set_read_update_method(sid: u64, cts: &mut IotCharacteristic, ch: HapCh
             }
         }
         MappingMethod::JsScript => {
+            let p = if let Some(MappingParam::JsScript(param)) = ch.mapping_param {
+                param
+            } else {
+                return Err(anyhow!("映射参数不能为空"));
+            };
+            let channel = init_mapping_characteristic_module(p.script.as_str()).await?;
+            let result = device.eval_js(ch.cid, p.script.as_str()).await?;
+            // let (a) = ch.split();
+            let read = move || {
+                async move {
+                    // 与dev 上的 js 交互-> 发送事件到js
+                    todo!();
+
+                    // let dev = dev.clone();
+                    // let value = dev.eval_js(read_script).await?;
+                    // Ok(Some(CharacteristicValue::new(Self::conv_from_value(conv, value))))
+                }.boxed()
+            };
+
+            //初始化js 模块得到channel
             let read = ToChUtils::get_js_read_func(device.clone(), "".to_string(), unit_conv.clone());
         }
         _ => {
@@ -142,7 +168,7 @@ impl ToChUtils {
             let did = did.clone();
             let property = property.clone();
             async move {
-                if let SetProperty(res) = data {
+                if let UpdateProperty(res) = data {
                     if let Some(value) = res.value {
                         if res.did.as_str() == did.as_str() && res.piid == property.piid && res.siid == property.siid {
                             info!("listen property:{},{},{:?}", res.siid, res.piid, value);
@@ -243,8 +269,9 @@ impl ToChUtils {
             let read_script = read_script.clone();
             async move {
                 let dev = dev.clone();
-                let value = dev.eval_js(read_script).await?;
-                Ok(Some(CharacteristicValue::new(Self::conv_from_value(conv, value))))
+                // let value = dev.eval_js(read_script).await?;
+                // Ok(Some(CharacteristicValue::new(Self::conv_from_value(conv, value))))
+                todo!();
             }.boxed()
         }
     }

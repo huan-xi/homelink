@@ -11,29 +11,26 @@ pub struct AppStateInner {
     conn: DatabaseConnection,
     // hap_server: Arc<IpServer>,
     pub hap_metadata: Arc<HapMetadata>,
-    pub device_manager: Arc<RwLock<Option<IotDeviceManager>>>,
-    pub hap_manager: Arc<RwLock<Option<HapManage>>>,
+    pub device_manager: IotDeviceManager,
+    pub hap_manager: HapManage,
 }
 
 impl AppStateInner {
-    pub fn new(conn: DatabaseConnection, hap_metadata: Arc<HapMetadata>) -> Self {
+    pub fn new(conn: DatabaseConnection,
+               hap_metadata: Arc<HapMetadata>,
+               device_manager: IotDeviceManager,
+               hap_manager: HapManage,
+    ) -> Self {
         Self {
             conn,
             hap_metadata,
-            device_manager: Arc::new(RwLock::new(None)),
-            hap_manager: Arc::new(Default::default()),
+            device_manager,
+            hap_manager,
         }
     }
-    pub async fn hap_manager(&self) -> anyhow::Result<HapManage> {
-        self.hap_manager.read().await
-            .clone()
-            .ok_or(anyhow::anyhow!("hap manager not init"))
-    }
+
     pub fn conn(&self) -> &DatabaseConnection {
         &self.conn
-    }
-    pub async fn get_iot_device_manager(&self) -> Option<IotDeviceManager> {
-        self.device_manager.read().await.clone()
     }
 }
 
@@ -44,9 +41,11 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub fn new(conn: DatabaseConnection, hap_metadata: Arc<HapMetadata>) -> Self {
+    pub fn new(conn: DatabaseConnection, hap_metadata: Arc<HapMetadata>,
+               device_manager: IotDeviceManager,
+               hap_manager: HapManage, ) -> Self {
         Self {
-            inner: Arc::new(AppStateInner::new(conn, hap_metadata)),
+            inner: Arc::new(AppStateInner::new(conn, hap_metadata, device_manager, hap_manager, )),
         }
     }
 }

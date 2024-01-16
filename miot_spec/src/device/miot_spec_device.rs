@@ -1,13 +1,12 @@
 use std::sync::Arc;
 use futures_util::future::BoxFuture;
 use serde::{Deserialize, Serialize};
-use tokio::sync::RwLock;
+use tokio::sync::{broadcast, RwLock};
 use crate::device::ble::ble_device::BleDevice;
 use crate::device::emitter::{DataEmitter, DataListener, EventType};
 use crate::proto::miio_proto::{MiotSpecDTO, MiotSpecId, MiotSpecProtocolPointer};
-use futures_util::FutureExt;
 use serde_json::Value;
-use crate::proto::protocol::ExitError;
+use crate::proto::protocol::{ExitError, JsonMessage};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, )]
 pub struct DeviceInfo {
@@ -37,15 +36,17 @@ pub struct BaseMiotSpecDevice {
     /// 注册轮询的属性
     pub registered_property: Arc<RwLock<Vec<MiotSpecId>>>,
     pub(crate) emitter: Arc<RwLock<DataEmitter<EventType>>>,
-
+    pub tx: broadcast::Sender<EventType>,
 }
 
 impl Default for BaseMiotSpecDevice {
     fn default() -> Self {
+        let (tx, _) = broadcast::channel(10);
         Self {
             status: RwLock::new(DeviceStatus::Run),
             registered_property: Arc::new(RwLock::new(Vec::new())),
             emitter: Arc::new(RwLock::new(DataEmitter::new())),
+            tx,
         }
     }
 }
@@ -83,6 +84,9 @@ pub trait MiotSpecDevice {
         Ok(value)
     }
 
+    async fn get_event_recv(&self) -> broadcast::Receiver<EventType> {
+        self.get_base().tx.subscribe()
+    }
     /// 创建连接并且 监听
     fn run(&self) -> BoxFuture<Result<(), ExitError>>;
 

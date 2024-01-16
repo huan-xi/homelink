@@ -1,5 +1,10 @@
-/target
-/data
-/bin/examples
-/log
+target
+data
+bin/examples
+log
 .idea
+hap-rs/.idea
+Cargo.lock
+test.json
+test1.json
+bin/src/test

@@ -5,10 +5,13 @@ use futures_util::future::BoxFuture;
 use futures_util::FutureExt;
 use log::{error, info};
 use tap::TapFallible;
-use crate::proto::protocol::ExitError;
+use tokio::select;
+use tokio::sync::broadcast::Receiver;
+use crate::proto::protocol::{ExitError, JsonMessage};
 use tokio::sync::RwLock;
+use crate::device::emitter::EventType;
 use crate::device::miot_spec_device::{BaseMiotSpecDevice, DeviceInfo, MiotSpecDevice};
-use crate::proto::miio_proto::{MiotSpecProtocolPointer};
+use crate::proto::miio_proto::{MiotSpecProtocolPointer, MsgCallback};
 use crate::proto::transport::open_miio_mqtt_proto::OpenMiIOMqttSpecProtocol;
 
 /// 连接网关的mqtt
@@ -18,6 +21,7 @@ pub struct OpenMiioGatewayDevice {
     proto: Arc<RwLock<Option<MiotSpecProtocolPointer>>>,
     base: BaseMiotSpecDevice,
 }
+
 #[async_trait::async_trait]
 impl MiotSpecDevice for OpenMiioGatewayDevice {
     fn get_info(&self) -> &DeviceInfo {
@@ -27,7 +31,6 @@ impl MiotSpecDevice for OpenMiioGatewayDevice {
     fn get_base(&self) -> &BaseMiotSpecDevice {
         &self.base
     }
-
     async fn get_proto(&self) -> Result<MiotSpecProtocolPointer, ExitError> {
         let read = self.proto.clone();
         let read = read.read().await;
@@ -41,7 +44,20 @@ impl MiotSpecDevice for OpenMiioGatewayDevice {
     fn run(&self) -> BoxFuture<Result<(), ExitError>> {
         async move {
             let p_arc = self.connect().await?;
-            p_arc.start_listen().await;
+            // self.base.tx.send(EventType::GatewayMsg(self.info.clone().into())
+            let listen = p_arc.start_listen();
+            let forward = async {
+                while let Ok(msg) = p_arc.recv().recv().await {
+                    let _ = self.base.tx.send(EventType::GatewayMsg(msg));
+                };
+            };
+            loop {
+                select! {
+                    _ = listen =>{break;}
+                    _ = forward =>{break;}
+                }
+            }
+            // futures_util::join!(listen, a);
             Err(ExitError::Disconnect)
         }.boxed()
     }
@@ -67,7 +83,7 @@ impl OpenMiioGatewayDevice {
     pub async fn new(info: DeviceInfo) -> anyhow::Result<Self> {
         let _ = info.localip.clone()
             .ok_or(anyhow!("网关设备ip不能为空"))?;
-
-        Ok(Self { info, proto: Arc::new(RwLock::new(None)), base: Default::default() })
+        let base: BaseMiotSpecDevice = Default::default();
+        Ok(Self { info, proto: Arc::new(RwLock::new(None)), base })
     }
 }

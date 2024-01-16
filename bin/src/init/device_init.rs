@@ -15,7 +15,7 @@ use crate::init::device_manage::IotDeviceManager;
 use crate::StdDefault;
 
 /// 初始化hap 设备 init_iot_device
-pub async fn init_iot_devices(conn: &DatabaseConnection) -> anyhow::Result<IotDeviceManager> {
+pub async fn init_iot_devices(conn: &DatabaseConnection,manage:IotDeviceManager) -> anyhow::Result<()> {
     // let mut map: DeviceMap = dashmap::DashMap::new();
     let mut list = vec![];
     //读取设备
@@ -66,12 +66,12 @@ pub async fn init_iot_devices(conn: &DatabaseConnection) -> anyhow::Result<IotDe
             }
         }
     }
-    let manage = IotDeviceManager::new();
+
     list.into_iter()
         .for_each(|(id, dev)| {
             manage.push_device(id, dev);
         });
-    Ok(manage)
+    Ok(())
 }
 
 async fn init_children_device(dev: IotDeviceModel, gw: Arc<OpenMiioGatewayDevice>) -> anyhow::Result<DevicePointer> {
