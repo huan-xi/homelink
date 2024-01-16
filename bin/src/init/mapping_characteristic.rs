@@ -8,12 +8,12 @@ use serde_json::Value;
 use tap::{Tap, TapFallible, TapOptional};
 use miot_spec::device::emitter::{DataListener, EventType};
 use miot_spec::device::emitter::EventType::{UpdateProperty};
+use crate::config::context::get_app_context;
 use crate::hap::iot_characteristic::{CharacteristicValue, IotCharacteristic};
 use crate::hap::unit_convertor::{ConvertorParamType, UnitConv, UnitConvertor};
 use crate::db::entity::hap_characteristic::{MappingMethod, MappingParam, Model, Property};
 use crate::db::entity::prelude::HapCharacteristicModel;
 use crate::init::{DevicePointer, HapAccessoryPointer};
-use crate::js_engine::init_mapping_characteristic_module::init_mapping_characteristic_module;
 
 
 pub async fn to_characteristic(sid: u64, aid: u64, index: usize, ch: HapCharacteristicModel,
@@ -49,7 +49,7 @@ pub async fn to_characteristic(sid: u64, aid: u64, index: usize, ch: HapCharacte
     set_default_for_cts(&mut cts, ch.clone())?;
 
     // 这是属性方法
-    set_read_update_method(sid, &mut cts, ch, device, accessory).await?;
+    set_read_update_method(aid, sid, &mut cts, ch, device, accessory).await?;
     //当前特征值设置
     cts.0.value = match cts.0.min_value.as_ref() {
         None => {
@@ -63,8 +63,13 @@ pub async fn to_characteristic(sid: u64, aid: u64, index: usize, ch: HapCharacte
     Ok(cts)
 }
 
+
 /// 设置特征的读写方法
-async fn set_read_update_method(sid: u64, cts: &mut IotCharacteristic, ch: HapCharacteristicModel, device: DevicePointer, accessory: HapAccessoryPointer) -> anyhow::Result<()> {
+async fn set_read_update_method(aid: u64, sid: u64,
+                                cts: &mut IotCharacteristic,
+                                ch: HapCharacteristicModel,
+                                device: DevicePointer,
+                                accessory: HapAccessoryPointer) -> anyhow::Result<()> {
     // let cid = cts.get_id();
     let hap_type = cts.get_type();
     let unit_conv = UnitConv(ch.unit_convertor.clone(), ch.convertor_param.clone());
@@ -96,36 +101,50 @@ async fn set_read_update_method(sid: u64, cts: &mut IotCharacteristic, ch: HapCh
             }
         }
         MappingMethod::JsScript => {
-            let p = if let Some(MappingParam::JsScript(param)) = ch.mapping_param {
+            let param = if let Some(MappingParam::JsScript(param)) = ch.mapping_param {
                 param
             } else {
                 return Err(anyhow!("映射参数不能为空"));
             };
-            let channel = init_mapping_characteristic_module(p.script.as_str()).await?;
-            let result = device.eval_js(ch.cid, p.script.as_str()).await?;
-            // let (a) = ch.split();
+            // 获取 channel
+
+            let channel = get_app_context().hap_manager.get_accessory_module(aid).await?;
+            let channel_c = channel.clone();
             let read = move || {
+                let channel_c = channel_c.clone();
                 async move {
                     // 与dev 上的 js 交互-> 发送事件到js
+                    // let value = channel_c.read_property(sid).await?;
+                    // Ok(Some(CharacteristicValue::new(value)))
                     todo!();
-
-                    // let dev = dev.clone();
-                    // let value = dev.eval_js(read_script).await?;
-                    // Ok(Some(CharacteristicValue::new(Self::conv_from_value(conv, value))))
                 }.boxed()
             };
+            cts.on_read_async(Some(read));
+        }
 
-            //初始化js 模块得到channel
-            let read = ToChUtils::get_js_read_func(device.clone(), "".to_string(), unit_conv.clone());
-        }
-        _ => {
-            //脚本映射,需要设置读,写,校验脚本
-            // read:
-            // actions:
-            //   action: eval(val/10)
-            //   action: set_ps(val/10)
-            // 读到一个value -> 操作函数[] -> value
-        }
+        /* MappingMethod::JsScript => {
+             let p = if let Some(MappingParam::JsScript(param)) = ch.mapping_param {
+                 param
+             } else {
+                 return Err(anyhow!("映射参数不能为空"));
+             };
+             //初始化js 模块得到channel
+             let channel = device.init_mapping_js_module(ch.cid, p.script.as_str(), false).await?;
+             let channel_c = channel.clone();
+             // let (a) = ch.split();
+             let read = move || {
+                 let channel_c = channel_c.clone();
+                 async move {
+                     // 与dev 上的 js 交互-> 发送事件到js
+                     let value = channel_c.read_property().await?;
+                     Ok(Some(CharacteristicValue::new(value)))
+                 }.boxed()
+             };
+             cts.on_read_async(Some(read));
+         }
+         _ => {
+
+         }*/
     }
 
     Ok(())
@@ -171,8 +190,7 @@ impl ToChUtils {
                 if let UpdateProperty(res) = data {
                     if let Some(value) = res.value {
                         if res.did.as_str() == did.as_str() && res.piid == property.piid && res.siid == property.siid {
-                            info!("listen property:{},{},{:?}", res.siid, res.piid, value);
-
+                            // info!("listen property:{},{},{:?}", res.siid, res.piid, value);
                             // 蓝牙数据设置到特征上
                             match accessory.lock()
                                 .await
@@ -224,7 +242,7 @@ impl ToChUtils {
                         error!("To单位转换错误:{:?}",e);
                     })
                     .unwrap_or(Value::Null);
-                debug!("convert to hap value:{:?}=>{:?}", old, value);
+                // debug!("convert to hap value:{:?}=>{:?}", old, value);
                 value
             }
         }
@@ -245,7 +263,7 @@ impl ToChUtils {
                 };
                 let value = Self::conv_from_value(conv, new.value);
                 //读取状态
-                info!("set to iot value:{},{},{:?}",property_id.siid,property_id.piid,value);
+                // debug!("set to iot value:{},{},{:?}",property_id.siid,property_id.piid,value);
                 let res = dev.set_property(property_id.siid, property_id.piid, value.clone())
                     .await
                     .tap_err(|e| {

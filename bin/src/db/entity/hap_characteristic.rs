@@ -54,7 +54,7 @@ pub enum MappingParam {
 
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
 pub struct JsScriptParam {
-    pub script: String,
+    pub name: String,
 }
 
 

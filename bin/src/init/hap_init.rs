@@ -17,6 +17,7 @@ use hap::characteristic::{HapCharacteristic};
 use hap::characteristic::configured_name::ConfiguredNameCharacteristic;
 use miot_spec::device::miot_spec_device::{MiotSpecDevice};
 use crate::config::cfgs::Configs;
+use crate::config::context::get_app_context;
 use crate::hap::iot_characteristic::IotCharacteristic;
 use crate::hap::iot_hap_accessory::{IotDeviceAccessory, IotHapAccessory};
 use crate::db::entity::prelude::{HapAccessoryColumn, HapAccessoryEntity, HapAccessoryModel, HapBridgeEntity, HapBridgeColumn, HapCharacteristicEntity, HapCharacteristicModel, HapServiceColumn, HapServiceEntity, HapServiceModel};
@@ -25,6 +26,7 @@ use crate::hap::iot_hap_service::IotHapService;
 use crate::init::device_manage::{IotDeviceManager, IotDeviceManagerInner};
 use crate::init::hap_manage::HapManage;
 use crate::init::mapping_characteristic::{to_characteristic, ToChUtils};
+use crate::js_engine::init_hap_accessory_module::init_hap_accessory_module;
 
 pub fn rand_num() -> u32 {
     let mut rng = rand::thread_rng();
@@ -39,13 +41,15 @@ pub fn rand_num() -> u32 {
     random_number
 }
 
-pub async fn init_hap(conn: &DatabaseConnection, config: &Configs, iot_device_manager:HapManage,iot_device_map: IotDeviceManager) -> anyhow::Result<()> {
+pub async fn init_hap(conn: &DatabaseConnection, iot_device_manager: HapManage, iot_device_map: IotDeviceManager) -> anyhow::Result<()> {
     let manage = HapManage::new();
     let bridges = HapBridgeEntity::find()
         .filter(HapBridgeColumn::Disabled.eq(false))
         .all(conn).await?;
     // let mut servers = Vec::new();
     for bridge in bridges.into_iter() {
+        let config = &get_app_context().config;
+
         let hex = format!("{:x}", bridge.bridge_id);
         let str = format!("{}/{}_{}", config.server.data_dir, "hap", hex);
         let mut storage = FileStorage::new(str.as_str()).await?;
@@ -178,7 +182,11 @@ async fn init_hap_accessory<'a>(conn: &DatabaseConnection, device: DevicePointer
         cid += len as u64 + 1;
         // 转成服务, 服务需要服务类型和服务的必填特征
     }
-
+    // 查询script
+    if let Some(script) = hap_accessory.script {
+        // 初始化hap js模块,
+        // init_hap_accessory_module(HapManage);
+    };
 
     Ok(accessory.clone())
 }

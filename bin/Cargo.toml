@@ -55,6 +55,7 @@ uuid = { version = "0.8", features = ["v4", "serde"] }
 deno_runtime.workspace = true
 once_cell.workspace = { workspace = true }
 derive_builder = "0.12.0"
+rust-embed.workspace = true
 [features]
 default = ["sqlite"]
 #default = ["postgres", "mysql", "sqlite"]

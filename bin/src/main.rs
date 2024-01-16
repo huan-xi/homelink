@@ -4,6 +4,7 @@ use std::time::Duration;
 use axum::body::HttpBody;
 use axum::Router;
 use log::{error, info};
+use tokio::select;
 use tokio::sync::oneshot;
 use bin::api::router;
 use bin::api::state::{AppState, AppStateInner};
@@ -14,8 +15,8 @@ use bin::init;
 use bin::init::device_init::init_iot_devices;
 use bin::init::device_manage::IotDeviceManager;
 use bin::init::hap_manage::HapManage;
-use bin::js_engine::ext::env::{EnvContext, EnvContextBuilder};
-use bin::js_engine::init_js_engine::init_js_engine;
+use bin::js_engine::ext::env::{EnvContext};
+use bin::js_engine::init_js_engine::{init_js_engine, EngineEventResp};
 use hap_metadata::hap_metadata;
 
 pub fn init_context() {}
@@ -30,9 +31,9 @@ async fn main() -> anyhow::Result<()> {
     //读取配置
     let config = Configs::init();
 
-
     let addr = SocketAddr::new([0, 0, 0, 0].into(), 5514);
     let conn = db_conn().await;
+
     let hap_metadata = Arc::new(hap_metadata()?);
     // 初始化hap 服务器
     let iot_device_manager = IotDeviceManager::new();
@@ -45,24 +46,29 @@ async fn main() -> anyhow::Result<()> {
         .nest("/api", router::api())
         .with_state(app_state.clone());
 
-    // 初始化js 引擎
     //初始化js 引擎
-    let js_engine = init_js_engine(EnvContext {
+    let js_engine = init_js_engine(config.server.data_dir.clone(),EnvContext {
         info: "home gateway".to_string(),
-        version: "v1.0.0.0".to_string(),
+        version: "v1.0.0".to_string(),
         main_channel: None,
         conn: conn.clone(),
         dev_manager: iot_device_manager.clone(),
         hap_manager: hap_manager.clone(),
+        mapping_characteristic_map: Arc::new(Default::default()),
+        hap_module_map: Arc::new(Default::default()),
     })?;
-    APP_CONTEXT.set(ApplicationContext {
-        config: config.clone(),
-        conn,
+
+    let res = APP_CONTEXT.set(ApplicationContext {
+        config,
+        conn: conn.clone(),
         js_engine,
-        hap_metadata,
+        hap_metadata: hap_metadata.clone(),
         device_manager: iot_device_manager.clone(),
-        hap_manager,
-    }).unwrap();
+        hap_manager: hap_manager.clone(),
+    });
+    if res.is_err() {
+        panic!("APP_CONTEXT 初始化失败");
+    }
     let context = get_app_context();
 
 
@@ -83,11 +89,32 @@ async fn main() -> anyhow::Result<()> {
     // 初始化iot设备
     init_iot_devices(&conn, iot_device_manager.clone()).await?;
     // 初始化hap设备
-    init::hap_init::init_hap(&conn, &config, hap_manager.clone(), iot_device_manager.clone()).await?;
+    init::hap_init::init_hap(&conn, hap_manager.clone(), iot_device_manager.clone()).await?;
 
-    api_server_ch.await?;
-    context.js_engine.close()?;
+    // 等待引擎退出
+    let mut recv = context.js_engine.resp_recv.subscribe();
 
+    let engin_statue = async {
+        while let Ok(event_type) = recv.recv().await {
+            if let EngineEventResp::Exit(str) = event_type {
+                error!("js engine exit:{:?}", str);
+                break;
+            }
+        }
+    };
+
+    loop {
+        select! {
+            _ = engin_statue=> break,
+            _ = api_server_ch => {
+                info!("api server recv resp");
+                break;
+            }
+        }
+    }
+
+    // api_server_ch.await?;
+    context.js_engine.close().await;
     // 服务停止
     drop(app_state);
     // let _ = js_tx.send(0);

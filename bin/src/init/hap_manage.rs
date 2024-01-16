@@ -1,12 +1,19 @@
 use std::ops::Deref;
 use std::sync::Arc;
+use anyhow::anyhow;
 use log::{error, info};
 use hap::server::{IpServer, Server};
 use crate::init::hap_init::AccessoryRelation;
+use crate::js_engine::channel::hap_channel::ToHapModuleSender;
 
 pub struct HapTask {
     sender: tokio::sync::oneshot::Sender<bool>,
     server: IpServer,
+}
+
+pub struct AccessoryModule {
+    pub sender: Arc<ToHapModuleSender>,
+    pub exit_ch: tokio::sync::oneshot::Sender<bool>,
 }
 
 /// hap 设备管理器
@@ -18,13 +25,19 @@ pub struct HapManageInner {
     aid_bid_map: dashmap::DashMap<u64, i64>,
     // 配件与设备的关系
     dev_aid_map: dashmap::DashMap<i64, u64>,
-
+    accessory_module: dashmap::DashMap<u64, AccessoryModule>,
 }
 
 impl HapManageInner {
+    pub async fn get_accessory_module(&self, aid: u64) -> anyhow::Result<Arc<ToHapModuleSender>> {
+        self.accessory_module.get(&aid)
+            .map(|i| i.sender.clone())
+            .ok_or(anyhow!("未运行js脚本"))
+    }
+
     pub async fn refresh_accessory_config(&self, aid: u64) {
         if let Some(bid) = self.aid_bid_map.get(&aid) {
-            if let Some(server) = self.server_map.get(bid.value()){
+            if let Some(server) = self.server_map.get(bid.value()) {
                 server.server.configuration_number_incr().await;
             }
         }
@@ -46,15 +59,15 @@ impl HapManageInner {
         tokio::spawn(async move {
             let task = async move {
                 let res = server_c.run_handle().await;
-                error!("hap 服务退出:{:?},res:{:?}",bid, res);
+                error!("hap server退出:{:?},res:{:?}",bid, res);
             };
             loop {
                 tokio::select! {
-                    _= recv=>{
-                        info!("hap 服务退出:{}",bid);
+                    Ok(val)= recv=>{
+                        error!("收到hap服务:{}退出指令,{}",bid,val);
                         break
                     }
-                    _= task=>{break}
+                    _= task=>break,
                 }
             }
         });
@@ -83,6 +96,7 @@ impl HapManage {
                 aid_map: Default::default(),
                 aid_bid_map: Default::default(),
                 dev_aid_map: Default::default(),
+                accessory_module: Default::default(),
             })
         }
     }

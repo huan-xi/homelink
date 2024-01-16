@@ -1,14 +1,15 @@
-// hap读取数据,需要返回数据值
-const on_read = async (context) => {
-    console.log('on_read');
-}
-// hap 设置数据
-const on_update = async (context, old_val, new_val) => {
+// hap ch read data,require return value
+const on_read = async () => {
 
+    return 1;
+}
+// hap set data
+const on_update = async (context, old_val, new_val) => {
+    console.log("on_update", old_val, new_val)
 }
 // 收到设备数据
 const on_device_event = async (context, event) => {
-
+    console.log("on_device_event", event)
 }
 
 export default {

@@ -15,6 +15,11 @@ pub fn get_app_context() -> &'static ApplicationContext {
     APP_CONTEXT.get().expect("APP_JS_CONTEXT 未初始化")
 }
 
+pub fn get_data_dir() -> &'static str {
+    let context = get_app_context();
+    context.config.server.data_dir.as_str()
+}
+
 pub struct ApplicationContext {
     pub config: Configs,
     pub conn: DatabaseConnection,

@@ -3,9 +3,10 @@ declare interface IotDevice {
 
     /**
      * 获取属性
-     * @param name
+     * @param siid
+     * @param piid
      */
-    get_property(name: string): Promise<any>;
+    get_property(siid: number, piid: number): Promise<any>;
 
     /**
      * 设置属性

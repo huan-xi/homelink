@@ -45,6 +45,7 @@ impl AddHapAccessoryParam {
             disabled: Set(self.disabled.unwrap_or(false)),
             hap_type: Set(self.hap_type),
             info: Default::default(),
+            script: Default::default(),
         })
     }
 }

@@ -18,7 +18,7 @@ pub async fn db_conn() -> DatabaseConnection {
                let p = CFG.server.data_dir.as_str();
                match fs::metadata(p) {
                    Ok(f) => {
-                       assert!(f.is_dir(), "数据目录不是目录");
+                       asset!(f.is_dir(), "数据目录不是目录");
                    }
                    Err(e) => {
                        fs::create_dir_all(p).expect(format!("创建数据目录:{:?}失败", p).as_str());

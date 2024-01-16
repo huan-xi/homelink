@@ -21,6 +21,8 @@ pub struct Model {
     pub bridge_id: i64,
     pub disabled: bool,
     pub hap_type: Option<MappingHapType>,
+    /// 运行js脚本,接管特征的读写事件
+    pub script: Option<String>,
     pub name: Option<String>,
     pub memo: Option<String>,
     pub info: Option<String>,
@@ -34,6 +36,7 @@ pub enum Column {
     Disabled,
     HapType,
     Name,
+    Script,
     Memo,
     Info,
 }
@@ -65,6 +68,7 @@ impl ColumnTrait for Column {
             Self::Disabled => ColumnType::Boolean.def(),
             Self::HapType => ColumnType::Integer.def().null(),
             Self::Name => ColumnType::String(None).def().null(),
+            Self::Script => ColumnType::String(None).def().null(),
             Self::Memo => ColumnType::String(None).def().null(),
             Self::Info => ColumnType::String(None).def().null(),
             Self::Aid => ColumnType::Integer.def().null(),
@@ -100,4 +104,5 @@ impl Related<super::iot_device::Entity> for Entity {
         Relation::IotDevice.def()
     }
 }
+
 impl ActiveModelBehavior for ActiveModel {}
