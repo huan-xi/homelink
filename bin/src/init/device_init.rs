@@ -12,7 +12,6 @@ use crate::init::{DeviceMap, DevicePointer};
 use sea_orm::QueryFilter;
 use miot_spec::device::mesh_device::MeshDevice;
 use crate::init::device_manage::IotDeviceManager;
-use crate::StdDefault;
 
 /// 初始化hap 设备 init_iot_device
 pub async fn init_iot_devices(conn: &DatabaseConnection,manage:IotDeviceManager) -> anyhow::Result<()> {

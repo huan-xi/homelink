@@ -1,5 +1,5 @@
 [workspace]
-members = ["miot_spec", "bin", "migration", "hap_metadata", "hap-rs"]
+members = ["miot_spec", "bin", "migration", "hap_metadata", "hap-rs", "java-types"]
 #exclude=["hap-rs/codegen"]
 [profile.dev]
 split-debuginfo = "unpacked"

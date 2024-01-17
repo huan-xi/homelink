@@ -14,6 +14,8 @@ use crate::hap::unit_convertor::{ConvertorParamType, UnitConv, UnitConvertor};
 use crate::db::entity::hap_characteristic::{MappingMethod, MappingParam, Model, Property};
 use crate::db::entity::prelude::HapCharacteristicModel;
 use crate::init::{DevicePointer, HapAccessoryPointer};
+use crate::js_engine::channel::main_channel::{FromModuleResp, ToModuleEvent};
+use crate::js_engine::channel::params::{OnCharReadParam, OnCharUpdateParam};
 
 
 pub async fn to_characteristic(sid: u64, aid: u64, index: usize, ch: HapCharacteristicModel,
@@ -71,7 +73,7 @@ async fn set_read_update_method(aid: u64, sid: u64,
                                 device: DevicePointer,
                                 accessory: HapAccessoryPointer) -> anyhow::Result<()> {
     // let cid = cts.get_id();
-    let hap_type = cts.get_type();
+    let cid = cts.get_id();
     let unit_conv = UnitConv(ch.unit_convertor.clone(), ch.convertor_param.clone());
     match ch.mapping_method {
         MappingMethod::None => {
@@ -94,57 +96,69 @@ async fn set_read_update_method(aid: u64, sid: u64,
                 let did = device.get_info().did.clone();
                 //注册属性事件
                 device.register_property(ps.siid, ps.piid).await;
-                let listener = ToChUtils::get_miot_listener(sid, hap_type, did, accessory.clone(), ps.clone(), unit_conv.clone());
+                let listener = ToChUtils::get_miot_listener(sid, cid, did, accessory.clone(), ps.clone(), unit_conv.clone());
                 device.add_listener(Box::new(listener)).await;
             } else {
                 return Err(anyhow!("映射参数不能为空"));
             }
         }
         MappingMethod::JsScript => {
-            let param = if let Some(MappingParam::JsScript(param)) = ch.mapping_param {
-                param
-            } else {
-                return Err(anyhow!("映射参数不能为空"));
-            };
+            /*      let param = if let Some(MappingParam::JsScript(param)) = ch.mapping_param {
+                      param
+                  } else {
+                      return Err(anyhow!("映射参数不能为空"));
+                  };*/
             // 获取 channel
-
-            let channel = get_app_context().hap_manager.get_accessory_module(aid).await?;
-            let channel_c = channel.clone();
+            let char_tag = ch.tag.clone()
+                .ok_or(anyhow!("js 几班特征标识不能为空"))?;
+            let sender = get_app_context().js_engine.sender.clone();
+            let sender_c = sender.clone();
+            let char_tag_c = char_tag.clone();
             let read = move || {
-                let channel_c = channel_c.clone();
+                let char_tag = char_tag_c.clone();
+                let sender = sender_c.clone();
                 async move {
-                    // 与dev 上的 js 交互-> 发送事件到js
-                    // let value = channel_c.read_property(sid).await?;
-                    // Ok(Some(CharacteristicValue::new(value)))
-                    todo!();
+                    let ch_id = get_app_context()
+                        .hap_manager
+                        .get_accessory_ch_id(aid).await?;
+
+                    let resp = sender.send(ToModuleEvent::OnCharRead(OnCharReadParam {
+                        ch_id,
+                        service_tag: "".to_string(),
+                        char_tag,
+                    })).await?;
+                    if let FromModuleResp::CharReadResp(value) = resp {
+                        return Ok(value.value.map(|f| CharacteristicValue::new(f)));
+                    }
+                    Err(anyhow!("未知错误"))?
                 }.boxed()
             };
             cts.on_read_async(Some(read));
+            let sender_c = sender.clone();
+            let char_tag_c = char_tag.clone();
+            let update = move |old_val: CharacteristicValue, new_val: CharacteristicValue| {
+                let sender = sender_c.clone();
+                let char_tag = char_tag_c.clone();
+                async move {
+                    if old_val == new_val {
+                        return Ok(());
+                    };
+                    let ch_id = get_app_context()
+                        .hap_manager
+                        .get_accessory_ch_id(aid).await.unwrap();
+                    let _ = sender.send(ToModuleEvent::OnCharUpdate(OnCharUpdateParam {
+                        ch_id,
+                        service_tag: "".to_string(),
+                        old_value: old_val.value,
+                        char_tag,
+                        new_value: new_val.value,
+                    })).await?;
+
+                    Ok(())
+                }.boxed()
+            };
+            cts.on_update_async(Some(update));
         }
-
-        /* MappingMethod::JsScript => {
-             let p = if let Some(MappingParam::JsScript(param)) = ch.mapping_param {
-                 param
-             } else {
-                 return Err(anyhow!("映射参数不能为空"));
-             };
-             //初始化js 模块得到channel
-             let channel = device.init_mapping_js_module(ch.cid, p.script.as_str(), false).await?;
-             let channel_c = channel.clone();
-             // let (a) = ch.split();
-             let read = move || {
-                 let channel_c = channel_c.clone();
-                 async move {
-                     // 与dev 上的 js 交互-> 发送事件到js
-                     let value = channel_c.read_property().await?;
-                     Ok(Some(CharacteristicValue::new(value)))
-                 }.boxed()
-             };
-             cts.on_read_async(Some(read));
-         }
-         _ => {
-
-         }*/
     }
 
     Ok(())
@@ -178,7 +192,7 @@ fn set_default_for_cts(cts: &mut IotCharacteristic, ch: HapCharacteristicModel) 
 pub struct ToChUtils {}
 
 impl ToChUtils {
-    pub fn get_miot_listener(sid: u64, hap_type: HapType, did: String, accessory: HapAccessoryPointer,
+    pub fn get_miot_listener(sid: u64, cid: u64, did: String, accessory: HapAccessoryPointer,
                              property: Property,
                              unit_conv: UnitConv) -> DataListener<EventType> {
         Box::new(move |data: EventType| {
@@ -195,7 +209,7 @@ impl ToChUtils {
                             match accessory.lock()
                                 .await
                                 .get_id_mut_service(sid)
-                                .and_then(|s| s.get_mut_characteristic(hap_type)) {
+                                .and_then(|s| s.get_id_mut_characteristic(cid)) {
                                 None => {
                                     return Err(anyhow::anyhow!("特征不存在"));
                                 }
@@ -275,27 +289,8 @@ impl ToChUtils {
         }
     }
 
-    // 读取脚本
-    pub fn get_js_read_func(device: DevicePointer,
-                            read_script: String,
-                            conv: UnitConv,
-    ) -> impl OnReadFuture<CharacteristicValue> {
-        let conv = conv.clone();
-        move || {
-            let dev = device.clone();
-            let conv = conv.clone();
-            let read_script = read_script.clone();
-            async move {
-                let dev = dev.clone();
-                // let value = dev.eval_js(read_script).await?;
-                // Ok(Some(CharacteristicValue::new(Self::conv_from_value(conv, value))))
-                todo!();
-            }.boxed()
-        }
-    }
 
-
-    /// 获取wifi 设备读取函数
+    /// 获取 属性映射读取函数
     pub fn get_read_func(device: DevicePointer,
                          property: Property,
                          conv: UnitConv,

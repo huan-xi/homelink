@@ -1,7 +1,8 @@
+use std::cmp::min;
 use std::sync::Arc;
 use futures_util::future::BoxFuture;
 use serde::{Deserialize, Serialize};
-use tokio::sync::{broadcast, RwLock};
+use tokio::sync::{broadcast, Mutex, RwLock};
 use crate::device::ble::ble_device::BleDevice;
 use crate::device::emitter::{DataEmitter, DataListener, EventType};
 use crate::proto::miio_proto::{MiotSpecDTO, MiotSpecId, MiotSpecProtocolPointer};
@@ -31,12 +32,57 @@ pub enum DeviceStatus {
     Disconnect,
 }
 
+pub struct RetryInfo {
+    /// 重试次数
+    pub retry_count: Mutex<u32>,
+    /// 最大重试间隔 5 分钟,单位毫秒
+    pub max_interval: u32,
+}
+
+impl RetryInfo {
+    pub async fn incr(&self) -> u32 {
+        let mut write = self.retry_count.lock().await;
+        *write += 1;
+        return *write;
+    }
+    pub async fn reset(&self) {
+        let mut write = self.retry_count.lock().await;
+        *write = 0;
+    }
+    pub async fn get(&self) -> u32 {
+        let read = self.retry_count.lock().await;
+        // 产生1-1000 随机数
+        let rand = rand::random::<u32>() % 1000 + 1;
+        2u32.pow(*read-1) * 1000 + rand
+    }
+}
+#[tokio::test]
+async fn test_retry_info() {
+    let retry_info = RetryInfo::default();
+    for i in 0..10 {
+        retry_info.incr().await;
+        let info = retry_info.get().await;
+        println!("{}:{}", i, info);
+    }
+}
+
+impl Default for RetryInfo {
+    fn default() -> Self {
+        Self {
+            retry_count: Mutex::new(0),
+            max_interval: 5 * 60_1000,
+        }
+    }
+}
+
+
 pub struct BaseMiotSpecDevice {
     pub status: RwLock<DeviceStatus>,
     /// 注册轮询的属性
     pub registered_property: Arc<RwLock<Vec<MiotSpecId>>>,
     pub(crate) emitter: Arc<RwLock<DataEmitter<EventType>>>,
     pub tx: broadcast::Sender<EventType>,
+    pub retry_info:RetryInfo,
 }
 
 impl Default for BaseMiotSpecDevice {
@@ -47,6 +93,7 @@ impl Default for BaseMiotSpecDevice {
             registered_property: Arc::new(RwLock::new(Vec::new())),
             emitter: Arc::new(RwLock::new(DataEmitter::new())),
             tx,
+            retry_info: Default::default(),
         }
     }
 }

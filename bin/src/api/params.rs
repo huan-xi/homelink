@@ -98,6 +98,7 @@ impl CharacteristicParam {
             unit: Set(self.unit),
             min_value: Set(self.min_value),
             max_value: Set(self.max_value),
+            tag: Default::default(),
             max_len: Set(self.max_len),
             unit_convertor: Set(self.unit_convertor),
             service_id: Set(service_id),

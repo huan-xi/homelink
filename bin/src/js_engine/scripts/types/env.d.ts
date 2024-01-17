@@ -1,12 +1,11 @@
 declare interface IotDevice {
 
-
     /**
      * 获取属性
      * @param siid
      * @param piid
      */
-    get_property(siid: number, piid: number): Promise<any>;
+    readProperty(siid: number, piid: number): Promise<any>;
 
     /**
      * 设置属性
@@ -14,11 +13,15 @@ declare interface IotDevice {
      * @param value
      */
 
-    set_property(ssid: number, value: any): Promise<void>;
+    setProperty(ssid: number, value: any): Promise<void>;
 }
 
 declare interface MainChannel {
     await(): Promise<boolean>;
+}
+
+declare interface HapAccessoryListener {
+    accept_event(): Promise<void>;
 }
 
 declare interface Env {

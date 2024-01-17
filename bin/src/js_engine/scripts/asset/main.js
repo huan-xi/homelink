@@ -1,4 +1,4 @@
-// import env from "ext:deno_env/01_env.js";
+// import env from "ext:deno_env/env.js";
 // console.log("fetch", await fetch("https://www.baidu.com"));
 console.log("main module exec")
 try {

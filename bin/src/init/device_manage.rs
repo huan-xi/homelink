@@ -14,12 +14,10 @@ use miot_spec::device::miot_spec_device::{MiotSpecDevice};
 use miot_spec::device::MiotDevicePointer;
 use crate::config::context::get_app_context;
 use crate::init::{DevicePointer};
-use crate::js_engine::channel::mapping_characteristic_channel::{MappingCharacteristicSender, MappingCharacteristicRecv};
-use crate::js_engine::init_js_engine::{EngineEvent, ExecuteSideModuleParam, EngineEventResp};
 
 pub struct JsModule {
     ///与 特征脚本通信的通道
-    pub sender: Arc<MappingCharacteristicSender>,
+    // pub sender: Arc<MappingCharacteristicSender>,
     /// module 的关闭通道
     pub exit_channel: oneshot::Sender<u8>,
 
@@ -50,8 +48,9 @@ impl DeviceWithJsEngine {
     }
 
     /// 初始化js模块,获取通道
-    pub async fn init_mapping_js_module(&self, cid: i64, script: &str, force: bool) -> anyhow::Result<Arc<MappingCharacteristicSender>> {
-        let chanel_sender = self.mapping_js_map.get_mut(&cid);
+    pub async fn init_mapping_js_module(&self, cid: i64, script: &str, force: bool) -> anyhow::Result<()> {
+        todo!();
+      /*  let chanel_sender = self.mapping_js_map.get_mut(&cid);
         if let Some(sender) = chanel_sender.as_ref() {
             //todo force 处理
             return Ok(sender.sender.clone());
@@ -89,7 +88,7 @@ impl DeviceWithJsEngine {
                 context.js_engine.mapping_characteristic_map.remove(&cid);
                 Err(anyhow::anyhow!("执行js错误"))
             }
-        };
+        };*/
     }
 
 
@@ -173,8 +172,11 @@ impl IotDeviceManagerInner {
             let task = async move {
                 loop {
                     let res = dev_c.run().await;
-                    error!("设备连接断开:{:?},res:{:?}", dev_c.get_info().did, res);
-                    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                    //标记重试次数+1
+                    let incr = dev_c.get_base().retry_info.incr().await;
+                    let interval = dev_c.get_base().retry_info.get().await;
+                    error!("设备连接断开:{:?},res:{:?},等待{interval}毫秒后,第{incr}次重试", dev_c.get_info().did, res);
+                    tokio::time::sleep(tokio::time::Duration::from_millis(interval as u64)).await;
                     info!("设备重连:{}", dev_c.get_info().did);
                 }
             };

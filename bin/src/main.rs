@@ -1,7 +1,5 @@
 use std::net::SocketAddr;
 use std::sync::{Arc, mpsc};
-use std::time::Duration;
-use axum::body::HttpBody;
 use axum::Router;
 use log::{error, info};
 use tokio::select;
@@ -16,7 +14,7 @@ use bin::init::device_init::init_iot_devices;
 use bin::init::device_manage::IotDeviceManager;
 use bin::init::hap_manage::HapManage;
 use bin::js_engine::ext::env::{EnvContext};
-use bin::js_engine::init_js_engine::{init_js_engine, EngineEventResp};
+use bin::js_engine::init_js_engine::{init_js_engine};
 use hap_metadata::hap_metadata;
 
 pub fn init_context() {}
@@ -50,13 +48,12 @@ async fn main() -> anyhow::Result<()> {
     let js_engine = init_js_engine(config.server.data_dir.clone(),EnvContext {
         info: "home gateway".to_string(),
         version: "v1.0.0".to_string(),
-        main_channel: None,
+        main_recv: None,
         conn: conn.clone(),
         dev_manager: iot_device_manager.clone(),
         hap_manager: hap_manager.clone(),
-        mapping_characteristic_map: Arc::new(Default::default()),
-        hap_module_map: Arc::new(Default::default()),
-    })?;
+    }).await?;
+
 
     let res = APP_CONTEXT.set(ApplicationContext {
         config,
@@ -76,7 +73,7 @@ async fn main() -> anyhow::Result<()> {
         axum::Server::bind(&addr)
             .serve(app.into_make_service());
     info!("api_server start at :{:?}", addr);
-    let (mut api_server_ch_send, api_server_ch) = oneshot::channel::<bool>();
+    let ( api_server_ch_send, api_server_ch) = oneshot::channel::<bool>();
     tokio::spawn(async move {
         if let Err(e) = api_server.await {
             error!("api_server error:{:?}", e);
@@ -84,6 +81,7 @@ async fn main() -> anyhow::Result<()> {
         // 发送到通道
         let _ = api_server_ch_send.send(false);
     });
+
 
 
     // 初始化iot设备
@@ -94,18 +92,18 @@ async fn main() -> anyhow::Result<()> {
     // 等待引擎退出
     let mut recv = context.js_engine.resp_recv.subscribe();
 
-    let engin_statue = async {
+   /* let engin_statue = async {
         while let Ok(event_type) = recv.recv().await {
             if let EngineEventResp::Exit(str) = event_type {
                 error!("js engine exit:{:?}", str);
                 break;
             }
         }
-    };
+    };*/
 
     loop {
         select! {
-            _ = engin_statue=> break,
+            // _ = engin_statue=> break,
             _ = api_server_ch => {
                 info!("api server recv resp");
                 break;

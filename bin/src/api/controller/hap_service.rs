@@ -60,6 +60,7 @@ pub async fn add_service(state: State<AppState>, Json(param): Json<AddServicePar
         id: Set(service_id),
         accessory_id: Set(param.accessory_id),
         name: Set(param.name),
+        tag: Default::default(),
         memo: Set(param.memo),
         service_type: Set(param.service_type),
         disabled: Set(false),

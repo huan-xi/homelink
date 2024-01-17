@@ -6,26 +6,25 @@ use dashmap::DashMap;
 use deno_runtime::deno_core;
 use deno_runtime::deno_core::error::AnyError;
 use deno_runtime::deno_core::{op2, OpState, ResourceId};
-use sea_orm::DbConn;
+use sea_orm::{DbConn, JsonValue};
 use tokio::sync::oneshot;
 use crate::init::device_manage::IotDeviceManager;
 use crate::init::hap_manage::HapManage;
-use crate::js_engine::channel::hap_channel::{HapAccessoryModuleRecv, ReceiverResource, ToModuleEvent};
-use crate::js_engine::channel::mapping_characteristic_channel::{MappingCharacteristicRecv, MappingCharacteristicSender};
-use crate::js_engine::init_js_engine::MsgId;
+use crate::js_engine::channel::{main_channel, MsgId};
+use crate::js_engine::channel::main_channel::{ReceiverResource, ReceiverResult, ToModuleEvent};
 
 
 pub struct EnvContext {
     pub info: String,
     pub version: String,
-    pub main_channel: Option<oneshot::Receiver<u8>>,
+    pub main_recv: Option<main_channel::ModuleRecv>,
     pub conn: DbConn,
     pub dev_manager: IotDeviceManager,
     pub hap_manager: HapManage,
-    /// 特征与模块通道的映射
-    /// 和context_js中的map 是同一个,
-    pub mapping_characteristic_map: Arc<DashMap<i64, MappingCharacteristicRecv>>,
-    pub hap_module_map: Arc<DashMap<i64, HapAccessoryModuleRecv>>,
+    // 特征与模块通道的映射
+    // 和context_js中的map 是同一个,
+    // pub mapping_characteristic_map: Arc<DashMap<i64, MappingCharacteristicRecv>>,
+    // pub hap_module_map: HapAccessoryModuleMapPointer,
 }
 
 
@@ -35,9 +34,16 @@ pub struct EnvContext {
 
 deno_core::extension!(deno_env,
     deps = [ deno_webidl, deno_console ],
-    ops = [op_get_device,op_main_listen],
-    esm_entry_point = "ext:deno_env/01_env.js",
-    esm = [ dir "src/js_engine/ext/env","01_env.js" ],
+    ops = [
+        op_open_main_listener,
+        op_update_char_value,
+        op_device_set_property,
+        op_device_read_property,
+        op_send_resp,
+        op_accept_event
+    ],
+    esm_entry_point = "ext:deno_env/env.js",
+    esm = [ dir "src/js_engine/ext/env","env.js" ],
     options = {
     env_context: EnvContext
     },
@@ -48,22 +54,13 @@ deno_core::extension!(deno_env,
 
 
 #[deno_core::op2(async)]
-#[number]
-pub async fn op_main_listen(state: Rc<RefCell<OpState>>) -> Result<u64, AnyError> {
-    let main_channel = state.borrow_mut().borrow_mut::<EnvContext>()
-        .main_channel.take()
-        .ok_or(anyhow!("main channel为空"))?;
-    let code = main_channel.await? as u64;
-    Ok(code)
-}
-
-#[deno_core::op2(async)]
 #[smi]
-pub async fn open_hap_listener(state: Rc<RefCell<OpState>>, #[number] aid: i64) -> Result<ResourceId, AnyError> {
-    let res = state.borrow()
-        .borrow::<EnvContext>().hap_module_map
-        .get_mut(&aid)
-        .ok_or(anyhow!("没有该设备运行通道"))?
+pub async fn op_open_main_listener(state: Rc<RefCell<OpState>>) -> Result<ResourceId, AnyError> {
+    let res = state.borrow_mut()
+        .borrow_mut::<EnvContext>()
+        .main_recv
+        .as_mut()
+        .ok_or(anyhow!("无主通道接收器"))?
         .take_receiver_resource()?;
 
     let rid = state.borrow_mut()
@@ -73,24 +70,71 @@ pub async fn open_hap_listener(state: Rc<RefCell<OpState>>, #[number] aid: i64) 
 }
 
 #[deno_core::op2(async)]
-#[serde]
-pub async fn accept_event(state: Rc<RefCell<OpState>>,
-                          #[smi] rid: ResourceId, ) -> Result<Option<(MsgId,ToModuleEvent)>, AnyError> {
-    let recv = state
-        .borrow_mut()
-        .resource_table
-        .take::<ReceiverResource>(rid)?;
-    let recv = Rc::try_unwrap(recv)
-        .ok()
-        .expect("multiple op_fetch_send ongoing");
-    Ok(recv.0.await)
+pub async fn op_send_resp(state: Rc<RefCell<OpState>>,
+                          #[bigint] msg_id: u64, #[serde] resp: main_channel::FromModuleResp) -> Result<(), AnyError> {
+    let sender = state.borrow_mut()
+        .borrow_mut::<EnvContext>()
+        .main_recv
+        .as_mut()
+        .ok_or(anyhow!("无主通道接收器"))?
+        .result_sender.clone();
+    sender.send((msg_id, resp))?;
+
+    Ok(())
 }
 
 #[deno_core::op2(async)]
-#[number]
-pub async fn op_get_device(state: Rc<RefCell<OpState>>) -> Result<i64, AnyError> {
-    // state.get_mut()
-    Ok(1)
+#[serde]
+pub async fn op_accept_event(state: Rc<RefCell<OpState>>,
+                             #[smi] rid: ResourceId) -> Result<Option<ReceiverResult>, AnyError> {
+    let mut recv = state
+        .borrow_mut()
+        .resource_table
+        .get::<ReceiverResource>(rid)?;
+    Ok(recv.recv().await)
 }
 
 
+#[deno_core::op2(async)]
+pub async fn op_device_set_property(state: Rc<RefCell<OpState>>,
+                                    #[bigint] device_id: i64,
+                                    siid: i32,
+                                    piid: i32,
+                                    #[serde] value: JsonValue) -> Result<(), AnyError> {
+    let mut dev = state.borrow()
+        .borrow::<EnvContext>()
+        .dev_manager
+        .get_device(device_id)
+        .ok_or(anyhow!("设备不存在"))?;
+    dev.set_property(siid, piid, value).await?;
+    Ok(())
+}
+
+/// 设备读取属性
+#[deno_core::op2(async)]
+#[serde]
+pub async fn op_device_read_property(state: Rc<RefCell<OpState>>,
+                                     #[bigint] device_id: i64,
+                                     siid: i32,
+                                     piid: i32) -> Result<Option<JsonValue>, AnyError> {
+    let mut dev = state.borrow()
+        .borrow::<EnvContext>()
+        .dev_manager
+        .get_device(device_id)
+        .ok_or(anyhow!("设备不存在"))?;
+    let val = dev.read_property(siid, piid).await?;
+    Ok(val)
+}
+
+/// 更新特征值
+#[deno_core::op2(async)]
+pub async fn op_update_char_value(state: Rc<RefCell<OpState>>,
+                                  #[bigint] aid: u64,
+                                  #[string] service_tag: String,
+                                  #[string] char_tag: String,
+                                  #[serde]  json_value: JsonValue) -> anyhow::Result<()>{
+    let mut hap = state.borrow()
+        .borrow::<EnvContext>()
+        .hap_manager.clone();
+    hap.update_char_value(aid,service_tag,char_tag,json_value).await
+}

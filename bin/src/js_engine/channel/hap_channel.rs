@@ -12,7 +12,7 @@ use tokio::sync::mpsc::Sender;
 use futures_util::FutureExt;
 use serde::{Deserialize, Serialize};
 use tokio::time::timeout;
-use crate::js_engine::init_js_engine::MsgId;
+use crate::js_engine::channel::MsgId;
 
 /// 结果接收器
 pub type ResultRecvPointer = Arc<broadcast::Sender<(MsgId, FromModuleResp)>>;
@@ -32,13 +32,6 @@ impl ReadPropertyParam {
     }
 }
 
-/// 发送给模块的时间类型
-#[derive(Clone,Serialize,Deserialize)]
-pub enum ToModuleEvent {
-    /// 读取结果 <-
-    ReadProperty(ReadPropertyParam),
-    UpdateCmd,
-}
 
 /// 从模块过来的返回值
 #[derive(Clone)]

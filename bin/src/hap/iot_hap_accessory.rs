@@ -24,6 +24,22 @@ impl IotDeviceAccessory {
     }
 }
 
+pub struct TagsIdMap {
+    map: HashMap<String, Vec<u64>>,
+}
+
+/*impl TagsIdMap {
+    pub fn new() -> Self {
+        Self {
+            map: Default::default(),
+        }
+    }
+    pub fn push(&mut self, tag: String, id: u64) {
+        let ids = self.map.entry(tag).or_insert(vec![]);
+        ids.push(id);
+    }
+}*/
+
 pub struct IotHapAccessory {
     /// ID of the Switch accessory.
     id: u64,
@@ -32,23 +48,22 @@ pub struct IotHapAccessory {
     // pub accessory_information: AccessoryInformationService,
     /// Switch service.
     pub services: HashMap<u64, Box<dyn HapService>>,
-
+    pub tag_ids_map: HashMap<String, Vec<u64>>,
 }
 
 impl IotHapAccessory {
-    pub fn new(id: u64, scvs: Vec<Box<dyn HapService>>) -> Self {
+    pub fn new(id: u64, scv_list: Vec<Box<dyn HapService>>) -> Self {
         let mut services = HashMap::new();
-        scvs.into_iter().for_each(|i| {
+        scv_list.into_iter().for_each(|i| {
             services.insert(i.get_id(), i);
         });
 
         Self {
             id,
             services,
+            tag_ids_map: Default::default(),
         }
     }
-
-
 }
 
 impl HapAccessory for IotHapAccessory {
@@ -66,7 +81,12 @@ impl HapAccessory for IotHapAccessory {
     fn get_id_mut_service(&mut self, id: u64) -> Option<&mut dyn HapService> {
         self.services.get_mut(&id).map(|i| i.as_mut() as &mut dyn HapService)
     }
-     fn push_service(&mut self, service: Box<dyn HapService>) {
+    fn push_service(&mut self, tag: Option<String>, service: Box<dyn HapService>) {
+        if let Some(tag) = tag {
+            self.tag_ids_map.entry(tag)
+                .or_insert(vec![])
+                .push(service.get_id())
+        };
         self.services.insert(service.get_id(), service);
     }
 
@@ -80,6 +100,16 @@ impl HapAccessory for IotHapAccessory {
 
     fn get_mut_services<'a>(&'a mut self) -> Vec<&'a mut dyn HapService> {
         self.services.values_mut().map(|i| i.as_mut() as (&mut dyn HapService )).collect()
+    }
+    fn get_mut_services_by_tag(&mut self, tag: &str) -> Vec<&mut dyn HapService> {
+        let ids = self.tag_ids_map.get(tag);
+        if let Some(ids) = ids {
+            return self.services
+                .values_mut()
+                .filter(|i| ids.contains(&i.get_id()))
+                .map(|i| i.as_mut() as (&mut dyn HapService )).collect();
+        }
+        vec![]
     }
 }
 

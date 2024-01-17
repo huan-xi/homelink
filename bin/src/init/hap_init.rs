@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-use std::ops::Deref;
 use std::sync::Arc;
 use axum::body::HttpBody;
 use futures_util::future::{BoxFuture, join_all};
@@ -41,8 +39,7 @@ pub fn rand_num() -> u32 {
     random_number
 }
 
-pub async fn init_hap(conn: &DatabaseConnection, iot_device_manager: HapManage, iot_device_map: IotDeviceManager) -> anyhow::Result<()> {
-    let manage = HapManage::new();
+pub async fn init_hap(conn: &DatabaseConnection, manage: HapManage, iot_device_map: IotDeviceManager) -> anyhow::Result<()> {
     let bridges = HapBridgeEntity::find()
         .filter(HapBridgeColumn::Disabled.eq(false))
         .all(conn).await?;
@@ -90,13 +87,16 @@ pub async fn init_hap(conn: &DatabaseConnection, iot_device_manager: HapManage, 
         server.add_accessory(bridge).await?;
 
         // 初始化其他配件
-        let accessories = init_hap_accessories(conn, bid, iot_device_map.clone()).await?;
+        let accessories = init_hap_accessories(conn,
+                                               manage.clone(),
+                                               bid, iot_device_map.clone()).await?;
 
         for accessory in accessories.iter() {
             server.add_arc_accessory(accessory.accessory.clone()).await?;
         }
         server.configuration_number_incr().await;
         manage.push_server(bid, server, accessories);
+
     }
     Ok(())
 }
@@ -108,7 +108,9 @@ pub struct AccessoryRelation {
 }
 
 /// 配件是基于设备的
-async fn init_hap_accessories(conn: &DatabaseConnection, bridge_id: i64, iot_device_map: IotDeviceManager) -> anyhow::Result<Vec<AccessoryRelation>> {
+async fn init_hap_accessories(conn: &DatabaseConnection,
+                              hap_manage: HapManage,
+                              bridge_id: i64, iot_device_map: IotDeviceManager) -> anyhow::Result<Vec<AccessoryRelation>> {
     let hap_accessories = HapAccessoryEntity::find()
         .filter(HapAccessoryColumn::BridgeId.eq(bridge_id)
             .and(HapAccessoryColumn::Disabled.eq(false)))
@@ -123,7 +125,7 @@ async fn init_hap_accessories(conn: &DatabaseConnection, bridge_id: i64, iot_dev
                 Err(anyhow::anyhow!("未找到设备:{:?}", hap_accessory.device_id))
             }
             Some(device) => {
-                init_hap_accessory(conn, device, hap_accessory).await
+                init_hap_accessory(conn, hap_manage.clone(), device, hap_accessory).await
             }
         };
         match result {
@@ -144,7 +146,9 @@ async fn init_hap_accessories(conn: &DatabaseConnection, bridge_id: i64, iot_dev
 
 /// 初始化配件的设备
 /// 需要建立配件与设备的关系,处理设备情况
-async fn init_hap_accessory<'a>(conn: &DatabaseConnection, device: DevicePointer, hap_accessory: HapAccessoryModel) -> anyhow::Result<HapAccessoryPointer> {
+async fn init_hap_accessory<'a>(conn: &DatabaseConnection,
+                                hap_manage: HapManage,
+                                device: DevicePointer, hap_accessory: HapAccessoryModel) -> anyhow::Result<HapAccessoryPointer> {
     let aid = hap_accessory.aid as u64;
     let mut hss: Vec<Box<dyn HapService>> = vec![];
     // let device = device.value().read().await.device.clone();
@@ -176,7 +180,13 @@ async fn init_hap_accessory<'a>(conn: &DatabaseConnection, device: DevicePointer
         .all(conn)
         .await?;
     let mut ha = IotHapAccessory::new(aid, hss);
+/*    for (svc_model, _) in &services {
+        if let Some(tag) = svc_model.tag.clone(){
+            ha.tag_ids_map.entry(tag.clone()).or_insert(vec![]).push(svc_model.id as u64);
+        }
+    }*/
     let accessory = Arc::new(FuturesMutex::new(Box::new(ha) as Box<dyn HapAccessory>));
+
     for service in services.into_iter() {
         let len = add_service(aid, cid, service, device.clone(), accessory.clone()).await?;
         cid += len as u64 + 1;
@@ -185,7 +195,7 @@ async fn init_hap_accessory<'a>(conn: &DatabaseConnection, device: DevicePointer
     // 查询script
     if let Some(script) = hap_accessory.script {
         // 初始化hap js模块,
-        // init_hap_accessory_module(HapManage);
+        init_hap_accessory_module(hap_manage, aid, script.as_str()).await?;
     };
 
     Ok(accessory.clone())
@@ -200,22 +210,26 @@ async fn add_service(aid: u64, cid: u64, service_chs: (HapServiceModel, Vec<HapC
     let chs = service_chs.1;
     let mut hap_service = IotHapService::new(cid, aid, service.service_type.into());
 
-    let chs: Vec<BoxFuture<anyhow::Result<IotCharacteristic>>> = chs.into_iter()
+    let chs: Vec<BoxFuture<anyhow::Result<(Option<String>, IotCharacteristic)>>> = chs.into_iter()
         .filter(|ch| !ch.disabled)
         .enumerate()
         .into_iter()
         .map(|(index, ch)| {
             let dev = device.clone();
             let acc = accessory.clone();
-            async move { to_characteristic(cid, aid, index, ch, dev, acc).await }.boxed()
+            async move {
+                let tag = ch.tag.clone();
+                let cts = to_characteristic(cid, aid, index, ch, dev, acc).await?;
+                Ok((tag, cts))
+            }.boxed()
         }).collect();
 
     let chs_list = join_all(chs).await;
     let mut success = false;
     for ch in chs_list.into_iter() {
         match ch {
-            Ok(cts) => {
-                hap_service.push_characteristic(Box::new(cts));
+            Ok((tag, cts)) => {
+                hap_service.push_characteristic(tag, Box::new(cts));
                 success = true;
             }
             Err(e) => {
@@ -231,12 +245,12 @@ async fn add_service(aid: u64, cid: u64, service_chs: (HapServiceModel, Vec<HapC
             let id = cid + len as u64 + 1;
             let mut name = ConfiguredNameCharacteristic::new(id, aid);
             name.set_value(JsonValue::String(n)).await?;
-            hap_service.push_characteristic(Box::new(name));
+            hap_service.push_characteristic(Some("configured-name".to_string()), Box::new(name));
         }
     };
 
     if success {
-        accessory.lock().await.push_service(Box::new(hap_service));
+        accessory.lock().await.push_service(service.tag, Box::new(hap_service));
     } else {
         error!("服务:{:?}没有可用的特征", service);
     }

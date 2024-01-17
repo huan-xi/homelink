@@ -73,7 +73,7 @@ impl OpenMiioGatewayDevice {
         let ip = self.info.localip.clone().ok_or(ExitError::ConnectEmpty)?;
         let proto = OpenMiIOMqttSpecProtocol::new(ip.as_str(), 1883)
             .await
-            .tap_err(|e| error!("连接网关失败,ip:{}: {:?}", ip,e))
+            .tap_err(|e| error!("连接网关失败,ip:{}: {}", ip,e))
             .map_err(|_| ExitError::ConnectErr)?;
         let p_arc = Arc::new(proto);
         write.replace(p_arc.clone());

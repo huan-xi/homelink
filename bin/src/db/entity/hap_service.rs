@@ -46,9 +46,11 @@ pub struct Model {
     /// 配件id
     pub accessory_id: i64,
     pub name: Option<String>,
+    pub tag: Option<String>,
     pub memo: Option<String>,
     pub service_type: MappingHapType,
     pub disabled: bool,
+
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveColumn)]
@@ -58,6 +60,7 @@ pub enum Column {
     ServiceType,
     Memo,
     Name,
+    Tag,
     Disabled,
 }
 
@@ -88,6 +91,7 @@ impl ColumnTrait for Column {
             Self::Disabled => ColumnType::Boolean.def(),
             Self::Memo => ColumnType::String(None).def().null(),
             Self::Name => ColumnType::String(None).def().null(),
+            Self::Tag => ColumnType::String(None).def().null(),
         }
     }
 }

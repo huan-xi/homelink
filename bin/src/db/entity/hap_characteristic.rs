@@ -5,7 +5,7 @@ use sea_orm::{FromJsonQueryResult, JsonValue};
 use serde::{Deserialize, Serialize};
 use crate::hap::hap_type::MappingHapType;
 use serde_aux::prelude::deserialize_number_from_string;
-use miot_spec::device::ble::value_types::{BleValue, BleValueType};
+use miot_spec::device::ble::value_types::{BleValueType};
 use crate::hap::unit_convertor::{ConvertorParamType, UnitConvertor};
 
 #[derive(Copy, Clone, Default, Debug, DeriveEntity)]
@@ -105,6 +105,7 @@ pub struct Model {
     pub unit: Option<String>,
     pub min_value: Option<JsonValue>,
     pub max_value: Option<JsonValue>,
+    pub tag: Option<String>,
     pub max_len: Option<JsonValue>,
     /// 单位转换器
     pub unit_convertor: Option<UnitConvertor>,
@@ -118,6 +119,7 @@ pub enum Column {
     ServiceId,
     MappingParam,
     Name,
+    Tag,
     Disabled,
     CharacteristicType,
     MappingMethod,
@@ -158,6 +160,7 @@ impl ColumnTrait for Column {
             Self::MappingParam => ColumnType::String(None).def().null(),
             Self::FixedValue => ColumnType::String(None).def().null(),
             Self::Name => ColumnType::String(Some(64)).def().null(),
+            Self::Tag => ColumnType::String(Some(64)).def().null(),
             Self::Format => ColumnType::String(None).def().null(),
             Self::Unit => ColumnType::String(None).def().null(),
             Self::MinValue => ColumnType::String(None).def().null(),

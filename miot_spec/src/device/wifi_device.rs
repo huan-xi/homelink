@@ -111,9 +111,10 @@ impl WifiDevice {
         //arp 获取map地址? mdns 获取ip
         let ip = self.info.localip.as_ref()
             .ok_or(ExitError::ConnectEmpty)?; // .expect("ip 不能为空");
-        let udp = UdpMiotSpecProtocol::new(ip.as_str(), 54321, token_bytes)
+        let port = 54321;
+        let udp = UdpMiotSpecProtocol::new(ip.as_str(), port, token_bytes)
             .await
-            .tap_err(|e| error!("udp 连接失败:{:?}", e))
+            .tap_err(|e| error!("udp 连接:{}:{}失败:{}",ip,port ,e))
             .map_err(|_| ConnectErr)?;
         let proto = Arc::new(udp);
         write.replace(proto.clone());
