@@ -14,7 +14,7 @@ use serde_json::Value;
 use tokio::sync::RwLock;
 use crate::device::ble::value_types::{BleValue, BleValueType, ValueLsbI16};
 use crate::device::gateway::gateway::OpenMiioGatewayDevice;
-use crate::device::emitter::{DataListener, DataEmitter, EventType};
+use crate::device::emitter::{DataListener, DataEmitter, EventType,};
 use crate::device::MiotDevicePointer;
 use crate::proto::miio_proto::{MiotSpecDTO, MiotSpecId, MiotSpecProtocolPointer};
 use crate::proto::protocol::{ExitError, RecvMessage};
@@ -147,12 +147,14 @@ impl BleDevice {
                         debug!("emit empty:{:?}", tp);
                     }
                     Some(ps) => {
-                        self.emit(EventType::UpdateProperty(MiotSpecDTO {
+                        let event = EventType::UpdateProperty(MiotSpecDTO {
                             did: self.info.did.clone(),
                             siid: ps.siid,
                             piid: ps.piid,
                             value: Some(value),
-                        })).await;
+                        });
+
+                        self.emit(event).await;
                     }
                 };
             }

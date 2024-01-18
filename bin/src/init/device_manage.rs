@@ -2,18 +2,23 @@ use std::fs;
 use std::ops::Deref;
 use std::path::PathBuf;
 use std::sync::{Arc};
+use axum::body::HttpBody;
 use dashmap::DashMap;
-use dashmap::mapref::one::Ref;
+use dashmap::mapref::entry::Entry;
+use dashmap::mapref::one::{Ref, RefMut};
 use deno_runtime::deno_fetch::reqwest::Url;
 use futures_util::FutureExt;
 use log::{error, info};
 use sea_orm::JsonValue;
 use tap::TapFallible;
 use tokio::sync::{broadcast, mpsc, oneshot};
+use miot_spec::device::emitter::EventType;
 use miot_spec::device::miot_spec_device::{MiotSpecDevice};
 use miot_spec::device::MiotDevicePointer;
 use crate::config::context::get_app_context;
 use crate::init::{DevicePointer};
+use crate::js_engine::channel::main_channel::ToModuleEvent;
+use crate::js_engine::channel::params::{OnCharReadParam, OnDeviceEventParam};
 
 pub struct JsModule {
     ///与 特征脚本通信的通道
@@ -50,45 +55,45 @@ impl DeviceWithJsEngine {
     /// 初始化js模块,获取通道
     pub async fn init_mapping_js_module(&self, cid: i64, script: &str, force: bool) -> anyhow::Result<()> {
         todo!();
-      /*  let chanel_sender = self.mapping_js_map.get_mut(&cid);
-        if let Some(sender) = chanel_sender.as_ref() {
-            //todo force 处理
-            return Ok(sender.sender.clone());
-        }
+        /*  let chanel_sender = self.mapping_js_map.get_mut(&cid);
+          if let Some(sender) = chanel_sender.as_ref() {
+              //todo force 处理
+              return Ok(sender.sender.clone());
+          }
 
-        //输出到文件
-        let context = get_app_context();
-        let dir = context.config.server.data_dir.as_str();
-        let js_file_str = format!("{}/js_scripts/mapping/mapping_{}.js", dir, cid);
-        let js_file = PathBuf::from(js_file_str.as_str());
-        fs::create_dir_all(js_file.parent().unwrap())?;
-        fs::write(js_file.as_path(), script)?;
-        let url = Url::parse(js_file_str.as_str())?;
+          //输出到文件
+          let context = get_app_context();
+          let dir = context.config.server.data_dir.as_str();
+          let js_file_str = format!("{}/js_scripts/mapping/mapping_{}.js", dir, cid);
+          let js_file = PathBuf::from(js_file_str.as_str());
+          fs::create_dir_all(js_file.parent().unwrap())?;
+          fs::write(js_file.as_path(), script)?;
+          let url = Url::parse(js_file_str.as_str())?;
 
-        //注册mapping 通道,
-        let channel = context.js_engine.mapping_characteristic_map.get(&cid);
-        let (tx, _) = broadcast::channel(10);
-        let js_to_tx = Arc::new(tx);
-        // 注册模块
-        let (recv, exit, sender) = MappingCharacteristicRecv::new(js_to_tx.clone());
-        let ch_sender = MappingCharacteristicSender::new(sender, js_to_tx.clone());
-        let ch_sender = Arc::new(ch_sender);
-        context.js_engine.mapping_characteristic_map.insert(cid, recv);
-        let module = JsModule { sender: ch_sender.clone(), exit_channel: exit };
+          //注册mapping 通道,
+          let channel = context.js_engine.mapping_characteristic_map.get(&cid);
+          let (tx, _) = broadcast::channel(10);
+          let js_to_tx = Arc::new(tx);
+          // 注册模块
+          let (recv, exit, sender) = MappingCharacteristicRecv::new(js_to_tx.clone());
+          let ch_sender = MappingCharacteristicSender::new(sender, js_to_tx.clone());
+          let ch_sender = Arc::new(ch_sender);
+          context.js_engine.mapping_characteristic_map.insert(cid, recv);
+          let module = JsModule { sender: ch_sender.clone(), exit_channel: exit };
 
-        return match context.js_engine
-            .execute_side_module(      ExecuteSideModuleParam::new(1, url)).await
-            .tap_err(|e| error!("执行js错误")) {
-            Ok(_) => {
-                self.mapping_js_map.insert(cid, module);
-                Ok(ch_sender.clone())
-            }
-            Err(_) => {
-                //删除掉
-                context.js_engine.mapping_characteristic_map.remove(&cid);
-                Err(anyhow::anyhow!("执行js错误"))
-            }
-        };*/
+          return match context.js_engine
+              .execute_side_module(      ExecuteSideModuleParam::new(1, url)).await
+              .tap_err(|e| error!("执行js错误")) {
+              Ok(_) => {
+                  self.mapping_js_map.insert(cid, module);
+                  Ok(ch_sender.clone())
+              }
+              Err(_) => {
+                  //删除掉
+                  context.js_engine.mapping_characteristic_map.remove(&cid);
+                  Err(anyhow::anyhow!("执行js错误"))
+              }
+          };*/
     }
 
 
@@ -142,6 +147,7 @@ impl DeviceWithJsEngine {
 
 pub struct DeviceTask {
     dev: DevicePointer,
+    /// 关闭整个任务
     close_sender: tokio::sync::oneshot::Sender<bool>,
     // exit_recv: tokio::sync::oneshot::Receiver<bool>,
 }
@@ -149,13 +155,17 @@ pub struct DeviceTask {
 
 pub struct IotDeviceManagerInner {
     device_map: dashmap::DashMap<i64, DeviceTask>,
+    did_map: dashmap::DashMap<String, i64>,
+    device_id_enable_js_map: dashmap::DashMap<i64, bool>,
 }
 
 
 impl IotDeviceManagerInner {
     pub fn new() -> Self {
         Self {
-            device_map: dashmap::DashMap::new()
+            device_map: dashmap::DashMap::new(),
+            did_map: Default::default(),
+            device_id_enable_js_map: Default::default(),
         }
     }
     pub fn push_device(&self, device_id: i64, device: DevicePointer) {
@@ -167,6 +177,7 @@ impl IotDeviceManagerInner {
             close_sender,
         };
         self.device_map.insert(device_id, device);
+        self.did_map.insert(dev_c.get_info().did.clone(), device_id);
         //执行任务
         tokio::spawn(async move {
             let task = async move {
@@ -239,6 +250,42 @@ pub struct IotDeviceManager {
 
 impl IotDeviceManager {
     pub fn new() -> Self { Self { inner: Arc::new(IotDeviceManagerInner::new()) } }
+
+    /// 开启js 提交监听器
+    pub async fn enable_to_js(&self, did: &str) -> anyhow::Result<()> {
+        let dev = self.did_map.get(did)
+            .and_then(|i| self.device_map.get(i.value()))
+            .ok_or(anyhow::anyhow!("设备不存在"))?;
+
+        if let Entry::Vacant(entry) = self.device_id_enable_js_map.entry(*dev.key()) {
+            let sender = get_app_context().js_engine.sender.clone();
+            info!("开启js 通道:{did}");
+            let did = did.to_string();
+
+            let listener = Box::new(move |event: EventType| {
+                let did = did.to_string();
+                let sender = sender.clone();
+                async move {
+                    //排除掉网关消息
+                    if let EventType::GatewayMsg(_) = event {
+                        return Ok(());
+                    };
+                    let _ = sender.send(ToModuleEvent::OnDeviceEvent(OnDeviceEventParam {
+                        did: did.to_string(),
+                        event,
+                    })).await;
+                    Ok(())
+                }.boxed()
+            });
+
+
+            dev.dev.add_listener(listener).await;
+            entry.insert(true);
+        };
+
+
+        Ok(())
+    }
 }
 
 impl Deref for IotDeviceManager {

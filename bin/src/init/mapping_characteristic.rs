@@ -1,24 +1,23 @@
 use anyhow::anyhow;
 use futures_util::FutureExt;
 use hap::characteristic::{AsyncCharacteristicCallbacks, Characteristic, CharacteristicCallbacks, Format, HapCharacteristic, OnReadFuture, OnUpdateFuture, Perm, Unit};
-use hap::HapType;
 use log::{debug, error, info};
 use sea_orm::JsonValue;
 use serde_json::Value;
-use tap::{Tap, TapFallible, TapOptional};
+use tap::{Tap, TapFallible};
 use miot_spec::device::emitter::{DataListener, EventType};
 use miot_spec::device::emitter::EventType::{UpdateProperty};
 use crate::config::context::get_app_context;
 use crate::hap::iot_characteristic::{CharacteristicValue, IotCharacteristic};
-use crate::hap::unit_convertor::{ConvertorParamType, UnitConv, UnitConvertor};
+use crate::hap::unit_convertor::{ UnitConv};
 use crate::db::entity::hap_characteristic::{MappingMethod, MappingParam, Model, Property};
 use crate::db::entity::prelude::HapCharacteristicModel;
 use crate::init::{DevicePointer, HapAccessoryPointer};
 use crate::js_engine::channel::main_channel::{FromModuleResp, ToModuleEvent};
-use crate::js_engine::channel::params::{OnCharReadParam, OnCharUpdateParam};
+use crate::js_engine::channel::params::{BindDeviceModuleParam, OnCharReadParam, OnCharUpdateParam};
 
 
-pub async fn to_characteristic(sid: u64, aid: u64, index: usize, ch: HapCharacteristicModel,
+pub async fn to_characteristic(sid: u64, aid: u64, stag: Option<String>, index: usize, ch: HapCharacteristicModel,
                                device: DevicePointer, accessory: HapAccessoryPointer) -> anyhow::Result<IotCharacteristic> {
     let format: Format = serde_json::from_str(format!("\"{}\"", ch.format).as_str())
         .map_err(|e| anyhow!("格式转换错误:{:?}", e))?;
@@ -51,7 +50,7 @@ pub async fn to_characteristic(sid: u64, aid: u64, index: usize, ch: HapCharacte
     set_default_for_cts(&mut cts, ch.clone())?;
 
     // 这是属性方法
-    set_read_update_method(aid, sid, &mut cts, ch, device, accessory).await?;
+    set_read_update_method(aid, sid, stag, &mut cts, ch, device, accessory).await?;
     //当前特征值设置
     cts.0.value = match cts.0.min_value.as_ref() {
         None => {
@@ -67,7 +66,7 @@ pub async fn to_characteristic(sid: u64, aid: u64, index: usize, ch: HapCharacte
 
 
 /// 设置特征的读写方法
-async fn set_read_update_method(aid: u64, sid: u64,
+async fn set_read_update_method(aid: u64, sid: u64, stag: Option<String>,
                                 cts: &mut IotCharacteristic,
                                 ch: HapCharacteristicModel,
                                 device: DevicePointer,
@@ -97,25 +96,23 @@ async fn set_read_update_method(aid: u64, sid: u64,
                 //注册属性事件
                 device.register_property(ps.siid, ps.piid).await;
                 let listener = ToChUtils::get_miot_listener(sid, cid, did, accessory.clone(), ps.clone(), unit_conv.clone());
-                device.add_listener(Box::new(listener)).await;
+                device.add_listener(listener).await;
             } else {
                 return Err(anyhow!("映射参数不能为空"));
             }
         }
         MappingMethod::JsScript => {
-            /*      let param = if let Some(MappingParam::JsScript(param)) = ch.mapping_param {
-                      param
-                  } else {
-                      return Err(anyhow!("映射参数不能为空"));
-                  };*/
+
             // 获取 channel
-            let char_tag = ch.tag.clone()
-                .ok_or(anyhow!("js 几班特征标识不能为空"))?;
+            let stag = stag.clone().ok_or(anyhow!("service 特征标识不能为空"))?;
+            let char_tag = ch.tag.clone().ok_or(anyhow!("char 特征标识不能为空"))?;
             let sender = get_app_context().js_engine.sender.clone();
             let sender_c = sender.clone();
             let char_tag_c = char_tag.clone();
+            let stag_c = stag.clone();
             let read = move || {
                 let char_tag = char_tag_c.clone();
+                let stag = stag_c.clone();
                 let sender = sender_c.clone();
                 async move {
                     let ch_id = get_app_context()
@@ -124,7 +121,7 @@ async fn set_read_update_method(aid: u64, sid: u64,
 
                     let resp = sender.send(ToModuleEvent::OnCharRead(OnCharReadParam {
                         ch_id,
-                        service_tag: "".to_string(),
+                        service_tag: stag,
                         char_tag,
                     })).await?;
                     if let FromModuleResp::CharReadResp(value) = resp {
@@ -139,16 +136,19 @@ async fn set_read_update_method(aid: u64, sid: u64,
             let update = move |old_val: CharacteristicValue, new_val: CharacteristicValue| {
                 let sender = sender_c.clone();
                 let char_tag = char_tag_c.clone();
+                let stag = stag.clone();
                 async move {
                     if old_val == new_val {
                         return Ok(());
                     };
                     let ch_id = get_app_context()
                         .hap_manager
-                        .get_accessory_ch_id(aid).await.unwrap();
+                        .get_accessory_ch_id(aid)
+                        .await?;
+
                     let _ = sender.send(ToModuleEvent::OnCharUpdate(OnCharUpdateParam {
                         ch_id,
-                        service_tag: "".to_string(),
+                        service_tag: stag,
                         old_value: old_val.value,
                         char_tag,
                         new_value: new_val.value,
@@ -158,6 +158,21 @@ async fn set_read_update_method(aid: u64, sid: u64,
                 }.boxed()
             };
             cts.on_update_async(Some(update));
+            //注册事件,dev 将事件 发送到js,js调用ch 的 事件处理方法,可以复用消息
+            let did = device.get_info().did.clone();
+            get_app_context().device_manager.enable_to_js(did.as_str()).await?;
+
+            // crate::js_engine::channel::main_channel::ToModuleEvent
+            let ch_id = get_app_context()
+                .hap_manager
+                .get_accessory_ch_id(aid).await?;
+
+            let _ = get_app_context()
+                .js_engine.send(
+                ToModuleEvent::BindDeviceModule(BindDeviceModuleParam {
+                    ch_id,
+                    dev_id: did,
+                })).await.map_err(|f| anyhow!("绑定事件通道失败"))?;
         }
     }
 

@@ -20,7 +20,7 @@ use tokio::io::AsyncWriteExt;
 use tokio::runtime::Builder;
 use tokio::time::timeout;
 use crate::js_engine::channel::{main_channel, MsgId};
-use crate::js_engine::channel::main_channel::{ FromModuleResp, ResultSenderPointer, ToModuleEvent, ToModuleSender};
+use crate::js_engine::channel::main_channel::{FromModuleResp, ResultSenderPointer, ToModuleEvent, ToModuleSender};
 use crate::js_engine::channel::params::ExecuteSideModuleParam;
 use crate::js_engine::ext::env;
 use crate::js_engine::ext::env::{EnvContext};
@@ -49,13 +49,17 @@ pub struct JsEngine {
 }
 
 impl JsEngine {
+    pub async fn send(&self, event: ToModuleEvent) -> anyhow::Result<FromModuleResp> {
+        self.sender.send(event).await
+    }
+
     pub async fn execute_side_module(&self, param: ExecuteSideModuleParam) -> anyhow::Result<()> {
         let id = param.ch_id;
 
         let resp = self.sender.send(ToModuleEvent::ExecuteSideModule(param))
             .await
             .tap_err(|e| error!("发送ExecuteSideModule 指令失败:{:?}",e))?;
-        if let FromModuleResp::ExecuteModuleResp(resp)= resp {
+        if let FromModuleResp::ExecuteModuleResp(resp) = resp {
             if resp.ch_id != id {
                 return Err(anyhow!("返回的通道id不一致"));
             }

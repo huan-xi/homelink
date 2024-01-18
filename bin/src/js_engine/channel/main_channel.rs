@@ -14,7 +14,7 @@ use futures_util::FutureExt;
 use impl_new::New;
 use serde::{Deserialize, Serialize};
 use tokio::time::timeout;
-use crate::js_engine::channel::params::{ExecuteSideModuleParam, OnCharReadParam, OnCharUpdateParam};
+use crate::js_engine::channel::params::{BindDeviceModuleParam, ExecuteSideModuleParam, OnCharReadParam, OnCharUpdateParam, OnDeviceEventParam};
 
 pub type ResultSenderPointer = Arc<broadcast::Sender<(MsgId, FromModuleResp)>>;
 
@@ -40,6 +40,7 @@ pub enum FromModuleResp {
     CharUpdateResp,
     /// 执行模块的响应
     ExecuteModuleResp(ExecuteHapModuleResult),
+    BindDeviceModuleResp,
     /// 错误
     Error(String),
     Success,
@@ -49,14 +50,18 @@ pub enum FromModuleResp {
 
 
 /// 发送给模块的事件类型
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize)]
 #[serde(tag = "type")]
 pub enum ToModuleEvent {
     ExecuteSideModule(ExecuteSideModuleParam),
+    /// 绑定设备和模块 事件关系
+    BindDeviceModule(BindDeviceModuleParam),
     /// 当特征值读取数据
     OnCharRead(OnCharReadParam),
+    OnDeviceEvent(OnDeviceEventParam),
     OnCharUpdate(OnCharUpdateParam),
 }
+
 
 #[test]
 pub fn test_serde() {
@@ -86,8 +91,8 @@ pub fn test() {
 /// 发送给模块的发送器
 pub struct ToModuleSender {
     /// 发送器
-    pub sender: mpsc::Sender<(MsgId, ToModuleEvent)>,
-    pub id: AtomicU64,
+    sender: mpsc::Sender<(MsgId, ToModuleEvent)>,
+    id: AtomicU64,
     /// 读取结果接收器,需要从sender 中订阅
     pub read_result_recv: ResultSenderPointer,
 }

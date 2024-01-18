@@ -53,9 +53,10 @@ impl RetryInfo {
         let read = self.retry_count.lock().await;
         // 产生1-1000 随机数
         let rand = rand::random::<u32>() % 1000 + 1;
-        2u32.pow(*read-1) * 1000 + rand
+        2u32.pow(*read - 1) * 1000 + rand
     }
 }
+
 #[tokio::test]
 async fn test_retry_info() {
     let retry_info = RetryInfo::default();
@@ -80,9 +81,10 @@ pub struct BaseMiotSpecDevice {
     pub status: RwLock<DeviceStatus>,
     /// 注册轮询的属性
     pub registered_property: Arc<RwLock<Vec<MiotSpecId>>>,
+
     pub(crate) emitter: Arc<RwLock<DataEmitter<EventType>>>,
     pub tx: broadcast::Sender<EventType>,
-    pub retry_info:RetryInfo,
+    pub retry_info: RetryInfo,
 }
 
 impl Default for BaseMiotSpecDevice {
@@ -107,6 +109,8 @@ pub enum MiotDeviceType<'a> {
 
 #[async_trait::async_trait]
 pub trait MiotSpecDevice {
+
+
     fn get_info(&self) -> &DeviceInfo;
     fn get_base(&self) -> &BaseMiotSpecDevice;
 
@@ -151,6 +155,6 @@ pub trait MiotSpecDevice {
         self.get_base().emitter.write().await.emit(event).await
     }
     async fn add_listener(&self, listener: DataListener<EventType>) {
-        self.get_base().emitter.write().await.add_listener(listener).await
+        self.get_base().emitter.write().await.add_listener(listener)
     }
 }

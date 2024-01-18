@@ -19,6 +19,7 @@ use crate::config::context::get_app_context;
 use crate::hap::iot_characteristic::IotCharacteristic;
 use crate::hap::iot_hap_accessory::{IotDeviceAccessory, IotHapAccessory};
 use crate::db::entity::prelude::{HapAccessoryColumn, HapAccessoryEntity, HapAccessoryModel, HapBridgeEntity, HapBridgeColumn, HapCharacteristicEntity, HapCharacteristicModel, HapServiceColumn, HapServiceEntity, HapServiceModel};
+use crate::db::SNOWFLAKE;
 use crate::init::{DevicePointer, FuturesMutex, HapAccessoryPointer};
 use crate::hap::iot_hap_service::IotHapService;
 use crate::init::device_manage::{IotDeviceManager, IotDeviceManagerInner};
@@ -96,7 +97,6 @@ pub async fn init_hap(conn: &DatabaseConnection, manage: HapManage, iot_device_m
         }
         server.configuration_number_incr().await;
         manage.push_server(bid, server, accessories);
-
     }
     Ok(())
 }
@@ -179,13 +179,12 @@ async fn init_hap_accessory<'a>(conn: &DatabaseConnection,
         .find_with_related(HapCharacteristicEntity)
         .all(conn)
         .await?;
-    let mut ha = IotHapAccessory::new(aid, hss);
-/*    for (svc_model, _) in &services {
-        if let Some(tag) = svc_model.tag.clone(){
-            ha.tag_ids_map.entry(tag.clone()).or_insert(vec![]).push(svc_model.id as u64);
-        }
-    }*/
+    let ha = IotHapAccessory::new(aid, hss);
     let accessory = Arc::new(FuturesMutex::new(Box::new(ha) as Box<dyn HapAccessory>));
+    let ch_id = SNOWFLAKE.next_id();
+    // 注册到manage 上
+    hap_manage.put_accessory_ch(aid, ch_id, false).await;
+
 
     for service in services.into_iter() {
         let len = add_service(aid, cid, service, device.clone(), accessory.clone()).await?;
@@ -195,7 +194,7 @@ async fn init_hap_accessory<'a>(conn: &DatabaseConnection,
     // 查询script
     if let Some(script) = hap_accessory.script {
         // 初始化hap js模块,
-        init_hap_accessory_module(hap_manage, aid, script.as_str()).await?;
+        init_hap_accessory_module(hap_manage,ch_id, aid, script.as_str()).await?;
     };
 
     Ok(accessory.clone())
@@ -209,7 +208,7 @@ async fn add_service(aid: u64, cid: u64, service_chs: (HapServiceModel, Vec<HapC
     let service = service_chs.0;
     let chs = service_chs.1;
     let mut hap_service = IotHapService::new(cid, aid, service.service_type.into());
-
+    let stag = service.tag.clone();
     let chs: Vec<BoxFuture<anyhow::Result<(Option<String>, IotCharacteristic)>>> = chs.into_iter()
         .filter(|ch| !ch.disabled)
         .enumerate()
@@ -217,10 +216,11 @@ async fn add_service(aid: u64, cid: u64, service_chs: (HapServiceModel, Vec<HapC
         .map(|(index, ch)| {
             let dev = device.clone();
             let acc = accessory.clone();
+            let stag = stag.clone();
             async move {
-                let tag = ch.tag.clone();
-                let cts = to_characteristic(cid, aid, index, ch, dev, acc).await?;
-                Ok((tag, cts))
+                let c_tag = ch.tag.clone();
+                let cts = to_characteristic(cid, aid, stag, index, ch, dev, acc).await?;
+                Ok((c_tag, cts))
             }.boxed()
         }).collect();
 

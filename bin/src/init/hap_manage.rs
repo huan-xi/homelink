@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::ops::Deref;
 use std::sync::Arc;
 use anyhow::anyhow;
+use impl_new::New;
 use log::{error, info};
 use serde_json::Value;
 use tap::TapFallible;
@@ -20,16 +21,21 @@ pub struct ServiceTagMap {
     char_tags: HashMap<String, u64>,
 }
 
+#[derive(New)]
+pub struct ChannelInfo {
+    ch_id: i64,
+    ruing: bool,
+}
+
 pub struct AccessoryInfo {
     /// 配件id
     pub aid: u64,
     /// 配件与js 通信的通道
-    pub ch_id: Option<i64>,
+    pub ch_id: Option<ChannelInfo>,
     /// 设备id
     pub device_id: i64,
     /// 桥接器的id
     pub bid: i64,
-
     ///tags-> service_id,char_ids
     pub service_tag_map: HashMap<String, ServiceTagMap>,
 
@@ -40,12 +46,13 @@ pub struct AccessoryInfo {
 
 /// hap 设备管理器
 /// 移除device 必须移除其对应的hap 设备
+#[derive(Default)]
 pub struct HapManageInner {
     server_map: dashmap::DashMap<i64, HapTask>,
     // 配件id关系
     aid_map: dashmap::DashMap<u64, AccessoryInfo>,
-    // aid_bid_map: dashmap::DashMap<u64, i64>,
-    aid_ch_id_map: dashmap::DashMap<u64, i64>,
+    /// 每个配件同时只能运行一个
+    aid_ch_map: dashmap::DashMap<u64, ChannelInfo>,
     /// 配件与设备的关系
     dev_aid_map: dashmap::DashMap<i64, u64>,
 
@@ -72,14 +79,14 @@ impl HapManageInner {
         }
         Ok(())
     }
-    pub async fn put_accessory_ch(&self, aid: u64, ch_id: i64) {
-        self.aid_ch_id_map.insert(aid, ch_id);
+    pub async fn put_accessory_ch(&self, aid: u64, ch_id: i64, status: bool) {
+        self.aid_ch_map.insert(aid, ChannelInfo::new(ch_id, status));
     }
 
     pub async fn get_accessory_ch_id(&self, aid: u64) -> anyhow::Result<i64> {
-        self.aid_ch_id_map
+        self.aid_ch_map
             .get(&aid)
-            .map(|i| i.clone())
+            .map(|i| i.ch_id)
             .ok_or(anyhow!("未运行js脚本"))
     }
 
@@ -137,7 +144,6 @@ pub struct HapManage {
 }
 
 
-
 impl Deref for HapManage {
     type Target = HapManageInner;
 
@@ -150,10 +156,7 @@ impl HapManage {
     pub fn new() -> Self {
         Self {
             inner: Arc::new(HapManageInner {
-                server_map: Default::default(),
-                aid_map: Default::default(),
-                aid_ch_id_map: Default::default(),
-                dev_aid_map: Default::default(),
+                ..Default::default()
             })
         }
     }

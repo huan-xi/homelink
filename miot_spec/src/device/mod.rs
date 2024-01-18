@@ -8,7 +8,7 @@ pub mod emitter;
 pub mod gateway;
 pub mod gw_zigbee_device;
 pub mod ble;
-
+mod utils;
 
 
 pub type MiotDevicePointer = Arc<dyn MiotSpecDevice + Send + Sync + 'static>;

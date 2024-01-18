@@ -1,5 +1,6 @@
 use std::process::ExitCode;
 use std::sync::Arc;
+use std::time::Duration;
 use anyhow::anyhow;
 use futures_util::future::BoxFuture;
 use futures_util::FutureExt;
@@ -11,6 +12,7 @@ use crate::proto::protocol::{ExitError, JsonMessage};
 use tokio::sync::RwLock;
 use crate::device::emitter::EventType;
 use crate::device::miot_spec_device::{BaseMiotSpecDevice, DeviceInfo, MiotSpecDevice};
+use crate::device::utils::get_poll_func;
 use crate::proto::miio_proto::{MiotSpecProtocolPointer, MsgCallback};
 use crate::proto::transport::open_miio_mqtt_proto::OpenMiIOMqttSpecProtocol;
 
@@ -20,6 +22,8 @@ pub struct OpenMiioGatewayDevice {
     info: DeviceInfo,
     proto: Arc<RwLock<Option<MiotSpecProtocolPointer>>>,
     base: BaseMiotSpecDevice,
+    /// 轮询间隔
+    pub interval: Duration,
 }
 
 #[async_trait::async_trait]
@@ -51,10 +55,13 @@ impl MiotSpecDevice for OpenMiioGatewayDevice {
                     let _ = self.base.tx.send(EventType::GatewayMsg(msg));
                 };
             };
+
+            let poll = get_poll_func(self, self.info.did.as_str(), self.interval);
             loop {
                 select! {
-                    _ = listen =>{break;}
-                    _ = forward =>{break;}
+                    _ = listen =>break,
+                    _ = forward =>break,
+                    _ = poll => break
                 }
             }
             // futures_util::join!(listen, a);
@@ -84,6 +91,6 @@ impl OpenMiioGatewayDevice {
         let _ = info.localip.clone()
             .ok_or(anyhow!("网关设备ip不能为空"))?;
         let base: BaseMiotSpecDevice = Default::default();
-        Ok(Self { info, proto: Arc::new(RwLock::new(None)), base })
+        Ok(Self { info, proto: Arc::new(RwLock::new(None)), base, interval: Duration::from_secs(1) })
     }
 }

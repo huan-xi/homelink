@@ -9,7 +9,7 @@ use log::{error, info};
 use tap::TapFallible;
 use tokio::select;
 use tokio::sync::RwLock;
-use crate::device::emitter::{DataEmitter, DataListener, EventType};
+use crate::device::utils::get_poll_func;
 use crate::proto::protocol::ExitError;
 use crate::proto::protocol::ExitError::ConnectErr;
 use crate::proto::transport::udp_iot_spec_proto::UdpMiotSpecProtocol;
@@ -48,41 +48,7 @@ impl MiotSpecDevice for WifiDevice {
             //开启状态获取
             let listen = proto.start_listen();
             // 开启轮询
-            let poll = async {
-                loop {
-                    tokio::time::sleep(self.interval).await;
-                    if self.base.emitter.read().await.is_empty() {
-                        continue;
-                    };
-                    let proto = match self.get_proto().await {
-                        Ok(p) => {
-                            p
-                        }
-                        Err(e) => {
-                            error!("获取协议失败");
-                            break;
-                        }
-                    };
-
-                    let params = self.base.registered_property
-                        .read()
-                        .await.iter()
-                        .map(|id| MiotSpecDTO {
-                            did: self.info.did.clone(),
-                            siid: id.siid,
-                            piid: id.piid,
-                            value: None,
-                        }).collect::<Vec<MiotSpecDTO>>();
-                    if params.is_empty() {
-                        continue;
-                    }
-                    if let Ok(results) = proto.get_properties(params, None).await {
-                        for result in results {
-                            self.base.emitter.clone().write().await.emit(EventType::UpdateProperty(result)).await;
-                        }
-                    }
-                }
-            };
+            let poll = get_poll_func(self, self.info.did.as_str(), self.interval);
             loop {
                 select! {
                     _ = listen => break,

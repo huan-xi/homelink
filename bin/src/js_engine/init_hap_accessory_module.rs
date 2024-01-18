@@ -12,22 +12,22 @@ use crate::js_engine::channel::params::ExecuteSideModuleParam;
 
 /// hap 设备作为一个module 运行
 
-pub async fn init_hap_accessory_module(manage: HapManage, aid: u64, script: &str) -> anyhow::Result<()> {
+pub async fn init_hap_accessory_module(manage: HapManage, ch_id: i64,aid: u64, script: &str) -> anyhow::Result<()> {
     // let (sender, recv, exit_ch) = hap_channel::channel();
     //注册到context
     let url = init_js_files(aid, script)?;
     //注册到context
     let context = get_app_context();
     // context.js_engine.hap_map.insert(aid, recv);
-    let id = SNOWFLAKE.next_id();
+
     // 执行js
     match context.js_engine
-        .execute_side_module(ExecuteSideModuleParam::new(id, url)).await
+        .execute_side_module(ExecuteSideModuleParam::new(ch_id, url)).await
         .tap_err(|e| error!("执行js错误"))
     {
         Ok(_) => {
             // 注册到manage 上
-            manage.put_accessory_ch(aid, id).await;
+            manage.put_accessory_ch(aid, ch_id, true).await;
             Ok(())
         }
         Err(e) => {

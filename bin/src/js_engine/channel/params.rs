@@ -2,6 +2,7 @@ use deno_runtime::deno_core::url::Url;
 use impl_new::New;
 use sea_orm::JsonValue;
 use serde::{Deserialize, Serialize};
+use miot_spec::device::emitter::EventType;
 
 #[derive(Clone, Serialize, Deserialize, New)]
 #[serde(rename_all = "camelCase")]
@@ -9,9 +10,23 @@ pub struct ExecuteSideModuleParam {
     pub ch_id: i64,
     pub url: Url,
 }
+#[derive(Clone, Serialize, Deserialize, New)]
+#[serde(rename_all = "camelCase")]
+pub struct BindDeviceModuleParam {
+    pub ch_id: i64,
+    pub dev_id: String,
+}
+
+#[derive(Clone, Serialize, Debug, New)]
+#[serde(rename_all = "camelCase")]
+pub struct OnDeviceEventParam {
+    pub(crate) did: String,
+    pub(crate) event: EventType,
+
+}
 
 
-#[derive(Clone, Serialize, Deserialize, Debug, New)]
+#[derive(Clone, Serialize, Debug, New)]
 #[serde(rename_all = "camelCase")]
 pub struct OnCharReadParam {
     // 通道id
