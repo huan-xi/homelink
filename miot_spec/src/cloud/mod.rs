@@ -1,11 +1,13 @@
 mod types;
 pub mod state;
+mod cookie_store_mutex;
 
 use crypto::symmetriccipher::SynchronousStreamCipher;
 use crypto::rc4::Rc4;
 use base64;
 use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
+use std::i64;
 use std::io::Write;
 use std::iter::repeat;
 use std::path::PathBuf;
@@ -38,6 +40,7 @@ mod test {
     use base64::Engine;
     use base64::engine::general_purpose::STANDARD;
     use base64::prelude::BASE64_STANDARD_NO_PAD;
+    use log::info;
     use crate::cloud::Utils;
 
     #[test]
@@ -53,23 +56,28 @@ mod test {
     }
 
     #[test]
+    pub fn test_map() {
+        let mut map = BTreeMap::new();
+        map.insert("data".to_string(), "test".to_string());
+        map.insert("data1".to_string(), "test".to_string());
+        map.insert("data2".to_string(), "test".to_string());
+        println!("map:{:?}", map);
+    }
+
+    #[test]
     pub fn test_gen_enc_signature() {
         let url = "https://api.io.mi.com/app/home/device_list";
         let method = "POST";
-        // Utils::gen_nonce();
-        // let signed_nonce = "l2YPQo7fjEnBKzWSvNXtPn3hnhBR5uJ65/ZMqpWkMQQ=";
-
-        let mut params = BTreeMap::new();
         let str = r#"{"getVirtualModel":true,"getHuamiDevices":1,"get_split_device":false,"support_smart_home":true}"#;
+        let mut params = BTreeMap::new();
         params.insert("data".to_string(), str.to_string());
         let nonce = "W9afkMgX0qwBsaTy";
         let ssecurity = "mYxY+TqjOywvBtu5sSM/mw==";
         let signed_nonce = Utils::signed_nonce(ssecurity, nonce).unwrap();
         println!("signed_nonce={:?}", signed_nonce);
         let a = Utils::gen_enc_signature(url, method, signed_nonce.as_str(), &params).unwrap();
-        let tr = Utils::generate_enc_params(url, method, signed_nonce.as_str(),
-                                            nonce, &mut params, ssecurity).unwrap();
-        println!("{:?}", params);
+        Utils::generate_enc_params(url, method, signed_nonce.as_str(), nonce, &mut params, ssecurity).unwrap();
+        info!("param:{:?}",params);
     }
 
     #[test]
@@ -145,8 +153,6 @@ impl Utils {
         let mut rc4 = Rc4::new(&password);
         rc4.process(&[0u8; 1024], &mut [0u8; 1024]);
         rc4.process(payload.as_bytes(), &mut encrypted_payload);
-        let a = hex::encode(encrypted_payload.as_slice());
-        println!("a:{}", a);
         let data = STANDARD.encode(encrypted_payload);
         Ok(data)
     }
@@ -161,16 +167,14 @@ impl Utils {
         rc4.process(payload.as_slice(), &mut encrypted_payload);
         Ok(encrypted_payload)
     }
-    fn generate_enc_params(url: &str, method: &str, signed_nonce: &str, nonce: &str,
-                           params: &mut BTreeMap<String, String>, ssecurity: &str) -> Result<()> {
+    fn generate_enc_params(url: &str, method: &str, signed_nonce: &str, nonce: &str, params: &mut BTreeMap<String, String>, ssecurity: &str) -> Result<()> {
         let sign = Self::gen_enc_signature(url, method, signed_nonce, &params)?;
-        params.insert("rc4_hash__".to_string(), sign.clone());
-        for (k, v) in params.iter_mut() {
+        params.insert("rc4_hash__".to_string(), sign);
+        for (_, v) in params.iter_mut() {
             *v = Self::encrypt_rc4(signed_nonce, v.as_str())?;
         }
-        println!("params:{:?}", params);
         let sign = Self::gen_enc_signature(url, method, signed_nonce, &params)?;
-        params.insert("signature".to_string(), sign.clone());
+        params.insert("signature".to_string(), sign);
         params.insert("ssecurity".to_string(), ssecurity.to_string());
         params.insert("_nonce".to_string(), nonce.to_string());
         Ok(())
@@ -210,9 +214,6 @@ impl Utils {
     }
 
     fn gen_nonce() -> anyhow::Result<String> {
-        if true {
-            return Ok("5HOnGjLuXhgBsaTE".to_string());
-        }
         let millis = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map_err(|e| anyhow!("Time went backwards"))?
@@ -220,15 +221,12 @@ impl Utils {
 
         let mut rng = rand::thread_rng();
         let random_bytes: [u8; 8] = rng.gen();
-        let random_int = u64::from_be_bytes(random_bytes) - (1 << 63);
+        let random_int = i64::from_be_bytes(random_bytes).overflowing_sub(1 << 63).0;
 
         let part2 = millis as u64 / 60000;
-        let a = part2.count_ones();
-        // let byte_count = (part2.count_ones() + 7) / 8;
-
         let mut nonce_bytes = random_int.to_be_bytes().to_vec();
         let mut part2_bytes = part2.to_be_bytes().to_vec();
-        nonce_bytes.extend_from_slice(&part2_bytes[0..4 as usize]);
+        nonce_bytes.extend_from_slice(&part2_bytes[4..8]);
         Ok(STANDARD.encode(&nonce_bytes))
     }
 
@@ -267,13 +265,18 @@ pub struct MiCloud {
     state: CookieState,
     info_path: PathBuf,
     info: Option<Info>,
+    country: String,
     username: String,
-    password: String,
+    password: Option<String>,
 }
+
+unsafe impl Send for MiCloud {}
+
+unsafe impl Sync for MiCloud {}
 
 
 impl MiCloud {
-    pub async fn new(session_path: &str, username: String, password: String) -> anyhow::Result<Self> {
+    pub async fn new(session_path: &str, username: String, password: Option<String>) -> anyhow::Result<Self> {
         let agent_id = Utils::get_random_agent_id();
         let useragent = format!("Android-7.1.1-1.0.0-ONEPLUS A3010-136-{} APP/xiaomi.smarthome APPV/62830", agent_id);
         let mut headers = header::HeaderMap::new();
@@ -282,7 +285,6 @@ impl MiCloud {
         let path_id = hex::encode(md5::compute(username.as_str()).to_vec());
         let cookie_path = format!("{}/cookie_{}.json", session_path, path_id);
         let info_path = PathBuf::from(format!("{}/info_{}.json", session_path, path_id));
-
         let info = match tokio::fs::File::open(&info_path).await {
             Ok(mut f) => {
                 let mut contents = String::new();
@@ -304,6 +306,7 @@ impl MiCloud {
             )
             .cookie_store(true)
             .http1_title_case_headers()
+            // .proxy(reqwest::Proxy::all("http://127.0.0.1:7890")?)
             .cookie_provider(state.cookie_store.clone())
             .build()
             .unwrap();
@@ -314,6 +317,7 @@ impl MiCloud {
             state,
             info_path,
             info,
+            country: "cn".to_string(),
             username,
             password,
         })
@@ -332,7 +336,14 @@ impl MiCloud {
     pub async fn login(&mut self) -> anyhow::Result<()> {
         let sign = self.login_step1().await?;
         info!("start login step1");
-        let location = if !sign.starts_with("http") || self.info.is_none() {
+        self.info = None;
+        self.login_step2(sign.as_str()).await?;
+        let has_info = match self.info.as_ref() {
+            None => { false }
+            Some(i) => !i.service_token.is_empty()
+        };
+
+        let location = if !sign.starts_with("http") || !has_info {
             info!("start login step2");
             self.login_step2(sign.as_str()).await?
         } else {
@@ -355,18 +366,22 @@ impl MiCloud {
             Some(i) => Ok(i)
         }
     }
-
-    pub async fn get_devices(&self, country: &str) -> anyhow::Result<()> {
-        let api_url = self._get_api_url(country, "/home/device_list");
-        // let nonce = Utils::gen_nonce()?;
-        let nonce = "W9afkMgX0qwBsaTy".to_string();
-        let ssecurity = "mYxY+TqjOywvBtu5sSM/mw==".to_string();
-
-
-        let signed_nonce = Utils::signed_nonce(ssecurity.as_str(), nonce.as_str())?;
-        let mut params = BTreeMap::new();
+    pub async fn get_devices(&self) -> anyhow::Result<serde_json::Value> {
         let str = r#"{"getVirtualModel":true,"getHuamiDevices":1,"get_split_device":false,"support_smart_home":true}"#;
-        params.insert("data".to_string(), str.to_string());
+        self.call_api("/home/device_list", str).await
+    }
+    pub async fn call_api(&self, url: &str, param_str: &str) -> anyhow::Result<serde_json::Value> {
+        let api_url = self._get_api_url(url);
+        let nonce = Utils::gen_nonce()?;
+        let info = self.get_info()?;
+        let mut params = BTreeMap::new();
+        params.insert("data".to_string(), param_str.to_string());
+        let ssecurity = info.ssecurity;
+        if info.service_token.is_empty() {
+            return Err(anyhow!("未登录"));
+        };
+        let signed_nonce = Utils::signed_nonce(ssecurity.as_str(), nonce.as_str())?;
+
         Utils::generate_enc_params(api_url.as_str(), "POST",
                                    signed_nonce.as_str(), nonce.as_str(),
                                    &mut params,
@@ -379,47 +394,65 @@ impl MiCloud {
         header.insert("content-type", "application/x-www-form-urlencoded".parse()?);
         header.insert("MIOT-ENCRYPT-ALGORITHM", "ENCRYPT-RC4".parse()?);
         // 设置cookies
-        let mut cookies = self.state.cookie_store.lock().unwrap();
-        let info = self.get_info()?;
-        let url = Url::parse(api_url.as_str())?;
-        let ck = reqwest_cookie_store::RawCookie::new("userId", info.user_id
-            .to_string());
-        cookies.insert_raw(&ck, &url)?;
-        let token = r#"kdo1R0QU3U5VCj7xRbVII7KZ7wIFl78CIiUHJJWoa9U9qzHH2kIb8udrJDYNEZKNnR+Yi3fxaNjN4KVFi+x7ks/+MpI2cco5hPuUi9Eskb/VyEeq8t3vYCGwgkWyO8ZREEFOLIhDx0P7rfMCWWXxVyCiXsOEzzrnrwEPjwA41vM="#;
-        let ck = reqwest_cookie_store::RawCookie::new("yetAnotherServiceToken", token.clone());
-        cookies.insert_raw(&ck, &url)?;
-        let ck = reqwest_cookie_store::RawCookie::new("serviceToken", token.clone());
-        cookies.insert_raw(&ck, &url)?;
-        let ck = reqwest_cookie_store::RawCookie::new("is_daylight", "0");
-        cookies.insert_raw(&ck, &url)?;
-        let ck = reqwest_cookie_store::RawCookie::new("dst_offset", "0");
-        cookies.insert_raw(&ck, &url)?;
-        let ck = reqwest_cookie_store::RawCookie::new("locale", "zh_CN");
-        cookies.insert_raw(&ck, &url)?;
-        let ck = reqwest_cookie_store::RawCookie::new("timezone", "GMT+08:00");
-        cookies.insert_raw(&ck, &url)?;
-        let ck = reqwest_cookie_store::RawCookie::new("channel", "MI_APP_STORE");
-        cookies.insert_raw(&ck, &url)?;
-        let ck = reqwest_cookie_store::RawCookie::new("deviceId", "gnjplb");
-        cookies.insert_raw(&ck, &url)?;
-        let ck = reqwest_cookie_store::RawCookie::new("sdkVersion", "3.8.6");
-        cookies.insert_raw(&ck, &url)?;
-        drop(cookies);
-        //url编码
-        for (k, v) in params.iter_mut() {
-            // *v=url::encoding::encode_component(v.as_str());
+        {
+            let mut cookies = self.state.cookie_store.lock().unwrap();
+
+            let url = Url::parse(api_url.as_str())?;
+            let ck = reqwest_cookie_store::RawCookie::new("userId", info.user_id
+                .to_string());
+            cookies.insert_raw(&ck, &url)?;
+            let token = info.service_token;
+
+            let ck = reqwest_cookie_store::RawCookie::new("yetAnotherServiceToken", token.clone());
+            cookies.insert_raw(&ck, &url)?;
+            let ck = reqwest_cookie_store::RawCookie::new("serviceToken", token.clone());
+            cookies.insert_raw(&ck, &url)?;
+            let ck = reqwest_cookie_store::RawCookie::new("is_daylight", "0");
+            cookies.insert_raw(&ck, &url)?;
+            let ck = reqwest_cookie_store::RawCookie::new("dst_offset", "0");
+            cookies.insert_raw(&ck, &url)?;
+            let ck = reqwest_cookie_store::RawCookie::new("locale", "zh_CN");
+            cookies.insert_raw(&ck, &url)?;
+            let ck = reqwest_cookie_store::RawCookie::new("timezone", "GMT+08:00");
+            cookies.insert_raw(&ck, &url)?;
+            let ck = reqwest_cookie_store::RawCookie::new("channel", "MI_APP_STORE");
+            cookies.insert_raw(&ck, &url)?;
+            let ck = reqwest_cookie_store::RawCookie::new("deviceId", "gnjplb");
+            cookies.insert_raw(&ck, &url)?;
+            let ck = reqwest_cookie_store::RawCookie::new("sdkVersion", "3.8.6");
+            cookies.insert_raw(&ck, &url)?;
         }
+
+        //url编码
+        info!("params:{:?}", params);
+
         let resp = self.client
             .post(api_url)
             .headers(header)
             //提交表单数据
             .form(&params)
             .send().await?;
-        info!("resp:{}", resp.text().await?);
-        return Ok(());
+        let text = resp.text().await?;
+        info!("resp:{}", text.as_str());
+        if text.starts_with("{\"") {
+            return Err(anyhow!("登录失败 请重新登入"));
+        }
+        let sign = Utils::signed_nonce(ssecurity.as_str(), nonce.as_str())?;
+        let bytes = Utils::decrypt_rc4(sign.as_str(), text.as_str())?;
+        // let text = String::from_utf8(bytes)?;
+
+        let text = String::from_utf8(bytes)?;
+        // 写入json
+        // let mut file = File::create("./data/mi_devices.json")?;
+        // file.write_all(text.as_bytes())?;
+
+        let val: serde_json::Value = serde_json::from_str(text.as_str())?;
+
+
+        return Ok(val);
     }
-    fn _get_api_url(&self, country: &str, path: &str) -> String {
-        let country_lower = country.trim().to_lowercase();
+    fn _get_api_url(&self, path: &str) -> String {
+        let country_lower = self.country.as_str().trim().to_lowercase();
         let api_url = if country_lower == "cn" {
             "".to_string()
         } else {
@@ -429,8 +462,23 @@ impl MiCloud {
     }
 
 
-    async fn login_step3(&self, location: &str) -> anyhow::Result<StatusCode> {
+    async fn login_step3(&mut self, location: &str) -> anyhow::Result<StatusCode> {
         let resp = self.client.get(location).send().await?;
+        //userId=1254140309;
+        let cookies: Option<String> = self.state.cookie_store
+            .lock().unwrap()
+            .get("sts.api.io.mi.com", "/", "serviceToken")
+            .and_then(|f| Option::from(f.value().to_owned()));
+        match cookies {
+            None => {
+                return Err(anyhow!("获取cookie失败"));
+            }
+            Some(s) => {
+                info!("service_token:{}", s.as_str());
+                self.info.as_mut().unwrap().service_token = s;
+                self.save_info().await?;
+            }
+        }
         Ok(resp.status())
     }
 
@@ -462,9 +510,9 @@ impl MiCloud {
 
     async fn login_step2(&mut self, sign: &str) -> anyhow::Result<String> {
         let url = "https://account.xiaomi.com/pass/serviceLoginAuth2";
-        let hash: String = md5::compute(self.password.as_bytes()).encode_hex_upper();
-
-
+        let hash: String = md5::compute(self.password.as_ref()
+            .ok_or(anyhow!("未设置密码"))?
+            .as_bytes()).encode_hex_upper();
         let mut params = BTreeMap::new();
         params.insert("sid", "xiaomiio");
         params.insert("baz", "quux");
@@ -515,7 +563,7 @@ impl MiCloud {
 
                 let info = Info {
                     ssecurity: ssecurity.to_string(),
-                    service_token: "GVprXGsFZ/9RWfMAU+ydPkTzMXJsWPSAYwT0+31VGbTEO+VshHt8TDcpZ8CEkp4fMDxKgvIZkDvsXHn3Z+eeO/HiINOVXn0/CY6wbYYxkoizuSuNAqAh6OjQdenaQRgaYyxOvQhXjqtS+4CikE7Q5RUuJ+mKr3GmoDKFD9ZI460=".to_string(),
+                    service_token: "".to_string(),
                     user_id,
                     cuser_id: cuser_id.to_string(),
                     pass_token: pass_token.to_string(),

@@ -14,7 +14,7 @@ use serde_json::Value;
 use tokio::sync::RwLock;
 use crate::device::ble::value_types::{BleValue, BleValueType, ValueLsbI16};
 use crate::device::gateway::gateway::OpenMiioGatewayDevice;
-use crate::device::emitter::{DataListener, DataEmitter, EventType,};
+use crate::device::common::emitter::{DataListener, DataEmitter, EventType,};
 use crate::device::MiotDevicePointer;
 use crate::proto::miio_proto::{MiotSpecDTO, MiotSpecId, MiotSpecProtocolPointer};
 use crate::proto::protocol::{ExitError, RecvMessage};
@@ -23,7 +23,7 @@ use crate::proto::transport::ble_mapping_proto::BleMappingProto;
 /// https://tasmota.github.io/docs/Bluetooth/
 /// 低功耗蓝牙设备
 /// 目前低功耗蓝牙设备只支持被动获取数据
-
+///spec_map 用户
 
 
 pub struct BleDevice {
@@ -99,9 +99,9 @@ impl MiotSpecDevice for BleDevice {
 }
 
 impl BleDevice {
-    pub fn new(info: DeviceInfo, gateway: Arc<OpenMiioGatewayDevice>, spec_map: bimap::BiMap<MiotSpecId, BleValueType>) -> Self {
-        //网关上设置一个监听器,监听属于我的消息
-        //蓝牙协议
+    //网关上设置一个监听器,监听属于我的消息
+    //蓝牙协议
+    pub fn new(info: DeviceInfo, gateway: MiotDevicePointer, spec_map: bimap::BiMap<MiotSpecId, BleValueType>) -> Self {
         Self {
             info,
             base: BaseMiotSpecDevice {

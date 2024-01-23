@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
+use crate::db::entity::common::Property;
 use crate::hap::hap_type::MappingHapType;
-use crate::db::entity::hap_characteristic::Property;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct MappingConfig {

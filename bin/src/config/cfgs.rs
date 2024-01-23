@@ -29,6 +29,7 @@ pub struct Server {
     // pub dav_prefix: String,
     /// 数据存储目录 /data
     pub data_dir: String,
+    pub db_schema: Option<String>,
 }
 
 /// 数据库

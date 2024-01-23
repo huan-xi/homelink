@@ -1,14 +1,16 @@
+use anyhow::anyhow;
 use axum::extract::{Path, Query, State};
 use axum::Json;
-use sea_orm::{ActiveModelTrait, EntityTrait, ModelTrait};
+use log::info;
+use sea_orm::{ActiveModelTrait, EntityTrait, ModelTrait, QueryOrder};
 use sea_orm::ActiveValue::Set;
-use tap::Conv;
 use crate::api::output::{ApiResp, ApiResult};
-use crate::api::params::{AddHapAccessoryParam, DisableParam};
+use crate::api::params::{AddHapAccessoryParam, DisableParam, UpdateHapAccessoryParam};
 use crate::api::results::HapAccessoryResult;
 use crate::api::state::AppState;
-use crate::db::entity::prelude::{HapAccessoryActiveModel, HapAccessoryEntity, HapAccessoryModel, HapAccessoryRelation, HapBridgeEntity, IotDevice, IotDeviceActiveModel, IotDeviceColumn, IotDeviceModel};
+use crate::db::entity::prelude::{HapAccessoryActiveModel, HapAccessoryColumn, HapAccessoryEntity, HapAccessoryModel, HapAccessoryRelation, HapBridgeEntity, IotDevice, IotDeviceActiveModel, IotDeviceColumn, IotDeviceModel};
 use crate::db::SNOWFLAKE;
+use crate::err_msg;
 
 pub async fn add(state: State<AppState>, Json(param): Json<AddHapAccessoryParam>) -> ApiResult<()> {
     let mut model = param.into_model()?;
@@ -17,10 +19,12 @@ pub async fn add(state: State<AppState>, Json(param): Json<AddHapAccessoryParam>
     Ok(ApiResp::with_data(()))
 }
 
+
 pub async fn list(state: State<AppState>) -> ApiResult<Vec<HapAccessoryResult>> {
     // HapBridge
     let list = HapAccessoryEntity::find()
         .find_also_related(HapBridgeEntity)
+        .order_by_desc(HapAccessoryColumn::Aid)
         .all(state.conn()).await?;
     let mut result = vec![];
     for (model, bridge) in list.into_iter() {
@@ -34,6 +38,23 @@ pub async fn list(state: State<AppState>) -> ApiResult<Vec<HapAccessoryResult>> 
     Ok(ApiResp::with_data(result))
 }
 
+pub async fn detail(state: State<AppState>, Path(id): Path<i64>) -> ApiResult<HapAccessoryModel> {
+    let model = HapAccessoryEntity::find_by_id(id)
+        .one(state.conn()).await?
+        .ok_or(anyhow!("该配件不存在"))?;
+    Ok(ApiResp::with_data(model))
+}
+
+pub async fn update(state: State<AppState>, Path(id): Path<i64>, Json(param): Json<UpdateHapAccessoryParam>) -> ApiResult<()> {
+    info!("param:{:?}",id);
+    let mut model = param.into_model(id)?;
+    model.update(state.conn()).await?;
+    Ok(ApiResp::with_data(()))
+}
+
+pub async fn update_script() {
+
+}
 
 pub async fn disable(state: State<AppState>, Path(id): Path<i64>, Query(param): Query<DisableParam>) -> ApiResult<()> {
     let model = HapAccessoryActiveModel {

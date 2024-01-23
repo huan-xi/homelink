@@ -3,6 +3,19 @@ use hap_metadata::metadata::HapCharacteristic;
 use crate::db::entity::prelude::{HapAccessoryModel, HapBridgeEntity, HapBridgeModel, IotDeviceModel};
 
 #[derive(Debug, serde::Serialize)]
+pub struct UserInfoResult {
+    pub(crate) username: String,
+    pub(crate) roles: Vec<String>,
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct HapBridgeResult {
+    #[serde(flatten)]
+    pub(crate) model: HapBridgeModel,
+    pub setup_uri: String,
+}
+
+#[derive(Debug, serde::Serialize)]
 pub struct HapAccessoryResult {
     #[serde(flatten)]
     pub model: HapAccessoryModel,

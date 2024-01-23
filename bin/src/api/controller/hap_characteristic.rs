@@ -10,7 +10,6 @@ use sea_orm::{ActiveModelTrait, EntityTrait, PaginatorTrait, QueryFilter};
 use crate::api::errors::ApiError;
 use crate::api::params::{CharacteristicParam, AddServiceParam, DisableParam};
 use crate::api_err;
-use crate::db::entity::hap_characteristic::{BleToSensorParam, DbBleValueType, MappingMethod, MappingParam, MiotSpecParam, Property};
 use crate::db::SNOWFLAKE;
 
 

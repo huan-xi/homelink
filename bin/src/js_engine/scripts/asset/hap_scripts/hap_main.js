@@ -13,7 +13,7 @@ const props = {
  * 0 在家  1.
  * 1 离家  2
  * 2 睡眠  3
- * 3 停用  2
+ * 3 停用  0
  *
  * @type {Map<number, number>}
  */
@@ -21,7 +21,7 @@ const mi_to_homekit_mapping = new Map([
     [1, 0],
     [2, 1],
     [3, 2],
-    [4, 3]
+    [0, 3]
 ]);
 
 const reverseMapping = new Map([...mi_to_homekit_mapping].map(([key, value]) => [value, key]));

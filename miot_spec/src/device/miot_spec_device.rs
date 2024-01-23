@@ -4,7 +4,7 @@ use futures_util::future::BoxFuture;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, Mutex, RwLock};
 use crate::device::ble::ble_device::BleDevice;
-use crate::device::emitter::{DataEmitter, DataListener, EventType};
+use crate::device::common::emitter::{DataEmitter, DataListener, EventType};
 use crate::proto::miio_proto::{MiotSpecDTO, MiotSpecId, MiotSpecProtocolPointer};
 use serde_json::Value;
 use crate::proto::protocol::{ExitError, JsonMessage};
@@ -109,8 +109,6 @@ pub enum MiotDeviceType<'a> {
 
 #[async_trait::async_trait]
 pub trait MiotSpecDevice {
-
-
     fn get_info(&self) -> &DeviceInfo;
     fn get_base(&self) -> &BaseMiotSpecDevice;
 
@@ -132,6 +130,18 @@ pub trait MiotSpecDevice {
             .await
             .map_err(Into::<anyhow::Error>::into)?;
         let value = proto.get_property(MiotSpecDTO { did, siid, piid, value: None }).await?;
+        self.get_base().retry_info.reset().await;
+        Ok(value)
+    }
+
+    async fn read_properties(&self, props: Vec<MiotSpecId>) -> anyhow::Result<Vec<MiotSpecDTO>> {
+        let did = self.get_info().did.clone();
+        let props: Vec<MiotSpecDTO> = props.into_iter().map(|id| MiotSpecDTO { did: did.clone(), siid: id.siid, piid: id.piid, value: None }).collect();
+        let proto = self.get_proto()
+            .await
+            .map_err(Into::<anyhow::Error>::into)?;
+        let value = proto.get_properties(props, None).await?;
+        self.get_base().retry_info.reset().await;
         Ok(value)
     }
 

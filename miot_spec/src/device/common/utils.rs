@@ -3,7 +3,7 @@ use futures_util::future::BoxFuture;
 use futures_util::FutureExt;
 use log::error;
 use tokio::time;
-use crate::device::emitter::EventType;
+use crate::device::common::emitter::EventType;
 use crate::device::miot_spec_device::{BaseMiotSpecDevice, MiotSpecDevice};
 use crate::proto::miio_proto::MiotSpecDTO;
 

@@ -10,9 +10,9 @@ use tokio::select;
 use tokio::sync::broadcast::Receiver;
 use crate::proto::protocol::{ExitError, JsonMessage};
 use tokio::sync::RwLock;
-use crate::device::emitter::EventType;
+use crate::device::common::emitter::EventType;
 use crate::device::miot_spec_device::{BaseMiotSpecDevice, DeviceInfo, MiotSpecDevice};
-use crate::device::utils::get_poll_func;
+use crate::device::common::utils::get_poll_func;
 use crate::proto::miio_proto::{MiotSpecProtocolPointer, MsgCallback};
 use crate::proto::transport::open_miio_mqtt_proto::OpenMiIOMqttSpecProtocol;
 

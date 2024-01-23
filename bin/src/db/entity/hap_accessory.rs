@@ -2,7 +2,7 @@
 
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
-use hap::HapType;
+use crate::db::entity::common::{Property, PropertyVec};
 use crate::hap::hap_type::MappingHapType;
 
 #[derive(Copy, Clone, Default, Debug, DeriveEntity)]
@@ -23,6 +23,8 @@ pub struct Model {
     pub hap_type: Option<MappingHapType>,
     /// 运行js脚本,接管特征的读写事件
     pub script: Option<String>,
+    /// 注册属性,用户轮询映射到js脚本
+    pub register_props: PropertyVec,
     pub name: Option<String>,
     pub memo: Option<String>,
     pub info: Option<String>,
@@ -35,6 +37,7 @@ pub enum Column {
     BridgeId,
     Disabled,
     HapType,
+    RegisterProps,
     Name,
     Script,
     Memo,
@@ -68,6 +71,7 @@ impl ColumnTrait for Column {
             Self::Disabled => ColumnType::Boolean.def(),
             Self::HapType => ColumnType::Integer.def().null(),
             Self::Name => ColumnType::String(None).def().null(),
+            Self::RegisterProps => ColumnType::String(None).def().null(),
             Self::Script => ColumnType::String(None).def().null(),
             Self::Memo => ColumnType::String(None).def().null(),
             Self::Info => ColumnType::String(None).def().null(),

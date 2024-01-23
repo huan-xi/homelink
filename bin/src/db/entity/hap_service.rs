@@ -6,12 +6,6 @@ use sea_orm::FromJsonQueryResult;
 use serde::{Deserialize, Serialize};
 use crate::hap::hap_type::{MappingHapType};
 
-#[derive(Clone, Debug, PartialEq, Eq, Default, Deserialize, Serialize, FromJsonQueryResult)]
-pub struct Property {
-    pub siid: i32,
-    pub piid: i32,
-    //单位
-}
 
 #[derive(Copy, Clone, Default, Debug, DeriveEntity)]
 pub struct Entity;

@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::hap::hap_type::MappingHapType;
 use serde_aux::prelude::deserialize_number_from_string;
 use miot_spec::device::ble::value_types::{BleValueType};
+use crate::db::entity::common::Property;
 use crate::hap::unit_convertor::{ConvertorParamType, UnitConvertor};
 
 #[derive(Copy, Clone, Default, Debug, DeriveEntity)]
@@ -33,14 +34,6 @@ pub enum MappingMethod {
 }
 
 
-#[derive(Clone, Debug, Copy, PartialEq, Eq, Default, Deserialize, Serialize, FromJsonQueryResult)]
-pub struct Property {
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub siid: i32,
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub piid: i32,
-    //单位
-}
 
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize, FromJsonQueryResult)]
 #[serde(tag = "type")]

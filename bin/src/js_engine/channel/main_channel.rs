@@ -31,6 +31,10 @@ pub struct ExecuteHapModuleResult {
     pub ch_id: i64,
 }
 
+#[derive(Clone, Serialize, Deserialize, Debug, New)]
+pub struct ErrorRespResult {
+    pub error: String,
+}
 
 /// 从模块过来的返回值
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -42,7 +46,7 @@ pub enum FromModuleResp {
     ExecuteModuleResp(ExecuteHapModuleResult),
     BindDeviceModuleResp,
     /// 错误
-    Error(String),
+    ErrorResp(ErrorRespResult),
     Success,
     /// 模块退出
     EnginExit(String),
@@ -101,17 +105,18 @@ impl ToModuleSender {
     pub async fn send(&self, event: ToModuleEvent) -> anyhow::Result<FromModuleResp> {
         let id = self.id.fetch_add(1, Ordering::SeqCst);
         self.sender.send((id, event)).await
-            .map_err(|_| anyhow!("发送失败"))?;
+            .map_err(|e| anyhow!("发送失败:{e},js 引擎已退出"))?;
         // 等待结果
         let res = timeout(std::time::Duration::from_secs(5), async {
-            while let Ok((msg_id, resp)) = self.read_result_recv.subscribe().recv().await {
+            while let Ok((msg_id, resp)) = self.read_result_recv
+                .subscribe()
+                .recv().await {
                 if msg_id == id {
                     return Ok(resp);
                 }
             };
             Err(anyhow!("读取错误"))
-        }).await
-            .map_err(|_| anyhow!("命令执行超时"))?;
+        }).await.map_err(|_| anyhow!("命令执行超时"))?;
 
         res
     }
@@ -190,7 +195,7 @@ impl ModuleRecv {
 }
 
 pub fn channel() -> (Arc<ToModuleSender>, ModuleRecv) {
-    let (tx, _) = broadcast::channel(10);
+    let (tx, _) = broadcast::channel(100);
     let module_response_tx = Arc::new(tx);
 
     let (module_recv, sender) = ModuleRecv::new(module_response_tx.clone());

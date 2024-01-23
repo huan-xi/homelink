@@ -5,20 +5,22 @@ use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 use log::{error, warn};
 use reqwest_cookie_store::{CookieStore, CookieStoreMutex};
+use tokio::sync::Mutex;
+use crate::cloud::MiCloud;
 
 #[derive(Debug)]
 pub struct CookieState {
     cookie_store_path: PathBuf,
-
     pub cookie_store: Arc<CookieStoreMutex>,
 }
 
+unsafe impl Send for CookieState {}
+
+unsafe impl Sync for CookieState {}
+
+
 impl CookieState {
     pub fn try_new(cookie_store_path: PathBuf) -> anyhow::Result<CookieState> {
-
-
-
-
         let cookie_store = match File::open(&cookie_store_path) {
             Ok(f) => CookieStore::load_json(BufReader::new(f)).map_err(|e| {
                 let context = format!(
@@ -77,14 +79,16 @@ impl CookieState {
         } else { file.unwrap() };
 
 
-        let store = self.cookie_store.lock().unwrap();
-        store.save_json(&mut file).map_err(|e| {
-            let context = format!(
-                "error when save cookies to {}",
-                self.cookie_store_path.display()
-            );
-            anyhow::anyhow!("{}", e).context(context)
-        })
+        {
+            let store = self.cookie_store.lock().unwrap();
+            store.save_json(&mut file).map_err(|e| {
+                let context = format!(
+                    "error when save cookies to {}",
+                    self.cookie_store_path.display()
+                );
+                anyhow::anyhow!("{}", e).context(context)
+            })
+        }
     }
 }
 

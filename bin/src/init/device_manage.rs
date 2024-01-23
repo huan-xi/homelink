@@ -12,7 +12,7 @@ use log::{error, info};
 use sea_orm::JsonValue;
 use tap::TapFallible;
 use tokio::sync::{broadcast, mpsc, oneshot};
-use miot_spec::device::emitter::EventType;
+use miot_spec::device::common::emitter::EventType;
 use miot_spec::device::miot_spec_device::{MiotSpecDevice};
 use miot_spec::device::MiotDevicePointer;
 use crate::config::context::get_app_context;
@@ -30,7 +30,7 @@ pub struct JsModule {
 
 #[derive(Clone)]
 pub struct DeviceWithJsEngine {
-    device: MiotDevicePointer,
+    pub(crate) device: MiotDevicePointer,
     /// 特征 cid 和 对应的module
     /// 一个设备运行多个特征脚本
     mapping_js_map: Arc<DashMap<i64, JsModule>>,
@@ -95,8 +95,6 @@ impl DeviceWithJsEngine {
               }
           };*/
     }
-
-
 
 
 

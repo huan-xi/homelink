@@ -9,7 +9,7 @@ use log::{error, info};
 use tap::TapFallible;
 use tokio::select;
 use tokio::sync::RwLock;
-use crate::device::utils::get_poll_func;
+use crate::device::common::utils::get_poll_func;
 use crate::proto::protocol::ExitError;
 use crate::proto::protocol::ExitError::ConnectErr;
 use crate::proto::transport::udp_iot_spec_proto::UdpMiotSpecProtocol;
@@ -68,6 +68,7 @@ impl WifiDevice {
     // 设置协议
     async fn connect(&self) -> Result<MiotSpecProtocolPointer, ExitError> {
         let mut write = self.proto.write().await;
+        info!("开始连接设备:{}", self.info.did);
         // 避免重复创建
         if let Some(s) = write.clone() {
             return Ok(s);

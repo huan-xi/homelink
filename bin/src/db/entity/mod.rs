@@ -7,3 +7,5 @@ pub mod device_mapping;
 pub mod hap_accessory;
 pub mod hap_service;
 pub mod hap_characteristic;
+pub mod miot_device;
+pub mod common;

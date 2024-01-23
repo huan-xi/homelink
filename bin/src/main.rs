@@ -28,9 +28,9 @@ async fn main() -> anyhow::Result<()> {
     log4rs::init_file("log4rs.yaml", Default::default()).unwrap();
     //读取配置
     let config = Configs::init();
-
-    let addr = SocketAddr::new([0, 0, 0, 0].into(), 5514);
-    let conn = db_conn().await;
+    let addr = config.server.address.parse().expect("监听地址解析失败");
+    // let addr = SocketAddr::new([0, 0, 0, 0].into(), 5514);
+    let conn = db_conn(&config.server).await;
 
     let hap_metadata = Arc::new(hap_metadata()?);
     // 初始化hap 服务器
@@ -45,7 +45,7 @@ async fn main() -> anyhow::Result<()> {
         .with_state(app_state.clone());
 
     //初始化js 引擎
-    let js_engine = init_js_engine(config.server.data_dir.clone(),EnvContext {
+    let js_engine = init_js_engine(config.server.data_dir.clone(), EnvContext {
         info: "home gateway".to_string(),
         version: "v1.0.0".to_string(),
         main_recv: None,
@@ -73,7 +73,7 @@ async fn main() -> anyhow::Result<()> {
         axum::Server::bind(&addr)
             .serve(app.into_make_service());
     info!("api_server start at :{:?}", addr);
-    let ( api_server_ch_send, api_server_ch) = oneshot::channel::<bool>();
+    let (api_server_ch_send, api_server_ch) = oneshot::channel::<bool>();
     tokio::spawn(async move {
         if let Err(e) = api_server.await {
             error!("api_server error:{:?}", e);
@@ -83,23 +83,22 @@ async fn main() -> anyhow::Result<()> {
     });
 
 
-
     // 初始化iot设备
     init_iot_devices(&conn, iot_device_manager.clone()).await?;
     // 初始化hap设备
-    init::hap_init::init_hap(&conn, hap_manager.clone(), iot_device_manager.clone()).await?;
+    init::hap_init::init_haps(&conn, hap_manager.clone(), iot_device_manager.clone()).await?;
 
     // 等待引擎退出
     let mut recv = context.js_engine.resp_recv.subscribe();
 
-   /* let engin_statue = async {
-        while let Ok(event_type) = recv.recv().await {
-            if let EngineEventResp::Exit(str) = event_type {
-                error!("js engine exit:{:?}", str);
-                break;
-            }
-        }
-    };*/
+    /* let engin_statue = async {
+         while let Ok(event_type) = recv.recv().await {
+             if let EngineEventResp::Exit(str) = event_type {
+                 error!("js engine exit:{:?}", str);
+                 break;
+             }
+         }
+     };*/
 
     loop {
         select! {
@@ -118,22 +117,6 @@ async fn main() -> anyhow::Result<()> {
     // let _ = js_tx.send(0);
     iot_device_manager.close().await;
     hap_manager.close().await;
-    Ok(())
-}
-
-#[tokio::test]
-pub async fn test() -> anyhow::Result<()> {
-    // log
-    log4rs::init_file("/Users/huanxi/project/home-gateway/log4rs.yaml", Default::default()).unwrap();
-    let conn = db_conn().await;
-    let iot_device_manager = init_iot_devices(&conn).await?;
-
-    println!("test1");
-    tokio::time::sleep(std::time::Duration::from_secs(100)).await;
-    println!("test2");
-    drop(iot_device_manager);
-    tokio::time::sleep(std::time::Duration::from_secs(100)).await;
-    println!("test3");
     Ok(())
 }
 

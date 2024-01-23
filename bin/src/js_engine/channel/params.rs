@@ -2,7 +2,7 @@ use deno_runtime::deno_core::url::Url;
 use impl_new::New;
 use sea_orm::JsonValue;
 use serde::{Deserialize, Serialize};
-use miot_spec::device::emitter::EventType;
+use miot_spec::device::common::emitter::EventType;
 
 #[derive(Clone, Serialize, Deserialize, New)]
 #[serde(rename_all = "camelCase")]

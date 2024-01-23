@@ -15,6 +15,18 @@ pub fn api() -> Router<AppState> {
             ,
         )
         .nest(
+            "/users",
+            Router::new()
+                .route("/login", post(controller::sys_users::login))
+                .route("/info", get(controller::sys_users::info))
+                // .route("/logout", post(controller::sys_users::logout))
+                // .route("/register", post(controller::sys_users::register))
+                // .route("/list", get(controller::sys_users::list))
+                // .route("/disable/:id", put(controller::sys_users::disable))
+                // .route("/update/:id", put(controller::sys_users::update))
+        )
+
+        .nest(
             "/hap_characteristic",
             Router::new()
                 .route("/", post(controller::hap_characteristic::add))
@@ -36,13 +48,25 @@ pub fn api() -> Router<AppState> {
               Router::new()
                   .route("/list", get(controller::hap_bridge::list))
                   .route("/disable/:id", put(controller::hap_bridge::disable))
+                  .route("/", post(controller::hap_bridge::add))
               ,
         )
         .nest("/hap_accessory",
               Router::new()
                   .route("/list", get(controller::hap_accessory::list))
                   .route("/", post(controller::hap_accessory::add))
+                  .route("/:id", get(controller::hap_accessory::detail))
                   .route("/disable/:id", put(controller::hap_accessory::disable))
+                  .route("/:id", put(controller::hap_accessory::update))
+              ,
+        )
+        .nest("/miot_spec",
+              Router::new()
+                  .route("/sync_mi_devices", get(controller::miot_spec::sync_mi_devices))
+              // .route("/convert_to_iot_device", get(controller::miot_spec::convert_to_iot_device))
+              // .route("/update_iot_device", get(controller::miot_spec::update_iot_device))
+              // .route("/login_mi_account", get(controller::miot_spec::login_mi_account))
+              // .route("/delete_device", get(controller::miot_spec::delete_device))
               ,
         )
         .nest("/hap_metadata",
@@ -51,4 +75,5 @@ pub fn api() -> Router<AppState> {
                   .route("/service_meta/:hap_type", get(controller::hap_metadata::get_service_meta))
               ,
         )
+
 }

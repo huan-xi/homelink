@@ -19,7 +19,7 @@ log = { workspace = true }
 packed_struct = "0.10.1"
 #block-modes = "0.9.1"
 block-modes = "0.8"
-
+rust-crypto.workspace = true
 serde_json = "1.0.108"
 serde = { version = "1.0.193", features = ["derive"] }
 bytes.workspace = true
@@ -29,7 +29,7 @@ toml = "0.8.8"
 log4rs = { version = "1.2.0", features = ["default"] }
 
 
-axum.workspace=true
+axum.workspace = true
 
 
 
@@ -45,8 +45,8 @@ strum_macros = "0.25.3"
 mime = "0.3.17"
 serde-aux = "4.3.1"
 snowdon = "0.2.0"
-
-chrono.workspace=true
+base64.workspace = true
+chrono.workspace = true
 evalexpr = "11.3.0"
 async-trait = "0.1.77"
 num_enum = "0.7.2"

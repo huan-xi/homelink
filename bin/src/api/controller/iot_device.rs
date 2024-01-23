@@ -26,3 +26,7 @@ pub async fn disable(state: State<AppState>, Path(id): Path<i64>, Query(param): 
         .exec(state.conn()).await?;
     Ok(ApiResp::with_data(()))
 }
+
+pub async fn export_template(state: State<AppState>,) {
+
+}

@@ -1,8 +1,9 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
+use anyhow::anyhow;
 use futures_util::StreamExt;
-use log::{debug, error};
+use log::{debug, error, info};
 use paho_mqtt::{AsyncClient, Message};
 use serde_json::{Map, Value};
 use tokio::sync::broadcast::{Receiver, Sender};
@@ -47,7 +48,7 @@ impl OpenMiIOMqttSpecProtocol {
             msg_sender,
             id: Default::default(),
             receiver: Arc::new(RwLock::new(strm)),
-            timeout: Duration::from_secs(2),
+            timeout: Duration::from_secs(10),
         })
     }
 }
@@ -85,11 +86,12 @@ impl MiotSpecProtocol for OpenMiIOMqttSpecProtocol {
                 let msg = recv.recv().await?;
                 if let Some(val) = msg.data.get("id") {
                     if val.as_u64() == Some(id as u64) {
+                        info!("await_result:{:?}", msg.data);
                         return Ok(msg);
                     }
                 };
             }
-        }).await?
+        }).await.map_err(|e| anyhow!("执行命令超时"))?
     }
 
     async fn start_listen(&self) {

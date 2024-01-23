@@ -3,6 +3,7 @@ use packed_struct::derive::PackedStruct;
 use packed_struct::PackedStruct;
 use anyhow::Error;
 use block_modes::{BlockMode, Cbc};
+use impl_new::New;
 use serde::Serialize;
 use serde_json::{Map, Value};
 use crate::proto::transport::udp_iot_spec_proto::Utils;
@@ -51,7 +52,7 @@ pub trait RecvMessage {
     fn get_json_data(&self) -> &Map<String, Value>;
 }
 
-#[derive(Clone, Debug,Serialize)]
+#[derive(Clone, Debug,Serialize,New)]
 pub struct JsonMessage {
     /// json 数据
     pub data: Map<String, Value>,

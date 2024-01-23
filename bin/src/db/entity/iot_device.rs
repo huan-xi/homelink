@@ -30,6 +30,8 @@ pub enum IotDeviceType {
     MiBleDevice = 3,
     /// 米家mesh设备
     MiMeshDevice = 4,
+    /// 米家云端设备
+    MiCloudDevice = 5,
     // Bl
 }
 
@@ -41,6 +43,7 @@ pub enum DeviceParam {
     BleParam(BleParam),
     MeshParam(DeviceInfo),
 }
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MiotSpecIdType {
     pub siid: i32,
@@ -50,11 +53,13 @@ pub struct MiotSpecIdType {
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BleParam {
+    /// 设备信息
     #[serde(flatten)]
     pub info: DeviceInfo,
     /// 规则
     pub mapping: Vec<MiotSpecIdType>,
 }
+
 impl BleParam {
     pub fn get_mapping(&self) -> bimap::BiMap<MiotSpecId, BleValueType> {
         let mut map = bimap::BiMap::new();

@@ -30,3 +30,8 @@ pub use super::hap_characteristic::Entity as HapCharacteristicEntity;
 pub use super::hap_characteristic::Model as HapCharacteristicModel;
 pub use super::hap_characteristic::ActiveModel as HapCharacteristicActiveModel;
 pub use super::hap_characteristic::Column as HapCharacteristicColumn;
+
+pub use super::miot_device::Entity as MiotDeviceEntity;
+pub use super::miot_device::Model as MiotDeviceModel;
+pub use super::miot_device::ActiveModel as MiotDeviceActiveModel;
+pub use super::miot_device::Column as MiotDeviceColumn;

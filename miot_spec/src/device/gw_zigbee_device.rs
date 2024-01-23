@@ -2,7 +2,6 @@ use std::sync::Arc;
 use futures_util::future::BoxFuture;
 use crate::device::gateway::gateway::OpenMiioGatewayDevice;
 use crate::device::miot_spec_device::{BaseMiotSpecDevice, DeviceInfo, MiotSpecDevice};
-use crate::device::emitter::DataListener;
 use crate::proto::miio_proto::MiotSpecProtocolPointer;
 use crate::proto::protocol::ExitError;
 /// 通过米家网关的zigbee子设备

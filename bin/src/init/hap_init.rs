@@ -1,3 +1,4 @@
+use std::str::FromStr;
 use std::sync::Arc;
 use axum::body::HttpBody;
 use futures_util::future::{BoxFuture, join_all};
@@ -14,90 +15,92 @@ use sea_orm::{ColIdx, ColumnTrait, DatabaseConnection, EntityTrait, JsonValue, M
 use hap::characteristic::{HapCharacteristic};
 use hap::characteristic::configured_name::ConfiguredNameCharacteristic;
 use miot_spec::device::miot_spec_device::{MiotSpecDevice};
-use crate::config::cfgs::Configs;
 use crate::config::context::get_app_context;
 use crate::hap::iot_characteristic::IotCharacteristic;
 use crate::hap::iot_hap_accessory::{IotDeviceAccessory, IotHapAccessory};
-use crate::db::entity::prelude::{HapAccessoryColumn, HapAccessoryEntity, HapAccessoryModel, HapBridgeEntity, HapBridgeColumn, HapCharacteristicEntity, HapCharacteristicModel, HapServiceColumn, HapServiceEntity, HapServiceModel};
+use crate::db::entity::prelude::{HapAccessoryColumn, HapAccessoryEntity, HapAccessoryModel, HapBridgeEntity, HapBridgeColumn, HapCharacteristicEntity, HapCharacteristicModel, HapServiceColumn, HapServiceEntity, HapServiceModel, HapBridgeModel};
 use crate::db::SNOWFLAKE;
 use crate::init::{DevicePointer, FuturesMutex, HapAccessoryPointer};
 use crate::hap::iot_hap_service::IotHapService;
+use crate::hap::rand_utils::{compute_setup_hash, pin_code_from_str, rand_pin_code};
 use crate::init::device_manage::{IotDeviceManager, IotDeviceManagerInner};
 use crate::init::hap_manage::HapManage;
 use crate::init::mapping_characteristic::{to_characteristic, ToChUtils};
 use crate::js_engine::init_hap_accessory_module::init_hap_accessory_module;
 
-pub fn rand_num() -> u32 {
-    let mut rng = rand::thread_rng();
-    let invalid_numbers: [u32; 12] = [0, 11111111, 22222222, 33333333, 44444444, 55555555, 66666666, 77777777, 88888888, 99999999, 12345678, 87654321];
 
-    let random_number = loop {
-        let number = rng.gen_range(100_000_00, 999_999_99);
-        if !invalid_numbers.contains(&number) {
-            break number;
-        }
-    };
-    random_number
-}
-
-pub async fn init_hap(conn: &DatabaseConnection, manage: HapManage, iot_device_map: IotDeviceManager) -> anyhow::Result<()> {
+pub async fn init_haps(conn: &DatabaseConnection, manage: HapManage, iot_device_map: IotDeviceManager) -> anyhow::Result<()> {
     let bridges = HapBridgeEntity::find()
         .filter(HapBridgeColumn::Disabled.eq(false))
-        .all(conn).await?;
+        .all(conn)
+        .await?;
     // let mut servers = Vec::new();
     for bridge in bridges.into_iter() {
-        let config = &get_app_context().config;
-
-        let hex = format!("{:x}", bridge.bridge_id);
-        let str = format!("{}/{}_{}", config.server.data_dir, "hap", hex);
-        let mut storage = FileStorage::new(str.as_str()).await?;
-        let bid = bridge.bridge_id;
-
-        //config
-        let hap_config = match storage.load_config().await {
-            Ok(mut config) => {
-                config.redetermine_local_ip();
-                storage.save_config(&config).await?;
-                config
-            }
-            Err(_) => {
-                let pin = pin_from_str(bridge.pin_code.to_string().as_str());
-                let name = bridge.name.clone();
-                //todo 分类
-                let config = Config {
-                    pin,
-                    name,
-                    //mac 地址配置
-                    device_id: MacAddress::from([10, 21, 30, 40, 50, 60]),
-                    category: AccessoryCategory::Bridge,
-                    ..Default::default()
-                };
-                storage.save_config(&config).await?;
-                config
-            }
-        };
-
-        let server = IpServer::new(hap_config, storage).await?;
-        // 初始化bridge 设备 //todo 生成随机端口
-        let bridge = BridgeAccessory::new(1, AccessoryInformation {
-            name: bridge.name.clone(),
-            serial_number: "00000".into(),
-            software_revision: Some(config.server.version.clone()),
-            ..Default::default()
-        })?;
-        server.add_accessory(bridge).await?;
-
-        // 初始化其他配件
-        let accessories = init_hap_accessories(conn,
-                                               manage.clone(),
-                                               bid, iot_device_map.clone()).await?;
-
-        for accessory in accessories.iter() {
-            server.add_arc_accessory(accessory.accessory.clone()).await?;
-        }
-        server.configuration_number_incr().await;
-        manage.push_server(bid, server, accessories);
+        init_hap(conn, bridge, manage.clone(), iot_device_map.clone()).await?;
     }
+    Ok(())
+}
+
+pub async fn init_hap(conn: &DatabaseConnection, bridge: HapBridgeModel, manage: HapManage, iot_device_map: IotDeviceManager) -> anyhow::Result<()> {
+    let config = &get_app_context().config;
+
+    let hex = format!("{:x}", bridge.bridge_id);
+    let str = format!("{}/{}_{}", config.server.data_dir, "hap", hex);
+    let mut storage = FileStorage::new(str.as_str()).await?;
+    let bid = bridge.bridge_id;
+
+    //config
+    let hap_config = match storage.load_config().await {
+        Ok(mut config) => {
+            config.redetermine_local_ip();
+            config.port = bridge.port as u16;
+            storage.save_config(&config).await?;
+            config
+        }
+        Err(_) => {
+            let pin = pin_code_from_str(bridge.pin_code.to_string().as_str());
+            let name = bridge.name.clone();
+            let setup_hash = compute_setup_hash(bridge.setup_id.as_str(), bridge.mac.as_str());
+            // let setup_hash=
+            let config = Config {
+                pin,
+                name,
+                //mac 地址配置
+                device_id: MacAddress::from_str(bridge.mac.as_str())?,
+                port: bridge.port as u16,
+                category: AccessoryCategory::Bridge,
+                setup_id: bridge.setup_id.clone(),
+                setup_hash,
+                ..Default::default()
+            };
+            storage.save_config(&config).await?;
+            config
+        }
+    };
+    let mut rng = rand::thread_rng();
+    let random_bytes: [u8; 32] = rng.gen();
+    let serial_number = hex::encode(random_bytes);
+
+    let server = IpServer::new(hap_config, storage).await?;
+    // 初始化bridge 设备 //todo 生成随机端口
+    let bridge = BridgeAccessory::new(1, AccessoryInformation {
+        name: bridge.name.clone(),
+        serial_number,
+        software_revision: Some(config.server.version.clone()),
+        ..Default::default()
+    })?;
+    server.add_accessory(bridge).await?;
+
+    // 初始化其他配件
+    let accessories = init_hap_accessories(conn,
+                                           manage.clone(),
+                                           bid, iot_device_map.clone()).await?;
+
+    for accessory in accessories.iter() {
+        server.add_arc_accessory(accessory.accessory.clone()).await?;
+    }
+    server.configuration_number_incr().await;
+    manage.push_server(bid, server, accessories);
     Ok(())
 }
 
@@ -193,8 +196,10 @@ async fn init_hap_accessory<'a>(conn: &DatabaseConnection,
     }
     // 查询script
     if let Some(script) = hap_accessory.script {
-        // 初始化hap js模块,
-        init_hap_accessory_module(hap_manage,ch_id, aid, script.as_str()).await?;
+        if !script.is_empty() {
+            // 初始化hap js模块,
+            init_hap_accessory_module(hap_manage, ch_id, aid, script.as_str()).await?;
+        };
     };
 
     Ok(accessory.clone())
@@ -203,8 +208,7 @@ async fn init_hap_accessory<'a>(conn: &DatabaseConnection,
 
 /// 服务映射
 /// cid 自增的 每次+特征的长度
-async fn add_service(aid: u64, cid: u64, service_chs: (HapServiceModel, Vec<HapCharacteristicModel>), device: DevicePointer,
-                     accessory: HapAccessoryPointer) -> anyhow::Result<usize> {
+async fn add_service(aid: u64, cid: u64, service_chs: (HapServiceModel, Vec<HapCharacteristicModel>), device: DevicePointer, accessory: HapAccessoryPointer) -> anyhow::Result<usize> {
     let service = service_chs.0;
     let chs = service_chs.1;
     let mut hap_service = IotHapService::new(cid, aid, service.service_type.into());
@@ -257,16 +261,6 @@ async fn add_service(aid: u64, cid: u64, service_chs: (HapServiceModel, Vec<HapC
     Ok(len)
 }
 
-
-pub fn pin_from_str(pin: &str) -> Pin {
-    let mut arr: [u8; 8] = [0; 8]; // 初始化一个长度为8的u8数组
-    for (i, c) in pin.chars().enumerate() {
-        if i < 8 {
-            arr[i] = c.to_digit(10).unwrap() as u8
-        }
-    }
-    Pin::new(arr).unwrap()
-}
 
 #[test]
 pub fn test_format() {

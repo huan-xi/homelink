@@ -1,15 +1,39 @@
 use std::str::FromStr;
 use anyhow::anyhow;
 use sea_orm::ActiveValue::Set;
-use sea_orm::JsonValue;
+use sea_orm::{ActiveValue, JsonValue};
 use crate::hap::hap_type::MappingHapType;
 use serde_aux::prelude::deserialize_number_from_string;
-use crate::db::entity::hap_characteristic::{BleToSensorParam, DbBleValueType, MappingMethod, MappingParam, MiotSpecParam, Property};
+use crate::db::entity::hap_characteristic::{BleToSensorParam, DbBleValueType, MappingMethod, MappingParam, MiotSpecParam};
 use serde_aux::prelude::deserialize_option_number_from_string;
 use hap::HapType;
+use crate::db::entity::common::{Property, PropertyVec};
+use crate::db::entity::hap_bridge::BridgeCategory;
 use crate::db::entity::prelude::{HapAccessoryActiveModel, HapCharacteristicActiveModel};
 use crate::hap::unit_convertor::{ConvertorParamType, UnitConvertor};
 
+#[derive(serde::Deserialize, Debug)]
+pub struct LoginParam {
+    /// 账号
+    pub password: String,
+    pub username: String,
+}
+
+#[derive(serde::Deserialize, Debug)]
+pub struct AddHapBridgeParam {
+    /// pin码
+    pub pin_code: Option<String>,
+
+    pub category: BridgeCategory,
+    pub name: String,
+
+}
+
+#[derive(serde::Deserialize, Debug)]
+pub struct SyncDeviceParam {
+    /// 账号
+    pub account: String,
+}
 
 #[derive(serde::Deserialize, Debug)]
 pub struct AddServiceParam {
@@ -30,8 +54,10 @@ pub struct AddHapAccessoryParam {
     bridge_id: i64,
     name: Option<String>,
     memo: Option<String>,
+    script: Option<String>,
     disabled: Option<bool>,
     hap_type: Option<MappingHapType>,
+    register_props: PropertyVec,
 }
 
 impl AddHapAccessoryParam {
@@ -45,7 +71,8 @@ impl AddHapAccessoryParam {
             disabled: Set(self.disabled.unwrap_or(false)),
             hap_type: Set(self.hap_type),
             info: Default::default(),
-            script: Default::default(),
+            script: Set(self.script),
+            register_props: Set(self.register_props),
         })
     }
 }
@@ -73,7 +100,6 @@ pub struct CharacteristicParam {
 impl CharacteristicParam {
     pub fn into_model(self, service_id: i64) -> anyhow::Result<HapCharacteristicActiveModel> {
         let mapping_param = match &self.mapping_method {
-
             MappingMethod::PropMapping => {
                 Some(match self.mapping_property.clone() {
                     None => {
@@ -115,6 +141,30 @@ impl CharacteristicParam {
 pub struct DisableParam {
     pub disabled: bool,
 }
+
+#[derive(serde::Deserialize, Debug)]
+pub struct UpdateHapAccessoryParam {
+    pub name: Option<String>,
+    pub memo: Option<String>,
+    pub hap_type: Option<MappingHapType>,
+    // pub script: Option<String>,
+    // pub register_props: PropertyVec,
+}
+
+impl UpdateHapAccessoryParam {
+    pub fn into_model(self, id: i64) -> anyhow::Result<HapAccessoryActiveModel> {
+        Ok(HapAccessoryActiveModel {
+            aid: Set(id),
+            name: Set(self.name),
+            memo: Set(self.memo),
+            hap_type: Set(self.hap_type),
+            // script: Set(self.script),
+            // register_props: Set(self.register_props),
+            ..Default::default()
+        })
+    }
+}
+
 
 #[derive(serde::Deserialize, Debug)]
 pub struct Test {

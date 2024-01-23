@@ -2,12 +2,14 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use aes::Aes128;
+use anyhow::anyhow;
 use async_trait::async_trait;
 use block_modes::block_padding::Pkcs7;
 use block_modes::{BlockMode, Cbc};
-use futures_util::FutureExt;
+use futures_util::{FutureExt, TryStreamExt};
 use log::{debug, error, info};
 use serde_json::{Map, Value};
+use tap::TapFallible;
 use tokio::net::UdpSocket;
 use tokio::sync::broadcast::{Receiver, Sender};
 use tokio::time::timeout;
@@ -41,7 +43,6 @@ impl UdpMiotSpecProtocol {
         let (msg_sender, _) = tokio::sync::broadcast::channel(10);
         let msg = Self::discover(socket.clone().as_ref(), Duration::from_secs(30)).await?;
         //获取时间戳
-        // let now = Utc::now();
         let millis = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
@@ -87,7 +88,9 @@ impl UdpMiotSpecProtocol {
             socket.send(helle_bytes.as_slice()).await?;
         }
         let mut buf = [0u8; 1024];
-        let result = tokio::time::timeout(timeout, socket.recv_from(&mut buf)).await??;
+        let result = tokio::time::timeout(timeout, socket.recv_from(&mut buf))
+            .await
+            .tap_err(|f| error!("hello 包响应超时"))??;
         let (size, block_modes) = result;
         let msg = Message::parse(&buf[..size]).unwrap();
         Ok(msg)
@@ -107,9 +110,9 @@ impl MiotSpecProtocol for UdpMiotSpecProtocol {
         Ok(())
     }
 
-   fn recv(&self) -> Receiver<JsonMessage> {
-            self.msg_sender.subscribe()
-        }
+    fn recv(&self) -> Receiver<JsonMessage> {
+        self.msg_sender.subscribe()
+    }
 
 
     async fn await_result(&self, id: u64, timeout_val: Option<Duration>) -> anyhow::Result<JsonMessage> {
@@ -128,15 +131,15 @@ impl MiotSpecProtocol for UdpMiotSpecProtocol {
                     }
                 };
             }
-        }).await?;
+        }).await.map_err(|f| anyhow!("调用接口响应超时"))?;
         if let Err(e) = &res {
-            error!("await_result error:{:?}", e);
+            error!("await_result error:{}", e);
             //将状态改成断开
         };
         res
     }
 
-    async fn start_listen(&self){
+    async fn start_listen(&self) {
         let mut buf = [0u8; 65535];
         let sender = self.msg_sender.clone();
         info!("设备id:{},开始监听消息udp",self.device_id);
@@ -145,13 +148,21 @@ impl MiotSpecProtocol for UdpMiotSpecProtocol {
             let vec = buf.to_vec();
             //解包
             let msg = Message::unpack(&self.token, &vec[..bytes]);
-            let str = String::from_utf8(msg.data.clone()).unwrap();
-            info!("收到udp消息:{}", str);
-            serde_json::from_str::<Value>(str.as_str()).unwrap();
-            let _ = sender.send(JsonMessage {
-                // header: Some(msg.header),
-                data: serde_json::from_str(str.as_str()).unwrap(),
-            });
+            if !msg.data.is_empty() {
+                let str = String::from_utf8(msg.data.clone()).unwrap();
+                info!("收到udp消息:{}", str);
+                match serde_json::from_str::<Map<String, Value>>(str.as_str()) {
+                    Ok(data) => {
+                        let _ = sender.send(JsonMessage {
+                            // header: Some(msg.header),
+                            data,
+                        });
+                    }
+                    Err(e) => {
+                        error!("设备消息解析json错误:{:?}", e);
+                    }
+                };
+            }
         }
         // 设备断开
         error!("udp 协议断开");

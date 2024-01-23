@@ -5,18 +5,19 @@ use log::{debug, error, info};
 use sea_orm::JsonValue;
 use serde_json::Value;
 use tap::{Tap, TapFallible};
-use miot_spec::device::emitter::{DataListener, EventType};
-use miot_spec::device::emitter::EventType::{UpdateProperty};
+use miot_spec::device::common::emitter::{DataListener, EventType};
+use miot_spec::device::common::emitter::EventType::{UpdateProperty};
 use crate::config::context::get_app_context;
+use crate::db::entity::common::Property;
+use crate::db::entity::hap_characteristic::{MappingMethod, MappingParam};
 use crate::hap::iot_characteristic::{CharacteristicValue, IotCharacteristic};
-use crate::hap::unit_convertor::{ UnitConv};
-use crate::db::entity::hap_characteristic::{MappingMethod, MappingParam, Model, Property};
+use crate::hap::unit_convertor::{UnitConv};
 use crate::db::entity::prelude::HapCharacteristicModel;
 use crate::init::{DevicePointer, HapAccessoryPointer};
 use crate::js_engine::channel::main_channel::{FromModuleResp, ToModuleEvent};
 use crate::js_engine::channel::params::{BindDeviceModuleParam, OnCharReadParam, OnCharUpdateParam};
 
-
+/// 转成特征
 pub async fn to_characteristic(sid: u64, aid: u64, stag: Option<String>, index: usize, ch: HapCharacteristicModel,
                                device: DevicePointer, accessory: HapAccessoryPointer) -> anyhow::Result<IotCharacteristic> {
     let format: Format = serde_json::from_str(format!("\"{}\"", ch.format).as_str())

@@ -2,6 +2,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
 use hex::FromHex;
+use impl_new::New;
 use log::info;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -82,22 +83,13 @@ pub trait MiotSpecProtocol {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash,New)]
 pub struct MiotSpecId {
     pub siid: i32,
     pub piid: i32,
 }
 
-impl MiotSpecId {
-    pub fn new(siid: i32, piid: i32) -> Self {
-        Self {
-            siid,
-            piid,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize,New)]
 pub struct MiotSpecDTO {
     pub did: String,
     pub siid: i32,
