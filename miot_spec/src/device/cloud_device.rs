@@ -38,8 +38,19 @@ impl MiotSpecDevice for MiCloudDevice {
     async fn get_proto(&self) -> Result<MiotSpecProtocolPointer, ExitError> {
         Ok(self.proto.clone())
     }
+    async fn run(&self) -> Result<(), ExitError> {
+        // let proto = self.proto.clone();
+        // proto.cloud_client.await;
+        //todo 从设备组监听轮询消息,并发布
 
-    fn run(&self) -> BoxFuture<Result<(), ExitError>> {
+        loop {
+            tokio::time::sleep(Duration::from_secs(100)).await
+        }
+        Ok(())
+    }
+    async fn register_property(&self, siid: i32, piid: i32) {
+        //todo 注册到设备组上
+
         todo!()
     }
 }

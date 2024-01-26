@@ -37,6 +37,12 @@ impl From<anyhow::Error> for ApiError {
     }
 }
 
+impl From<std::io::Error> for ApiError {
+    fn from(value: std::io::Error) -> Self {
+        ApiError::Msg("io error".to_string())
+    }
+}
+
 impl From<DbErr> for ApiError {
     fn from(d: DbErr) -> Self {
         ApiError::DbErr(d)

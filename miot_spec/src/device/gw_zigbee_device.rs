@@ -24,7 +24,7 @@ impl MiotSpecDevice for ZigbeeDevice {
         self.gateway.get_proto().await
     }
 
-    fn run(&self) -> BoxFuture<Result<(), ExitError>> {
+    async fn run(&self) -> Result<(), ExitError>{
         todo!()
     }
 }

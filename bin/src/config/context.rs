@@ -4,8 +4,8 @@ use sea_orm::DatabaseConnection;
 use tokio::sync::Mutex;
 use hap_metadata::metadata::HapMetadata;
 use crate::config::cfgs::Configs;
-use crate::init::device_manage::IotDeviceManager;
-use crate::init::hap_manage::HapManage;
+use crate::init::manager::device_manager::IotDeviceManager;
+use crate::init::manager::hap_manager::HapManage;
 use crate::js_engine::init_js_engine::JsEngine;
 
 /// 与js 交互的上下文

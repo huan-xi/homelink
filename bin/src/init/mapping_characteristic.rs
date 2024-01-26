@@ -146,7 +146,7 @@ async fn set_read_update_method(aid: u64, sid: u64, stag: Option<String>,
                         .hap_manager
                         .get_accessory_ch_id(aid)
                         .await?;
-
+                    // 像js 发送更新事件
                     let _ = sender.send(ToModuleEvent::OnCharUpdate(OnCharUpdateParam {
                         ch_id,
                         service_tag: stag,
@@ -169,11 +169,13 @@ async fn set_read_update_method(aid: u64, sid: u64, stag: Option<String>,
                 .get_accessory_ch_id(aid).await?;
 
             let _ = get_app_context()
-                .js_engine.send(
-                ToModuleEvent::BindDeviceModule(BindDeviceModuleParam {
-                    ch_id,
-                    dev_id: did,
-                })).await.map_err(|f| anyhow!("绑定事件通道失败"))?;
+                .js_engine
+                .send(
+                    ToModuleEvent::BindDeviceModule(BindDeviceModuleParam {
+                        ch_id,
+                        dev_id: did,
+                    })).await
+                .map_err(|f| anyhow!("绑定事件通道失败"))?;
         }
     }
 

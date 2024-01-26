@@ -54,7 +54,7 @@ export class IotDevice {
      */
     async setProperty(obj, value) {
         const {siid, piid} = obj;
-        if (value) {
+        if (value !== null && value !== undefined) {
             await op_device_set_property(this.id, siid, piid, value);
         }
     }

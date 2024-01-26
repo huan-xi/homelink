@@ -7,7 +7,7 @@ use log::error;
 use tap::TapFallible;
 use crate::config::context::get_app_context;
 use crate::db::SNOWFLAKE;
-use crate::init::hap_manage::{HapManage};
+use crate::init::manager::hap_manager::{HapManage};
 use crate::js_engine::channel::params::ExecuteSideModuleParam;
 
 /// hap 设备作为一个module 运行

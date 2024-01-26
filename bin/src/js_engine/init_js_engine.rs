@@ -45,7 +45,7 @@ pub struct JsEngine {
     ///引擎发出广播
     pub resp_recv: ResultSenderPointer,
     // engine_ctrl: Arc<Mutex<Option<oneshot::Sender<u8>>>>,
-    id: AtomicU64,
+    // id: AtomicU64,
 }
 
 impl JsEngine {
@@ -128,7 +128,7 @@ pub async fn init_js_engine(data_dir: String, mut context: EnvContext) -> anyhow
         sender: to_module_sender,
         resp_recv,
         // engine_ctrl: Arc::new(Mutex::new(Some(js_tx))),
-        id: Default::default(),
+        // id: Default::default(),
     })
 }
 

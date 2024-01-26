@@ -19,11 +19,15 @@ pub struct DeviceInfo {
     pub name: String,
     /// mac 地址
     pub mac: Option<String>,
-    /// 序列号
-    pub serial_number: Option<String>,
     pub manufacturer: Option<String>,
     pub localip: Option<String>,
+    pub extra: Option<Extra>,
 }
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, )]
+pub struct Extra {
+    pub fw_version: Option<String>,
+}
+
 
 pub enum DeviceStatus {
     /// 正常
@@ -71,7 +75,7 @@ impl Default for RetryInfo {
     fn default() -> Self {
         Self {
             retry_count: Mutex::new(0),
-            max_interval: 5 * 60_1000,
+            max_interval: 60_1000,
         }
     }
 }
@@ -149,7 +153,7 @@ pub trait MiotSpecDevice {
         self.get_base().tx.subscribe()
     }
     /// 创建连接并且 监听
-    fn run(&self) -> BoxFuture<Result<(), ExitError>>;
+    async fn run(&self) -> Result<(), ExitError>;
 
     /// 获取设备类型
     fn get_device_type(&self) -> MiotDeviceType { todo!("无法获取设备类型"); }

@@ -8,9 +8,9 @@ use crate::api::output::{ApiResp, ApiResult};
 use crate::api::params::{AddHapAccessoryParam, DisableParam, UpdateHapAccessoryParam};
 use crate::api::results::HapAccessoryResult;
 use crate::api::state::AppState;
-use crate::db::entity::prelude::{HapAccessoryActiveModel, HapAccessoryColumn, HapAccessoryEntity, HapAccessoryModel, HapAccessoryRelation, HapBridgeEntity, IotDevice, IotDeviceActiveModel, IotDeviceColumn, IotDeviceModel};
+use crate::db::entity::prelude::{HapAccessoryActiveModel, HapAccessoryColumn, HapAccessoryEntity, HapAccessoryModel, HapAccessoryRelation, HapBridgeEntity, IotDeviceEntity};
 use crate::db::SNOWFLAKE;
-use crate::err_msg;
+
 
 pub async fn add(state: State<AppState>, Json(param): Json<AddHapAccessoryParam>) -> ApiResult<()> {
     let mut model = param.into_model()?;
@@ -28,7 +28,7 @@ pub async fn list(state: State<AppState>) -> ApiResult<Vec<HapAccessoryResult>> 
         .all(state.conn()).await?;
     let mut result = vec![];
     for (model, bridge) in list.into_iter() {
-        let device = model.find_related(IotDevice).one(state.conn()).await?;
+        let device = model.find_related(IotDeviceEntity).one(state.conn()).await?;
         result.push(HapAccessoryResult {
             model,
             bridge,

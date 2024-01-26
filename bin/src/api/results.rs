@@ -1,3 +1,4 @@
+use serde::Serialize;
 use serde_json::Value;
 use hap_metadata::metadata::HapCharacteristic;
 use crate::db::entity::prelude::{HapAccessoryModel, HapBridgeEntity, HapBridgeModel, IotDeviceModel};
@@ -13,6 +14,13 @@ pub struct HapBridgeResult {
     #[serde(flatten)]
     pub(crate) model: HapBridgeModel,
     pub setup_uri: String,
+    pub running: bool,
+}
+#[derive(Debug, serde::Serialize)]
+pub struct IotDeviceResult {
+    #[serde(flatten)]
+    pub model: IotDeviceModel,
+    pub running: bool,
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -59,4 +67,17 @@ impl CharacteristicMetaResult {
             units: c.units.clone(),
         }
     }
+}
+
+
+#[derive(serde::Deserialize, Debug, Serialize)]
+pub struct MiotDeviceResult {
+    pub did: String,
+    pub token: String,
+    pub name: String,
+    pub model: String,
+    pub localip: Option<String>,
+    pub mac: Option<String>,
+    pub is_online: Option<bool>,
+    pub full: Option<String>,
 }

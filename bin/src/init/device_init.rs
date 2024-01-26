@@ -1,25 +1,27 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use anyhow::anyhow;
-use log::error;
+use log::{error, info};
 use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait};
 use miot_spec::device::ble::ble_device::BleDevice;
 use miot_spec::device::gateway::gateway::OpenMiioGatewayDevice;
 use miot_spec::device::wifi_device::WifiDevice;
 use crate::db::entity::iot_device::{DeviceParam, IotDeviceType, Model};
-use crate::db::entity::prelude::{IotDevice, IotDeviceColumn, IotDeviceModel};
+use crate::db::entity::prelude::{IotDeviceEntity, IotDeviceColumn, IotDeviceModel, MiotDeviceEntity};
 use crate::init::{DeviceMap, DevicePointer};
 use sea_orm::QueryFilter;
+use tap::TapFallible;
 use miot_spec::device::mesh_device::MeshDevice;
+use miot_spec::device::miot_spec_device::DeviceInfo;
 use miot_spec::device::MiotDevicePointer;
-use crate::init::device_manage::IotDeviceManager;
+use crate::init::manager::device_manager::IotDeviceManager;
 
 /// 初始化hap 设备 init_iot_device
 pub async fn init_iot_devices(conn: &DatabaseConnection, manage: IotDeviceManager) -> anyhow::Result<()> {
     // let mut map: DeviceMap = dashmap::DashMap::new();
     let mut list = vec![];
     //读取设备
-    let devices: Vec<IotDeviceModel> = IotDevice::find()
+    let devices: Vec<IotDeviceModel> = IotDeviceEntity::find()
         .filter(IotDeviceColumn::GatewayId.is_null().and(
             IotDeviceColumn::Disabled.eq(false)
         ))
@@ -27,7 +29,11 @@ pub async fn init_iot_devices(conn: &DatabaseConnection, manage: IotDeviceManage
         .await?;
     for device in devices.into_iter() {
         let device_id = device.device_id;
-        match init_mi_device(device).await {
+        if device.source_type.is_none() {
+            info!("设备{}没有来源类型", device_id);
+            continue;
+        };
+        match init_mi_device(conn, device).await {
             Ok(dev) => {
                 list.push((device_id, dev));
             }
@@ -37,7 +43,7 @@ pub async fn init_iot_devices(conn: &DatabaseConnection, manage: IotDeviceManage
         }
     }
     //初始化米家网关子设备
-    let children_devices = IotDevice::find()
+    let children_devices = IotDeviceEntity::find()
         .filter(IotDeviceColumn::GatewayId.is_not_null().and(
             IotDeviceColumn::Disabled.eq(false)
         ))
@@ -94,6 +100,16 @@ async fn init_children_device(dev: IotDeviceModel, gw: MiotDevicePointer) -> any
             }
             Err(anyhow!("初始化设备失败，参数类型错误"))
         }
+        IotDeviceType::MiCloudDevice => {
+            ///配置米家账号
+
+            todo!();
+            /*if let Some(DeviceParam::MeshParam(param)) = dev.params {
+                let ble_dev = MeshDevice::new(param, gw.clone());
+                return Ok(DevicePointer::new(Arc::new(ble_dev)));
+            }
+            Err(anyhow!("初始化设备失败，参数类型错误"))*/
+        }
         _ => {
             Err(anyhow!("初始化设备失败，设备类型错误"))
         }
@@ -101,16 +117,18 @@ async fn init_children_device(dev: IotDeviceModel, gw: MiotDevicePointer) -> any
 }
 
 /// 初始化米家不需要网关的设备
-async fn init_mi_device(dev: IotDeviceModel) -> anyhow::Result<DevicePointer> {
+async fn init_mi_device(conn: &DatabaseConnection, dev: IotDeviceModel) -> anyhow::Result<DevicePointer> {
+    let source_id = dev.source_id.ok_or(anyhow!("设备来源id不存在"))?;
+    let param = get_device_info(conn,source_id.as_str()).await?;
     return match dev.device_type {
         IotDeviceType::MiWifiDevice => {
-            if let Some(DeviceParam::WifiDeviceParam(param)) = dev.params {
+            if let Some(DeviceParam::WifiDeviceParam) = dev.params {
                 return Ok(DevicePointer::new(Arc::new(WifiDevice::new(param).await?)));
             }
             Err(anyhow!("初始化设备失败，参数类型错误"))
         }
         IotDeviceType::MiGatewayDevice => {
-            if let Some(DeviceParam::MiGatewayParam(param)) = dev.params {
+            if let Some(DeviceParam::MiGatewayParam) = dev.params {
                 let dev = OpenMiioGatewayDevice::new(param).await?;
                 let dev = Arc::new(dev);
                 return Ok(DevicePointer::new(dev.clone()));
@@ -121,4 +139,13 @@ async fn init_mi_device(dev: IotDeviceModel) -> anyhow::Result<DevicePointer> {
             Err(anyhow!("初始化设备失败，设备类型错误"))
         }
     };
+}
+
+async fn get_device_info(conn: &DatabaseConnection, id: &str) -> anyhow::Result<DeviceInfo> {
+    let miot = MiotDeviceEntity::find_by_id(id.to_string()).one(conn)
+        .await?
+        .ok_or(anyhow!("米家设备did:{}不存在",id))?;
+    let info: DeviceInfo = serde_json::from_value(miot.full)
+        .tap_err(|e| error!("米家设备字段不全:{}",e))?;
+    Ok(info)
 }

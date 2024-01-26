@@ -10,6 +10,7 @@ pub struct ExecuteSideModuleParam {
     pub ch_id: i64,
     pub url: Url,
 }
+
 #[derive(Clone, Serialize, Deserialize, New)]
 #[serde(rename_all = "camelCase")]
 pub struct BindDeviceModuleParam {
@@ -47,4 +48,18 @@ pub struct OnCharUpdateParam {
     pub char_tag: String,
     pub old_value: JsonValue,
     pub new_value: JsonValue,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct U64Value {
+    pub value: String,
+}
+
+impl U64Value {
+    pub fn new(value: u128) -> Self {
+        Self {
+            value: value.to_string(),
+        }
+    }
 }

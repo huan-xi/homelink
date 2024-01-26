@@ -4,7 +4,7 @@ pub use super::device_mapping::Entity as DeviceMapping;
 pub use super::device_mapping::Model as DeviceMappingModel;
 pub use super::device_mapping::Column as DeviceMappingColumn;
 
-pub use super::iot_device::Entity as IotDevice;
+pub use super::iot_device::Entity as IotDeviceEntity;
 pub use super::iot_device::Model as IotDeviceModel;
 pub use super::iot_device::Column as IotDeviceColumn;
 pub use super::iot_device::ActiveModel as IotDeviceActiveModel;
@@ -35,3 +35,9 @@ pub use super::miot_device::Entity as MiotDeviceEntity;
 pub use super::miot_device::Model as MiotDeviceModel;
 pub use super::miot_device::ActiveModel as MiotDeviceActiveModel;
 pub use super::miot_device::Column as MiotDeviceColumn;
+
+
+pub use super::mi_account::Entity as MiAccountEntity;
+pub use super::mi_account::Model as MiAccountModel;
+pub use super::mi_account::ActiveModel as MiAccountActiveModel;
+pub use super::mi_account::Column as MiAccountColumn;

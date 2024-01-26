@@ -2,11 +2,11 @@ use std::ops::Deref;
 use std::sync::{Arc, Mutex};
 use dashmap::DashMap;
 use sea_orm::DatabaseConnection;
-use tokio::sync::RwLock;
 use hap_metadata::metadata::HapMetadata;
 use miot_spec::cloud::MiCloud;
-use crate::init::device_manage::IotDeviceManager;
-use crate::init::hap_manage::HapManage;
+use crate::init::manager::device_manager::IotDeviceManager;
+use crate::init::manager::hap_manager::HapManage;
+use crate::init::manager::mi_account_manager::MiAccountManager;
 
 
 pub struct AppStateInner {
@@ -15,8 +15,8 @@ pub struct AppStateInner {
     pub hap_metadata: Arc<HapMetadata>,
     pub device_manager: IotDeviceManager,
     pub hap_manager: HapManage,
-    pub mi_cloud_map: DashMap<String, Arc<MiCloud>>,
-
+    pub mi_account_manager: MiAccountManager,
+    //
 }
 
 impl AppStateInner {
@@ -25,12 +25,13 @@ impl AppStateInner {
                device_manager: IotDeviceManager,
                hap_manager: HapManage,
     ) -> Self {
+        let conn_c = conn.clone();
         Self {
             conn,
             hap_metadata,
             device_manager,
             hap_manager,
-            mi_cloud_map: Default::default(),
+            mi_account_manager:MiAccountManager::new(conn_c),
         }
     }
 

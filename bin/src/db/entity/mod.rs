@@ -9,3 +9,5 @@ pub mod hap_service;
 pub mod hap_characteristic;
 pub mod miot_device;
 pub mod common;
+
+pub mod mi_account;

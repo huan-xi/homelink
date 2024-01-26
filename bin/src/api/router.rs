@@ -18,12 +18,7 @@ pub fn api() -> Router<AppState> {
             "/users",
             Router::new()
                 .route("/login", post(controller::sys_users::login))
-                .route("/info", get(controller::sys_users::info))
-                // .route("/logout", post(controller::sys_users::logout))
-                // .route("/register", post(controller::sys_users::register))
-                // .route("/list", get(controller::sys_users::list))
-                // .route("/disable/:id", put(controller::sys_users::disable))
-                // .route("/update/:id", put(controller::sys_users::update))
+                .route("/info", get(controller::sys_users::info)),
         )
 
         .nest(
@@ -41,7 +36,7 @@ pub fn api() -> Router<AppState> {
               Router::new()
                   .route("/list", get(controller::iot_device::list))
                   .route("/disable/:id", put(controller::iot_device::disable))
-                  // .route("/", post(controller::iot_device::add_device))
+              // .route("/", post(controller::iot_device::add_device))
               ,
         )
         .nest("/hap_bridge",
@@ -60,10 +55,20 @@ pub fn api() -> Router<AppState> {
                   .route("/:id", put(controller::hap_accessory::update))
               ,
         )
-        .nest("/miot_spec",
+        .nest("/test", Router::new()
+            .route("/ping_js", get(controller::test::ping_js),
+            ))
+        .nest("/miot_device",
               Router::new()
-                  .route("/sync_mi_devices", get(controller::miot_spec::sync_mi_devices))
-              // .route("/convert_to_iot_device", get(controller::miot_spec::convert_to_iot_device))
+
+                  .route("/list", get(controller::miot_device::list))
+                  .route("/convert", post(controller::miot_device::convert_to_iot_device))
+                  .route("/handshake", post(controller::miot_device::handshake))
+                  .route("/accounts", get(controller::miot_device::accounts))
+                  .route("/account", post(controller::miot_device::add_account))
+                  .route("/account/login", post(controller::miot_device::login))
+                  .route("/account", put(controller::miot_device::update_account))
+                  .route("/account/sync_mi_devices", get(controller::miot_device::sync_mi_devices))
               // .route("/update_iot_device", get(controller::miot_spec::update_iot_device))
               // .route("/login_mi_account", get(controller::miot_spec::login_mi_account))
               // .route("/delete_device", get(controller::miot_spec::delete_device))
@@ -75,5 +80,4 @@ pub fn api() -> Router<AppState> {
                   .route("/service_meta/:hap_type", get(controller::hap_metadata::get_service_meta))
               ,
         )
-
 }

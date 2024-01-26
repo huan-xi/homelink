@@ -21,13 +21,11 @@ impl MiotSpecDevice for MeshDevice {
         self.gateway.get_proto().await
     }
 
-    fn run(&self) -> BoxFuture<Result<(), ExitError>> {
-        async move {
-            loop {
-                tokio::time::sleep(Duration::from_secs(100)).await;
-            }
-            Ok(())
-        }.boxed()
+    async fn run(&self) -> Result<(), ExitError>{
+        loop {
+            tokio::time::sleep(Duration::from_secs(100)).await;
+        }
+        Ok(())
     }
 }
 

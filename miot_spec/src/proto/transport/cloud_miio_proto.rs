@@ -9,7 +9,7 @@ use crate::proto::protocol::JsonMessage;
 
 #[derive(New)]
 pub struct CloudMiioProto {
-    cloud_client: Arc<MiCloud>,
+    pub cloud_client: Arc<MiCloud>,
 }
 
 #[async_trait::async_trait]

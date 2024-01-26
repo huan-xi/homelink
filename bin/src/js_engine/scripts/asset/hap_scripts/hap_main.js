@@ -36,6 +36,9 @@ export const onCharRead = async (service_tag, char_tag) => {
 };
 export const onCharUpdate = async (service_tag, char_tag, old_value, new_value) => {
     let val = reverseMapping.get(new_value);
+    if (char_tag === "security-system-state.current") {
+        return;
+    }
     await context.dev.setProperty(props["arming-mode"], val);
     await context.accessory.updateCharacteristic("test1", "security-system-state.current", new_value);
 }

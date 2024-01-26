@@ -45,28 +45,26 @@ impl MiotSpecDevice for OpenMiioGatewayDevice {
         self.connect().await
     }
 
-    fn run(&self) -> BoxFuture<Result<(), ExitError>> {
-        async move {
-            let p_arc = self.connect().await?;
-            // self.base.tx.send(EventType::GatewayMsg(self.info.clone().into())
-            let listen = p_arc.start_listen();
-            let forward = async {
-                while let Ok(msg) = p_arc.recv().recv().await {
-                    let _ = self.base.tx.send(EventType::GatewayMsg(msg));
-                };
+    async fn run(&self) -> Result<(), ExitError>{
+        let p_arc = self.connect().await?;
+        // self.base.tx.send(EventType::GatewayMsg(self.info.clone().into())
+        let listen = p_arc.start_listen();
+        let forward = async {
+            while let Ok(msg) = p_arc.recv().recv().await {
+                let _ = self.base.tx.send(EventType::GatewayMsg(msg));
             };
+        };
 
-            let poll = get_poll_func(self, self.info.did.as_str(), self.interval);
-            loop {
-                select! {
+        let poll = get_poll_func(self, self.info.did.as_str(), self.interval);
+        loop {
+            select! {
                     _ = listen =>break,
                     _ = forward =>break,
                     _ = poll => break
                 }
-            }
-            // futures_util::join!(listen, a);
-            Err(ExitError::Disconnect)
-        }.boxed()
+        }
+        // futures_util::join!(listen, a);
+        Err(ExitError::Disconnect)
     }
 }
 

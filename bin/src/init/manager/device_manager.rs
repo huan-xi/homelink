@@ -249,6 +249,10 @@ pub struct IotDeviceManager {
 impl IotDeviceManager {
     pub fn new() -> Self { Self { inner: Arc::new(IotDeviceManagerInner::new()) } }
 
+    pub fn is_running(&self, id: i64) -> bool {
+        self.device_map.contains_key(&id)
+    }
+
     /// 开启js 提交监听器
     pub async fn enable_to_js(&self, did: &str) -> anyhow::Result<()> {
         let dev = self.did_map.get(did)

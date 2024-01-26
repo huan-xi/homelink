@@ -42,24 +42,22 @@ impl MiotSpecDevice for WifiDevice {
         self.connect().await
     }
     /// 连接协议,并且监听
-    fn run(&self) -> BoxFuture<Result<(), ExitError>> {
-        async move {
-            let proto = self.connect().await?;
-            //开启状态获取
-            let listen = proto.start_listen();
-            // 开启轮询
-            let poll = get_poll_func(self, self.info.did.as_str(), self.interval);
-            loop {
-                select! {
+    async fn run(&self) -> Result<(), ExitError>{
+        let proto = self.connect().await?;
+        //开启状态获取
+        let listen = proto.start_listen();
+        // 开启轮询
+        let poll = get_poll_func(self, self.info.did.as_str(), self.interval);
+        loop {
+            select! {
                     _ = listen => break,
                     _ = poll => break,
                 }
-            }
-            // join(listen, poll).await;
-            Err(ExitError::Disconnect)
-            // 该表当前设备的状态
-            //ExitCode::OK
-        }.boxed()
+        }
+        // join(listen, poll).await;
+        Err(ExitError::Disconnect)
+        // 该表当前设备的状态
+        //ExitCode::OK
     }
 }
 
@@ -94,7 +92,7 @@ impl WifiDevice {
             },
             info,
             proto: Arc::new(RwLock::new(None)),
-            interval: Duration::from_secs(70),
+            interval: Duration::from_secs(120),
         })
     }
 }

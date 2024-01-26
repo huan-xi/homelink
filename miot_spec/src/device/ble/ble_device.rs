@@ -63,35 +63,33 @@ impl MiotSpecDevice for BleDevice {
         Ok(None)
     }
     /// 1.同步网关的状态
-    fn run(&self) -> BoxFuture<Result<(), ExitError>> {
-        async move {
-            // let gw_proto = self.gateway.get_proto().await?;
-            // let mut recv = gw_proto.recv();
-            let mut recv = self.gateway.get_event_recv().await;
+    async fn run(&self) -> Result<(), ExitError>{
+        // let gw_proto = self.gateway.get_proto().await?;
+        // let mut recv = gw_proto.recv();
+        let mut recv = self.gateway.get_event_recv().await;
 
-            while let Ok(EventType::GatewayMsg(msg)) = recv.recv().await {
-                /// 收到数据
-                let data = msg.get_json_data();
-                if let Some(method) = data.get("method") {
-                    //异步蓝牙事件
-                    if method.as_str() == Some("_async.ble_event") {
-                        if let Some(v) = data.get("params") {
-                            let did = v.as_object()
-                                .and_then(|i| i.get("dev"))
-                                .and_then(|i| i.as_object())
-                                .and_then(|i| i.get("did"))
-                                .and_then(|i| i.as_str());
+        while let Ok(EventType::GatewayMsg(msg)) = recv.recv().await {
+            /// 收到数据
+            let data = msg.get_json_data();
+            if let Some(method) = data.get("method") {
+                //异步蓝牙事件
+                if method.as_str() == Some("_async.ble_event") {
+                    if let Some(v) = data.get("params") {
+                        let did = v.as_object()
+                            .and_then(|i| i.get("dev"))
+                            .and_then(|i| i.as_object())
+                            .and_then(|i| i.get("did"))
+                            .and_then(|i| i.as_str());
 
-                            if Some(self.info.did.as_str()) == did {
-                                //获取evt
-                                self.set_value_from_param(v).await;
-                            }
+                        if Some(self.info.did.as_str()) == did {
+                            //获取evt
+                            self.set_value_from_param(v).await;
                         }
                     }
                 }
             }
-            Ok(())
-        }.boxed()
+        }
+        Ok(())
     }
     fn get_device_type(&self) -> MiotDeviceType {
         return MiotDeviceType::Ble(self);

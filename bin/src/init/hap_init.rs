@@ -1,5 +1,6 @@
 use std::str::FromStr;
 use std::sync::Arc;
+use anyhow::anyhow;
 use axum::body::HttpBody;
 use futures_util::future::{BoxFuture, join_all};
 use futures_util::FutureExt;
@@ -11,7 +12,7 @@ use hap::service::HapService;
 use hap::storage::{FileStorage, Storage};
 use log::{debug, error, info};
 use rand::Rng;
-use sea_orm::{ColIdx, ColumnTrait, DatabaseConnection, EntityTrait, JsonValue, ModelTrait, QueryFilter};
+use sea_orm::{ColIdx, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, JsonValue, ModelTrait, QueryFilter};
 use hap::characteristic::{HapCharacteristic};
 use hap::characteristic::configured_name::ConfiguredNameCharacteristic;
 use miot_spec::device::miot_spec_device::{MiotSpecDevice};
@@ -23,8 +24,8 @@ use crate::db::SNOWFLAKE;
 use crate::init::{DevicePointer, FuturesMutex, HapAccessoryPointer};
 use crate::hap::iot_hap_service::IotHapService;
 use crate::hap::rand_utils::{compute_setup_hash, pin_code_from_str, rand_pin_code};
-use crate::init::device_manage::{IotDeviceManager, IotDeviceManagerInner};
-use crate::init::hap_manage::HapManage;
+use crate::init::manager::device_manager::{IotDeviceManager, IotDeviceManagerInner};
+use crate::init::manager::hap_manager::HapManage;
 use crate::init::mapping_characteristic::{to_characteristic, ToChUtils};
 use crate::js_engine::init_hap_accessory_module::init_hap_accessory_module;
 
@@ -36,12 +37,14 @@ pub async fn init_haps(conn: &DatabaseConnection, manage: HapManage, iot_device_
         .await?;
     // let mut servers = Vec::new();
     for bridge in bridges.into_iter() {
-        init_hap(conn, bridge, manage.clone(), iot_device_map.clone()).await?;
+        add_hap_bridge(conn, bridge, manage.clone(), iot_device_map.clone()).await?;
     }
     Ok(())
 }
 
-pub async fn init_hap(conn: &DatabaseConnection, bridge: HapBridgeModel, manage: HapManage, iot_device_map: IotDeviceManager) -> anyhow::Result<()> {
+/// 添加单个bridge 到管理器中
+pub async fn add_hap_bridge<C>(conn: &C, bridge: HapBridgeModel, manage: HapManage, iot_device_map: IotDeviceManager) -> anyhow::Result<()>
+    where C: ConnectionTrait, {
     let config = &get_app_context().config;
 
     let hex = format!("{:x}", bridge.bridge_id);
@@ -77,12 +80,16 @@ pub async fn init_hap(conn: &DatabaseConnection, bridge: HapBridgeModel, manage:
             config
         }
     };
-    let mut rng = rand::thread_rng();
-    let random_bytes: [u8; 32] = rng.gen();
-    let serial_number = hex::encode(random_bytes);
+
+    let serial_number = {
+        let mut rng = rand::thread_rng();
+        let random_bytes: [u8; 16] = rng.gen();
+        hex::encode(random_bytes)
+    };
+
 
     let server = IpServer::new(hap_config, storage).await?;
-    // 初始化bridge 设备 //todo 生成随机端口
+    // 初始化bridge 设备
     let bridge = BridgeAccessory::new(1, AccessoryInformation {
         name: bridge.name.clone(),
         serial_number,
@@ -111,9 +118,9 @@ pub struct AccessoryRelation {
 }
 
 /// 配件是基于设备的
-async fn init_hap_accessories(conn: &DatabaseConnection,
-                              hap_manage: HapManage,
-                              bridge_id: i64, iot_device_map: IotDeviceManager) -> anyhow::Result<Vec<AccessoryRelation>> {
+async fn init_hap_accessories<C: ConnectionTrait>(conn: &C,
+                                                  hap_manage: HapManage,
+                                                  bridge_id: i64, iot_device_map: IotDeviceManager) -> anyhow::Result<Vec<AccessoryRelation>> {
     let hap_accessories = HapAccessoryEntity::find()
         .filter(HapAccessoryColumn::BridgeId.eq(bridge_id)
             .and(HapAccessoryColumn::Disabled.eq(false)))
@@ -149,9 +156,9 @@ async fn init_hap_accessories(conn: &DatabaseConnection,
 
 /// 初始化配件的设备
 /// 需要建立配件与设备的关系,处理设备情况
-async fn init_hap_accessory<'a>(conn: &DatabaseConnection,
-                                hap_manage: HapManage,
-                                device: DevicePointer, hap_accessory: HapAccessoryModel) -> anyhow::Result<HapAccessoryPointer> {
+async fn init_hap_accessory<'a, C: ConnectionTrait>(conn: &C,
+                                                    hap_manage: HapManage,
+                                                    device: DevicePointer, hap_accessory: HapAccessoryModel) -> anyhow::Result<HapAccessoryPointer> {
     let aid = hap_accessory.aid as u64;
     let mut hss: Vec<Box<dyn HapService>> = vec![];
     // let device = device.value().read().await.device.clone();
@@ -160,14 +167,22 @@ async fn init_hap_accessory<'a>(conn: &DatabaseConnection,
 
     let dev_info = device.get_info().clone();
     let name = hap_accessory.name.unwrap_or(dev_info.name.clone());
+    let name_c = name.clone();
+    let software_revision = dev_info
+        .extra
+        .and_then(|i| i.fw_version);
+    let parts: Vec<&str> = dev_info.model.split('.').collect();
+    let manufacturer = parts.first()
+        .map(|f| f.to_string())
+        .unwrap_or("未知制造商".to_string());
     // 可以从设备信息中获取
     let mut info = AccessoryInformation {
         name,
         model: dev_info.model.clone(),
         firmware_revision: dev_info.firmware_revision.clone(),
-        software_revision: dev_info.software_revision.clone(),
-        serial_number: dev_info.serial_number.clone().unwrap_or("undefined".to_string()),
-        manufacturer: dev_info.manufacturer.clone().unwrap_or("undefined".to_string()),
+        software_revision,
+        serial_number: dev_info.did,
+        manufacturer,
         // configured_name: Some(dev_info.model.clone()),
         ..Default::default()
     };
@@ -182,18 +197,21 @@ async fn init_hap_accessory<'a>(conn: &DatabaseConnection,
         .find_with_related(HapCharacteristicEntity)
         .all(conn)
         .await?;
+    if services.is_empty() {
+        return Err(anyhow!("配件:{},无服务",name_c));
+    };
     let ha = IotHapAccessory::new(aid, hss);
     let accessory = Arc::new(FuturesMutex::new(Box::new(ha) as Box<dyn HapAccessory>));
     let ch_id = SNOWFLAKE.next_id();
     // 注册到manage 上
     hap_manage.put_accessory_ch(aid, ch_id, false).await;
 
-
     for service in services.into_iter() {
         let len = add_service(aid, cid, service, device.clone(), accessory.clone()).await?;
         cid += len as u64 + 1;
         // 转成服务, 服务需要服务类型和服务的必填特征
     }
+
     // 查询script
     if let Some(script) = hap_accessory.script {
         if !script.is_empty() {

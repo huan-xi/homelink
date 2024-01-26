@@ -17,9 +17,8 @@ impl EntityName for Entity {
     }
 }
 
-#[derive(
-EnumIter, DeriveActiveEnum, Copy, Clone, Hash, Debug, PartialEq, Eq, Serialize, Deserialize,
-)]
+/// 接入方式
+#[derive(EnumIter, DeriveActiveEnum, Copy, Clone, Hash, Debug, PartialEq, Eq, Serialize, Deserialize, )]
 #[sea_orm(rs_type = "i32", db_type = "Integer")]
 pub enum IotDeviceType {
     /// 米家wifi设备
@@ -30,16 +29,25 @@ pub enum IotDeviceType {
     MiBleDevice = 3,
     /// 米家mesh设备
     MiMeshDevice = 4,
+    /// 米家Zigbee
+    MiZigbeeDevice = 5,
     /// 米家云端设备
-    MiCloudDevice = 5,
+    MiCloudDevice = 6,
     // Bl
 }
+
+#[derive(EnumIter, DeriveActiveEnum, Copy, Clone, Hash, Debug, PartialEq, Eq, Serialize, Deserialize, )]
+#[sea_orm(rs_type = "i32", db_type = "Integer")]
+pub enum SourceType {
+    MiHome = 2
+}
+
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, FromJsonQueryResult)]
 #[serde(tag = "type")]
 pub enum DeviceParam {
-    WifiDeviceParam(DeviceInfo),
-    MiGatewayParam(DeviceInfo),
+    WifiDeviceParam,
+    MiGatewayParam,
     BleParam(BleParam),
     MeshParam(DeviceInfo),
 }
@@ -88,6 +96,8 @@ pub struct Model {
     pub name: Option<String>,
     pub memo: Option<String>,
     pub disabled: bool,
+    pub source_type: Option<SourceType>,
+    pub source_id: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveColumn)]
@@ -99,6 +109,8 @@ pub enum Column {
     Disabled,
     Name,
     Memo,
+    SourceType,
+    SourceId,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DerivePrimaryKey)]
@@ -131,11 +143,13 @@ impl ColumnTrait for Column {
         match self {
             Self::DeviceId => ColumnType::BigInteger.def(),
             Self::DeviceType => ColumnType::Integer.def(),
+            Self::SourceType => ColumnType::Integer.def(),
             Self::Params => ColumnType::Json.def().null(),
             Self::GatewayId => ColumnType::BigInteger.def().null(),
             Self::Disabled => ColumnType::Boolean.def(),
             Self::Name => ColumnType::String(None).def().null(),
             Self::Memo => ColumnType::String(None).def().null(),
+            Self::SourceId => ColumnType::String(None).def().null(),
         }
     }
 }

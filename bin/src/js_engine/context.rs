@@ -1,7 +1,7 @@
 use once_cell::sync::OnceCell;
 use sea_orm::DbConn;
-use crate::init::device_manage::IotDeviceManager;
-use crate::init::hap_manage::HapManage;
+use crate::init::manager::device_manager::IotDeviceManager;
+use crate::init::manager::hap_manager::HapManage;
 
 
 /// 与js 交互的上下文

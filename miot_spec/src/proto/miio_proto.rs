@@ -1,6 +1,7 @@
 use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
+use futures_util::future::join;
 use hex::FromHex;
 use impl_new::New;
 use log::info;
@@ -58,8 +59,11 @@ pub trait MiotSpecProtocol {
         }];
         let str = param.to_string();
         info!("call_rpc:{}", str);
-        self.send(str.as_str()).await?;
-        self.await_result(id, timeout).await
+        let sender = self.send(str.as_str());
+        let recv = self.await_result(id, timeout);
+        let (r1, r2) = join(recv, sender).await;
+        r2?;
+        r1
     }
 
     async fn set_properties(&self, params: Vec<MiotSpecDTO>, timeout_val: Option<Duration>) -> anyhow::Result<Vec<MiotSpecDTO>> {
@@ -83,13 +87,13 @@ pub trait MiotSpecProtocol {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash,New)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, New)]
 pub struct MiotSpecId {
     pub siid: i32,
     pub piid: i32,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize,New)]
+#[derive(Debug, Clone, Serialize, Deserialize, New)]
 pub struct MiotSpecDTO {
     pub did: String,
     pub siid: i32,

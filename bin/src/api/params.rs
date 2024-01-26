@@ -9,6 +9,7 @@ use serde_aux::prelude::deserialize_option_number_from_string;
 use hap::HapType;
 use crate::db::entity::common::{Property, PropertyVec};
 use crate::db::entity::hap_bridge::BridgeCategory;
+use crate::db::entity::iot_device::IotDeviceType;
 use crate::db::entity::prelude::{HapAccessoryActiveModel, HapCharacteristicActiveModel};
 use crate::hap::unit_convertor::{ConvertorParamType, UnitConvertor};
 
@@ -30,10 +31,26 @@ pub struct AddHapBridgeParam {
 }
 
 #[derive(serde::Deserialize, Debug)]
-pub struct SyncDeviceParam {
+pub struct AccountParam {
     /// 账号
     pub account: String,
+    pub password: Option<String>,
 }
+
+#[derive(serde::Deserialize, Debug)]
+pub struct DidParam {
+    /// did
+    pub did: String,
+}
+
+#[derive(serde::Deserialize, Debug)]
+pub struct MiConvertToIotParam {
+    /// did
+    pub did: String,
+    pub device_type: IotDeviceType,
+    pub name: String,
+}
+
 
 #[derive(serde::Deserialize, Debug)]
 pub struct AddServiceParam {

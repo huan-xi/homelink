@@ -79,6 +79,7 @@ impl UdpMiotSpecProtocol {
 
         Ok(msg)
     }
+    /// 握手
     /// 扫描设备
     pub async fn discover(socket: &UdpSocket, timeout: Duration) -> anyhow::Result<Message> {
         let helle_bytes = hex::decode("21310020ffffffffffffffffffffffffffffffffffffffffffffffffffffffff").unwrap();
@@ -116,12 +117,7 @@ impl MiotSpecProtocol for UdpMiotSpecProtocol {
 
 
     async fn await_result(&self, id: u64, timeout_val: Option<Duration>) -> anyhow::Result<JsonMessage> {
-        let t = match timeout_val {
-            None => {
-                self.timeout
-            }
-            Some(s) => { s }
-        };
+        let t = timeout_val.unwrap_or(self.timeout);
         let res = timeout(t, async move {
             loop {
                 let msg = self.msg_sender.subscribe().recv().await?;

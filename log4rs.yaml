@@ -3,7 +3,7 @@ appenders:
   stdout:
     kind: console
     encoder:
-#      {f} 文件
+      #      {f} 文件
       pattern: "{d(%Y-%m-%d %H:%M:%S)} {M} {L} {h({l})} - {m}{n}"
   requests:
     kind: file
@@ -15,8 +15,10 @@ root:
   appenders:
     - stdout
 loggers:
-  miot_spec:
+  "miot_spec::proto::transport::open_miio_mqtt_proto":
     level: info
+  miot_spec:
+    level: debug
   libmdns:
     level: info
   hap:

@@ -1,18 +1,32 @@
 use async_trait::async_trait;
+use sea_orm::DatabaseConnection;
 use hap::Config;
 use hap::pairing::Pairing;
 use hap::storage::Storage;
+use crate::db::entity::prelude::HapBridgeActiveModel;
 
-pub struct DbBridgesStorage{
-
+pub struct DbBridgesStorage {
+    bid: i64,
+    conn: DatabaseConnection,
 }
+
 #[async_trait]
-impl Storage for DbBridgesStorage{
+impl Storage for DbBridgesStorage {
     async fn load_config(&self) -> hap::Result<Config> {
         todo!()
     }
 
     async fn save_config(&mut self, config: &Config) -> hap::Result<()> {
+        let model = HapBridgeActiveModel {
+            bridge_id: Default::default(),
+            pin_code: Default::default(),
+            port: Default::default(),
+            category: Default::default(),
+            name: Default::default(),
+            mac: Default::default(),
+            setup_id: Default::default(),
+            disabled: Default::default(),
+        };
         todo!()
     }
 

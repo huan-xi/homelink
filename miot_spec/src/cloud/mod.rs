@@ -1,6 +1,7 @@
 mod types;
 pub mod state;
 mod cookie_store_mutex;
+mod mi_cloud_device_group;
 
 use crypto::symmetriccipher::SynchronousStreamCipher;
 use crypto::rc4::Rc4;
@@ -20,7 +21,7 @@ use crypto::digest::Digest;
 use crypto::sha1::Sha1;
 use crypto::sha2::Sha256;
 use hex::ToHex;
-use log::info;
+use log::{error, info};
 use rand::distributions::Alphanumeric;
 use rand::Rng;
 use reqwest::{header, StatusCode, Url};
@@ -32,6 +33,7 @@ use crate::cloud::state::CookieState;
 use anyhow::Result;
 use base64::prelude::BASE64_STANDARD_NO_PAD;
 use reqwest::header::HeaderMap;
+use tap::TapFallible;
 
 pub struct Utils {}
 
@@ -433,8 +435,9 @@ impl MiCloud {
             .form(&params)
             .send().await?;
         let text = resp.text().await?;
-        info!("resp:{}", text.as_str());
+        // info!("resp:{}", text.as_str());
         if text.starts_with("{\"") {
+            error!("调用失败返回值:{}",text);
             return Err(anyhow!("登录失败 请重新登入"));
         }
         let sign = Utils::signed_nonce(ssecurity.as_str(), nonce.as_str())?;
@@ -544,11 +547,24 @@ impl MiCloud {
         let mut json_map: serde_json::map::Map<String, Value> = serde_json::from_str(text.as_str())
             .map_err(|e| anyhow!("json解析失败"))?;
 
+        let code = json_map.remove("code")
+            .and_then(|i| i.as_u64());
+        if code != Some(0) {
+            let description = json_map.remove("description")
+                .and_then(|f| f.as_str().map(|i| i.to_string()))
+                .unwrap_or("未知原因".to_string());
+            return Err(anyhow!("登录失败:{}",description));
+        }
+
         if let Some(location) = json_map.remove("location") {
             if let Some(l) = location.as_str() {
                 let ssecurity = json_map.remove("ssecurity")
                     .and_then(|v| v.as_str().map(|s| s.to_string()))
-                    .ok_or(anyhow!("获取ssecurity 失败"))?;
+                    .ok_or(anyhow!("获取ssecurity 失败"))
+                    .tap_err(|e| {
+                        //{"qs":"%3Fsid%3Dxiaomiio%26_json%3Dtrue","code":70016,"description"
+                        error!("登录第二步失败,text:{}",text.as_str())
+                    })?;
 
                 let user_id = json_map.remove("userId")
                     .and_then(|v| v.as_u64())

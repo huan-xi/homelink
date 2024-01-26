@@ -2,10 +2,12 @@ use std::collections::HashMap;
 use std::ops::Deref;
 use std::sync::Arc;
 use anyhow::anyhow;
+use futures_util::lock::Mutex;
 use impl_new::New;
 use log::{error, info};
 use serde_json::Value;
 use tap::TapFallible;
+use hap::Config;
 use hap::server::{IpServer, Server};
 use crate::init::hap_init::AccessoryRelation;
 use crate::init::HapAccessoryPointer;
@@ -59,9 +61,11 @@ pub struct HapManageInner {
 }
 
 impl HapManageInner {
+    pub fn get_bridge_server_config(&self, bid: i64) -> Option<Arc<Mutex<Config>>> {
+        self.server_map.get(&bid)
+            .map(|i| i.server.config_pointer().clone())
+    }
     pub(crate) async fn update_char_value(&self, aid: u64, service_tag: String, char_tag: String, value: Value) -> anyhow::Result<()> {
-        info!("aid map size :{}", self.aid_map.len());
-
         let accessory = self.aid_map.get(&aid)
             .ok_or(anyhow!("设备:{}不存在",aid))
             .tap_err(|e| error!("{}",e))?;
@@ -117,8 +121,6 @@ impl HapManageInner {
             self.dev_aid_map.insert(rel.device_id, rel.aid);
             self.aid_map.insert(rel.aid, info);
         }
-        info!("aid map size :{}", self.aid_map.len());
-
         tokio::spawn(async move {
             let task = async move {
                 let res = server_c.run_handle().await;

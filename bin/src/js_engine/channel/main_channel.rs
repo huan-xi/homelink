@@ -4,17 +4,16 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use anyhow::anyhow;
 use deno_runtime::deno_core::{Resource, v8};
-use deno_runtime::deno_core::url::Url;
 use serde_aux::prelude::deserialize_number_from_string;
 use sea_orm::JsonValue;
 use tokio::sync::{broadcast, mpsc, oneshot};
-use tokio::sync::mpsc::Sender;
 use crate::js_engine::channel::MsgId;
 use futures_util::FutureExt;
 use impl_new::New;
+use log::info;
 use serde::{Deserialize, Serialize};
 use tokio::time::timeout;
-use crate::js_engine::channel::params::{BindDeviceModuleParam, ExecuteSideModuleParam, OnCharReadParam, OnCharUpdateParam, OnDeviceEventParam};
+use crate::js_engine::channel::params::{BindDeviceModuleParam, ExecuteSideModuleParam, OnCharReadParam, OnCharUpdateParam, OnDeviceEventParam, U64Value};
 
 pub type ResultSenderPointer = Arc<broadcast::Sender<(MsgId, FromModuleResp)>>;
 
@@ -42,6 +41,7 @@ pub struct ErrorRespResult {
 pub enum FromModuleResp {
     CharReadResp(V8Value),
     CharUpdateResp,
+    Pong(U64Value),
     /// 执行模块的响应
     ExecuteModuleResp(ExecuteHapModuleResult),
     BindDeviceModuleResp,
@@ -64,6 +64,8 @@ pub enum ToModuleEvent {
     OnCharRead(OnCharReadParam),
     OnDeviceEvent(OnDeviceEventParam),
     OnCharUpdate(OnCharUpdateParam),
+    ///ping 当前时间戳
+    Ping(U64Value),
 }
 
 
@@ -101,26 +103,6 @@ pub struct ToModuleSender {
     pub read_result_recv: ResultSenderPointer,
 }
 
-impl ToModuleSender {
-    pub async fn send(&self, event: ToModuleEvent) -> anyhow::Result<FromModuleResp> {
-        let id = self.id.fetch_add(1, Ordering::SeqCst);
-        self.sender.send((id, event)).await
-            .map_err(|e| anyhow!("发送失败:{e},js 引擎已退出"))?;
-        // 等待结果
-        let res = timeout(std::time::Duration::from_secs(5), async {
-            while let Ok((msg_id, resp)) = self.read_result_recv
-                .subscribe()
-                .recv().await {
-                if msg_id == id {
-                    return Ok(resp);
-                }
-            };
-            Err(anyhow!("读取错误"))
-        }).await.map_err(|_| anyhow!("命令执行超时"))?;
-
-        res
-    }
-}
 
 impl ToModuleSender {
     pub fn new(sender: mpsc::Sender<(MsgId, ToModuleEvent)>, read_result_recv: ResultSenderPointer) -> Self {
@@ -129,6 +111,31 @@ impl ToModuleSender {
             id: Default::default(),
             read_result_recv,
         }
+    }
+
+    pub async fn send(&self, event: ToModuleEvent) -> anyhow::Result<FromModuleResp> {
+        let id = self.id.fetch_add(1, Ordering::SeqCst);
+        self.sender
+            .send((id, event))
+            .await
+            .map_err(|e| anyhow!("发送失败:{e},js 引擎已退出"))?;
+        // 等待结果
+        let res = timeout(std::time::Duration::from_secs(60), async {
+            while let Ok((msg_id, resp)) = self.read_result_recv
+                .subscribe()
+                .recv()
+                .await {
+                if msg_id == id {
+                    if let FromModuleResp::ErrorResp(e) = resp {
+                        return Err(anyhow!(e.error));
+                    };
+                    return Ok(resp);
+                }
+            };
+            Err(anyhow!("读取错误"))
+        }).await.map_err(|_| anyhow!("命令执行超时"))?;
+
+        res
     }
 }
 
@@ -140,22 +147,17 @@ pub struct ModuleRecv {
     pub recv: Option<mpsc::Receiver<(MsgId, ToModuleEvent)>>,
 }
 
-/*#[derive(Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ReceiverResult {
-    pub msg_id: MsgId,
-    /// 事件类型
-    pub event: String,
-    /// 事件参数
-    pub param: JsonValue,
-}*/
 pub type ReceiverResult = (MsgId, ToModuleEvent);
 
 // (pub BoxFuture<'static, Option<ReceiverResult>>);
 pub struct ReceiverResource {
     recv: RefCell<mpsc::Receiver<(MsgId, ToModuleEvent)>>,
 }
-
+impl Drop for ReceiverResource{
+    fn drop(&mut self) {
+        info!("drop ReceiverResource");
+    }
+}
 impl ReceiverResource {
     pub async fn recv(&self) -> Option<ReceiverResult> {
         self.recv.borrow_mut().recv().await
@@ -172,8 +174,8 @@ impl Resource for ReceiverResource {
 }
 
 impl ModuleRecv {
-    pub fn new(result_sender: ResultSenderPointer) -> (Self, Sender<(MsgId, ToModuleEvent)>) {
-        let (sender, recv) = mpsc::channel(10);
+    pub fn new(result_sender: ResultSenderPointer) -> (Self, mpsc::Sender<(MsgId, ToModuleEvent)>) {
+        let (sender, recv) = mpsc::channel(100);
         (Self {
             result_sender,
             recv: Some(recv),

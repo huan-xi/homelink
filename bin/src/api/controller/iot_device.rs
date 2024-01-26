@@ -4,14 +4,24 @@ use sea_orm::ActiveValue::Set;
 use sea_orm::EntityTrait;
 use crate::api::output::{ApiResp, ApiResult};
 use crate::api::state::AppState;
-use crate::db::entity::prelude::{HapServiceColumn, HapServiceEntity, HapServiceModel, IotDevice, IotDeviceActiveModel, IotDeviceColumn, IotDeviceModel};
+use crate::db::entity::prelude::{IotDeviceEntity, IotDeviceActiveModel, IotDeviceColumn, IotDeviceModel};
 use sea_orm::QueryFilter;
 use sea_orm::ColumnTrait;
 use crate::api::params::{AddServiceParam, DisableParam};
+use crate::api::results::IotDeviceResult;
 
-pub async fn list(state: State<AppState>) -> ApiResult<Vec<IotDeviceModel>> {
-    let list = IotDevice::find()
-        .all(state.conn()).await?;
+pub async fn list(state: State<AppState>) -> ApiResult<Vec<IotDeviceResult>> {
+    let list = IotDeviceEntity::find()
+        .all(state.conn())
+        .await?;
+    let dev_manager = state.device_manager.clone();
+    let list: Vec<IotDeviceResult> = list.into_iter().map(|i| {
+        let running = dev_manager.is_running(i.device_id);
+        IotDeviceResult{
+            model:i ,
+            running,
+        }
+    }).collect();
     Ok(ApiResp::with_data(list))
 }
 
@@ -21,12 +31,13 @@ pub async fn disable(state: State<AppState>, Path(id): Path<i64>, Query(param): 
         disabled: Set(param.disabled),
         ..Default::default()
     };
-    IotDevice::update(model)
+    IotDeviceEntity::update(model)
         .filter(IotDeviceColumn::DeviceId.eq(id))
         .exec(state.conn()).await?;
     Ok(ApiResp::with_data(()))
 }
 
-pub async fn export_template(state: State<AppState>,) {
 
-}
+/// 导出模板
+
+pub async fn export_template(state: State<AppState>, Path(id): Path<i64>) {}

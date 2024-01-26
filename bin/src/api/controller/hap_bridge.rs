@@ -1,20 +1,20 @@
 use axum::extract::{Path, Query, State};
 use axum::Json;
 use sea_orm::ActiveValue::Set;
-use sea_orm::{ActiveEnum, ConnectionTrait, EntityTrait, PaginatorTrait, QueryResult};
+use sea_orm::{ActiveEnum, ConnectionTrait, EntityTrait, IntoActiveModel, PaginatorTrait, QueryResult, TransactionTrait};
 use sea_orm::prelude::Expr;
 use sea_orm::sea_query::{Alias, query, SelectStatement};
 use hap::accessory::AccessoryCategory;
 use crate::api::output::{ApiResp, ApiResult, ok_data, output_err_msg};
 use crate::api::params::{AddHapBridgeParam, DisableParam};
 use crate::api::state::AppState;
-use crate::db::entity::prelude::{HapBridgeActiveModel, HapBridgeColumn, HapBridgeEntity, HapBridgeModel, IotDevice, IotDeviceActiveModel, IotDeviceModel};
+use crate::db::entity::prelude::{HapBridgeActiveModel, HapBridgeColumn, HapBridgeEntity, HapBridgeModel, IotDeviceEntity};
 use crate::{api_err, err_msg};
 use crate::api::results::HapBridgeResult;
 use crate::db::SNOWFLAKE;
 use crate::hap::rand_utils::{gen_homekit_setup_uri_default, rand_mac_addr, rand_pin_code, rand_setup_id};
 use crate::db::init::SeaQuery;
-use crate::init::hap_init::{init_hap, init_haps};
+use crate::init::hap_init::{add_hap_bridge};
 
 /// 添加桥接器
 pub async fn add(state: State<AppState>, Json(param): Json<AddHapBridgeParam>) -> ApiResult<()> {
@@ -47,19 +47,29 @@ pub async fn add(state: State<AppState>, Json(param): Json<AddHapBridgeParam>) -
             res + 1
         }
     };
-    let model = HapBridgeActiveModel {
-        bridge_id: Set(SNOWFLAKE.next_id()),
-        pin_code: Set(pin_code),
-        category: Set(param.category),
-        name: Set(param.name),
-        mac: Set(mac.to_string()),
-        setup_id: Set(rand_setup_id()),
-        port: Set(port),
-        ..Default::default()
+    let bid = SNOWFLAKE.next_id();
+    let hap_bridge = HapBridgeModel {
+        bridge_id: bid,
+        pin_code,
+        port,
+        category: param.category,
+        name: param.name,
+        mac: mac.to_string(),
+        setup_id: rand_setup_id(),
+        disabled: false,
     };
+
+    let model = hap_bridge.clone().into_active_model();
     HapBridgeEntity::insert(model).exec(state.conn()).await?;
+    tokio::spawn(async move {
+        add_hap_bridge(state.conn(), hap_bridge, state.hap_manager.clone(), state.device_manager.clone())
+            .await
+            .map_err(|e| api_err!("添加成功,启动失败{e}")).unwrap();
+    });
+
     ok_data(())
 }
+
 /// 重启桥接器
 pub async fn restart(state: State<AppState>) {
     // state.hap_manager.stop();
@@ -72,13 +82,17 @@ pub async fn list(state: State<AppState>) -> ApiResult<Vec<HapBridgeResult>> {
     let list = HapBridgeEntity::find()
         .all(state.conn())
         .await?;
+    let manager = state.hap_manager.clone();
     let list = list.into_iter().map(|i| {
+        let config = manager.get_bridge_server_config(i.bridge_id);
+
         let setup_uri = gen_homekit_setup_uri_default(
             i.pin_code as u64, i.category.to_value() as u64,
             i.setup_id.clone());
         HapBridgeResult {
             model: i,
             setup_uri,
+            running: config.is_some(),
         }
     }).collect();
 

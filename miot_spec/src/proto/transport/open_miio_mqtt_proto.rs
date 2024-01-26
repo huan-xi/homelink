@@ -40,7 +40,7 @@ impl OpenMiIOMqttSpecProtocol {
             .finalize();
         client.connect(conn_opts).await?;
         client.subscribe("#", 1).await?;
-        let (msg_sender, _) = tokio::sync::broadcast::channel(10);
+        let (msg_sender, _) = tokio::sync::broadcast::channel(2048);
         let strm = client.get_stream(100);
         //启动消息监听
         Ok(Self {
@@ -74,19 +74,14 @@ impl MiotSpecProtocol for OpenMiIOMqttSpecProtocol {
     }
 
     async fn await_result(&self, id: u64, timeout_val: Option<Duration>) -> anyhow::Result<JsonMessage> {
-        let tv = match timeout_val {
-            None => {
-                self.timeout
-            }
-            Some(s) => { s }
-        };
+        let tv = timeout_val.unwrap_or(self.timeout);
         let mut recv = self.msg_sender.subscribe();
         timeout(tv, async move {
             loop {
                 let msg = recv.recv().await?;
                 if let Some(val) = msg.data.get("id") {
                     if val.as_u64() == Some(id as u64) {
-                        info!("await_result:{:?}", msg.data);
+                        debug!("await_result:{:?}", msg.data);
                         return Ok(msg);
                     }
                 };
