@@ -1,10 +1,9 @@
 use axum::extract::{Path, Query, State};
 use axum::Json;
+use deno_runtime::deno_core::Op;
 use sea_orm::ActiveValue::Set;
 use sea_orm::{ActiveEnum, ConnectionTrait, EntityTrait, IntoActiveModel, PaginatorTrait, QueryResult, TransactionTrait};
 use sea_orm::prelude::Expr;
-use sea_orm::sea_query::{Alias, query, SelectStatement};
-use hap::accessory::AccessoryCategory;
 use crate::api::output::{ApiResp, ApiResult, ok_data, output_err_msg};
 use crate::api::params::{AddHapBridgeParam, DisableParam};
 use crate::api::state::AppState;
@@ -37,14 +36,15 @@ pub async fn add(state: State<AppState>, Json(param): Json<AddHapBridgeParam>) -
         .to_owned();
     let stmt = builder.build(&st);
     let result = conn.query_one(stmt).await?;
+    let default = 30000;
 
     let port = match result {
-        None => {
-            30000
-        }
+        None => default,
         Some(r) => {
-            let res = r.try_get_by_index::<i64>(0)?;
-            res + 1
+            match r.try_get_by_index::<Option<i64>>(0)? {
+                None => default,
+                Some(s) => s + 1
+            }
         }
     };
     let bid = SNOWFLAKE.next_id();
@@ -61,21 +61,21 @@ pub async fn add(state: State<AppState>, Json(param): Json<AddHapBridgeParam>) -
 
     let model = hap_bridge.clone().into_active_model();
     HapBridgeEntity::insert(model).exec(state.conn()).await?;
-    tokio::spawn(async move {
-        add_hap_bridge(state.conn(), hap_bridge, state.hap_manager.clone(), state.device_manager.clone())
-            .await
-            .map_err(|e| api_err!("添加成功,启动失败{e}")).unwrap();
-    });
-
+    add_hap_bridge(state.conn(), hap_bridge, state.hap_manager.clone(), state.device_manager.clone())
+        .await
+        .map_err(|e| api_err!("添加成功,启动失败{e}")).unwrap();
     ok_data(())
 }
 
 /// 重启桥接器
-pub async fn restart(state: State<AppState>) {
-    // state.hap_manager.stop();
-    // state.conn();
-    // init_hap()
-    // init_haps();
+pub async fn restart(state: State<AppState>, Path(id): Path<i64>) -> ApiResult<()> {
+    state.hap_manager.stop_server(id).await?;
+    let model = HapBridgeEntity::find_by_id(id).one(state.conn()).await?;
+    let hap_bridge = model.ok_or(api_err!("桥接器不存在"))?;
+    add_hap_bridge(state.conn(), hap_bridge, state.hap_manager.clone(), state.device_manager.clone())
+        .await
+        .map_err(|e| api_err!("停止成功,启动失败{e}")).unwrap();
+    ok_data(())
 }
 
 pub async fn list(state: State<AppState>) -> ApiResult<Vec<HapBridgeResult>> {
@@ -101,5 +101,23 @@ pub async fn list(state: State<AppState>) -> ApiResult<Vec<HapBridgeResult>> {
 
 
 pub async fn disable(state: State<AppState>, Path(id): Path<i64>, Query(param): Query<DisableParam>) -> ApiResult<()> {
-    todo!();
+    let model = HapBridgeEntity::find_by_id(id).one(state.conn()).await?;
+    let mut hap_bridge = model.ok_or(api_err!("桥接器不存在"))?;
+    hap_bridge.disabled = param.disabled;
+
+    let update_model = HapBridgeActiveModel {
+        bridge_id: Set(id),
+        disabled: Set(param.disabled),
+        ..Default::default()
+    };
+
+    HapBridgeEntity::update(update_model).exec(state.conn()).await?;
+    if param.disabled {
+        state.hap_manager.stop_server(id).await?;
+    } else {
+        add_hap_bridge(state.conn(), hap_bridge, state.hap_manager.clone(), state.device_manager.clone())
+            .await
+            .map_err(|e| api_err!("停止成功,启动失败{e}")).unwrap();
+    }
+    ok_data(())
 }

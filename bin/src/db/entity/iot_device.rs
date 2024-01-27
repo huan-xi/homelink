@@ -49,7 +49,7 @@ pub enum DeviceParam {
     WifiDeviceParam,
     MiGatewayParam,
     BleParam(BleParam),
-    MeshParam(DeviceInfo),
+    MeshParam,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

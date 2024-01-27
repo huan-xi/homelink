@@ -1,5 +1,6 @@
 [workspace]
-members = ["miot_spec", "bin", "migration", "hap_metadata", "hap-rs", "hap-rs-new"]
+members = ["miot_spec", "bin", "migration", "hap_metadata", "hap-rs"]
+resolver = "2"
 #exclude=["hap-rs/codegen"]
 [profile.dev]
 split-debuginfo = "unpacked"

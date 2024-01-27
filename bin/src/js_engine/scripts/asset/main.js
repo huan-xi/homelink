@@ -124,7 +124,7 @@ async function main() {
                 });
                 continue;
             }
-            console.error("event handler not found")
+            console.error("event handler_bac not found")
         } catch (e) {
             console.error("handle event error", e)
             //   send error event

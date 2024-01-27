@@ -43,6 +43,7 @@ pub fn api() -> Router<AppState> {
               Router::new()
                   .route("/list", get(controller::hap_bridge::list))
                   .route("/disable/:id", put(controller::hap_bridge::disable))
+                  .route("/restart/:id", put(controller::hap_bridge::restart))
                   .route("/", post(controller::hap_bridge::add))
               ,
         )

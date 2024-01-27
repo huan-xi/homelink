@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::ops::Deref;
 use std::sync::Arc;
-use anyhow::anyhow;
+use anyhow::{anyhow, Error};
 use futures_util::lock::Mutex;
 use impl_new::New;
 use log::{error, info};
@@ -16,6 +16,7 @@ pub struct HapTask {
     sender: tokio::sync::oneshot::Sender<bool>,
     server: IpServer,
 }
+
 
 pub struct ServiceTagMap {
     id: u64,
@@ -102,6 +103,14 @@ impl HapManageInner {
          }*/
     }
     pub async fn close(&self) {}
+    pub async fn stop_server(&self, bid: i64) -> anyhow::Result<()> {
+        if let Some((_, task)) = self.server_map.remove(&bid) {
+            task.sender
+                .send(true)
+                .map_err(|e| anyhow!("发送退出指令失败:{:?}", e))?;
+        }
+        Ok(())
+    }
     pub fn push_server(&self, bid: i64, server: IpServer, accessories: Vec<AccessoryRelation>) {
         let (sender, recv) = tokio::sync::oneshot::channel();
         let server_c = server.clone();

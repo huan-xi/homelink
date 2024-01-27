@@ -5,7 +5,7 @@ declare interface Context {
 
 
 
-// a handler to process characteristic read/write and device event
+// a handler_bac to process characteristic read/write and device event
 declare interface CharacteristicHandler {
     // init func
     init(): void;

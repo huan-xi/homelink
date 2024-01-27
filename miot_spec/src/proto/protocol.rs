@@ -1,4 +1,4 @@
-use log::info;
+use log::{debug, info};
 use packed_struct::derive::PackedStruct;
 use packed_struct::PackedStruct;
 use anyhow::Error;
@@ -108,7 +108,7 @@ impl Message {
         let payload = &buf[32..header.packet_length as usize];
         // log::info!("Got payload len={}: {:?}", payload.len(), payload);
         let data = Utils::decrypt(token, payload);
-        info!("{}",String::from_utf8(data.to_vec()).unwrap());
+        debug!("{}",String::from_utf8(data.to_vec()).unwrap());
 
         Message {
             header,

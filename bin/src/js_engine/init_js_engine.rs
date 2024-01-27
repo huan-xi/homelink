@@ -1,16 +1,13 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::{panic, thread};
+use std::thread;
 use std::time::Duration;
+
 use anyhow::anyhow;
 use axum::body::HttpBody;
-use dashmap::DashMap;
 use deno_runtime::deno_core;
-use deno_runtime::deno_core::{FsModuleLoader, ModuleId, ModuleSpecifier};
-use deno_runtime::deno_core::error::AnyError;
-use deno_runtime::deno_core::url::Url;
+use deno_runtime::deno_core::{FsModuleLoader, ModuleSpecifier};
 use deno_runtime::permissions::PermissionsContainer;
 use deno_runtime::worker::{MainWorker, WorkerOptions};
 use log::{error, info};
@@ -19,13 +16,13 @@ use tokio::fs;
 use tokio::io::AsyncWriteExt;
 use tokio::runtime::Builder;
 use tokio::time::timeout;
-use crate::js_engine::channel::{main_channel, MsgId};
+
+use crate::js_engine::channel::main_channel;
 use crate::js_engine::channel::main_channel::{FromModuleResp, ResultSenderPointer, ToModuleEvent, ToModuleSender};
 use crate::js_engine::channel::params::ExecuteSideModuleParam;
 use crate::js_engine::ext::env;
-use crate::js_engine::ext::env::{EnvContext};
+use crate::js_engine::ext::env::EnvContext;
 use crate::js_engine::scripts::ScriptAsset;
-
 /*#[derive(Debug, Clone)]
 pub enum EngineEventResp {
     /// 成功与否?

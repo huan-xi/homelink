@@ -32,11 +32,17 @@ struct Data {
 }
 
 #[derive(Debug, Deserialize)]
+
 struct Extra {
-    isSetPincode: Option<i32>,
-    pincodeType: Option<i32>,
+    #[serde(rename = "camelCase")]
+    is_set_pincode: Option<i32>,
+    #[serde(rename = "camelCase")]
+    pincode_type: Option<i32>,
+
     fw_version: Option<String>,
-    needVerifyCode: Option<i32>,
-    isPasswordEncrypt: Option<i32>,
+    #[serde(rename = "camelCase")]
+    need_verify_code: Option<i32>,
+    #[serde(rename = "camelCase")]
+    is_password_encrypt: Option<i32>,
 }
 

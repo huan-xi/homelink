@@ -1,32 +1,26 @@
-use std::sync::{Arc, Mutex};
 use std::time::Duration;
+
 use anyhow::anyhow;
 use axum::body::HttpBody;
 use axum::extract::{Query, State};
 use axum::Json;
-use dashmap::mapref::entry::Entry;
-use deno_runtime::deno_core::error::AnyError;
 use log::warn;
+use sea_orm::{EntityTrait, PaginatorTrait};
 use sea_orm::ActiveValue::Set;
-use sea_orm::{EntityTrait, JsonValue, NotSet, PaginatorTrait};
-use serde::Serialize;
-use serde_json::Value;
 use tokio::net::UdpSocket;
-use tokio::net::unix::SocketAddr;
-use miot_spec::cloud::MiCloud;
+
 use miot_spec::proto::transport::udp_iot_spec_proto::UdpMiotSpecProtocol;
+
 use crate::api::output::{ApiResult, err_msg, ok_data};
 use crate::api::params::{AccountParam, DidParam, MiConvertToIotParam};
 use crate::api::results::MiotDeviceResult;
 use crate::api::state::AppState;
 use crate::api_err;
-use crate::config::context::{get_app_context, get_data_dir};
-use crate::db::entity::iot_device::{IotDeviceType, SourceType};
+use crate::db::entity::iot_device::{DeviceParam, IotDeviceType, SourceType};
 use crate::db::entity::iot_device::DeviceParam::{MiGatewayParam, WifiDeviceParam};
 use crate::db::entity::mi_account::MiAccountStatus;
-use crate::db::entity::prelude::{HapBridgeEntity, IotDeviceEntity, IotDeviceActiveModel, MiAccountActiveModel, MiAccountEntity, MiAccountModel, MiotDeviceActiveModel, MiotDeviceEntity, MiotDeviceModel};
+use crate::db::entity::prelude::{IotDeviceActiveModel, IotDeviceEntity, MiAccountActiveModel, MiAccountEntity, MiAccountModel, MiotDeviceActiveModel, MiotDeviceEntity, MiotDeviceModel};
 use crate::db::SNOWFLAKE;
-
 
 // accounts
 pub async fn update_account(state: State<AppState>, Json(param): Json<AccountParam>) -> ApiResult<()> {
@@ -173,6 +167,12 @@ pub async fn convert_to_iot_device(state: State<AppState>, Json(param): Json<MiC
             }
             MiGatewayParam
         }
+        IotDeviceType::MiMeshDevice => {
+            if param.gateway_id.is_none() {
+                return err_msg("网关id不能为空");
+            }
+            DeviceParam::MeshParam
+        }
         _ => {
             return err_msg("暂不支持该设备类型");
         }
@@ -183,7 +183,7 @@ pub async fn convert_to_iot_device(state: State<AppState>, Json(param): Json<MiC
         device_id: Set(SNOWFLAKE.next_id()),
         device_type: Set(param.device_type),
         params: Set(Some(dev_params)),
-        gateway_id: Default::default(),
+        gateway_id: Set(param.gateway_id),
         name: Set(Some(param.name)),
         memo: Default::default(),
         disabled: Set(false),
@@ -196,6 +196,18 @@ pub async fn convert_to_iot_device(state: State<AppState>, Json(param): Json<MiC
         .await?;
     ok_data(())
 }
+
+
+//删除账号
+
+/*pub async fn delete_account(state: State<AppState>, Path(account): Path<String>) -> ApiResult<()> {
+    MiAccountEntity::delete()
+        .filter(MiAccountEntity::Account.eq(account))
+        .exec(state.conn())
+        .await?;
+    ok_data(())
+}*/
+
 /*
 
 

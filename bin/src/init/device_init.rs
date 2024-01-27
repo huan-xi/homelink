@@ -59,8 +59,8 @@ pub async fn init_iot_devices(conn: &DatabaseConnection, manage: IotDeviceManage
             None => {
                 Err(anyhow!(("初始化设备失败，网关不存在")))
             }
-            Some((i, gw)) => {
-                init_children_device(dev, gw.device.clone()).await
+            Some((_, gw)) => {
+                init_children_device(conn,dev, gw.device.clone()).await
             }
         };
         match res {
@@ -82,7 +82,11 @@ pub async fn init_iot_devices(conn: &DatabaseConnection, manage: IotDeviceManage
 
 
 /// 初始化子设备
-async fn init_children_device(dev: IotDeviceModel, gw: MiotDevicePointer) -> anyhow::Result<DevicePointer> {
+async fn init_children_device(conn: &DatabaseConnection,dev: IotDeviceModel, gw: MiotDevicePointer) -> anyhow::Result<DevicePointer> {
+    //查米家设备
+    let source_id = dev.source_id.ok_or(anyhow!("设备来源id不存在"))?;
+    let dev_info = get_device_info(conn, source_id.as_str()).await?;
+
     return match dev.device_type {
         IotDeviceType::MiBleDevice => {
             if let Some(DeviceParam::BleParam(param)) = dev.params {
@@ -94,8 +98,8 @@ async fn init_children_device(dev: IotDeviceModel, gw: MiotDevicePointer) -> any
             Err(anyhow!("初始化设备失败，参数类型错误"))
         }
         IotDeviceType::MiMeshDevice => {
-            if let Some(DeviceParam::MeshParam(param)) = dev.params {
-                let ble_dev = MeshDevice::new(param, gw.clone());
+            if let Some(DeviceParam::MeshParam) = dev.params {
+                let ble_dev = MeshDevice::new(dev_info, gw.clone());
                 return Ok(DevicePointer::new(Arc::new(ble_dev)));
             }
             Err(anyhow!("初始化设备失败，参数类型错误"))

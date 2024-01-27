@@ -7,18 +7,23 @@ use crate::api::state::AppState;
 use crate::db::entity::prelude::{IotDeviceEntity, IotDeviceActiveModel, IotDeviceColumn, IotDeviceModel};
 use sea_orm::QueryFilter;
 use sea_orm::ColumnTrait;
-use crate::api::params::{AddServiceParam, DisableParam};
+use crate::api::params::{AddServiceParam, DisableParam, QueryIotDeviceParam};
 use crate::api::results::IotDeviceResult;
 
-pub async fn list(state: State<AppState>) -> ApiResult<Vec<IotDeviceResult>> {
-    let list = IotDeviceEntity::find()
+pub async fn list(state: State<AppState>, Query(param): Query<QueryIotDeviceParam>) -> ApiResult<Vec<IotDeviceResult>> {
+    let mut query = IotDeviceEntity::find();
+    if let Some(f) = param.device_type {
+        query.query().and_where(IotDeviceColumn::DeviceType.eq(f));
+    };
+    let list = query
         .all(state.conn())
         .await?;
+
     let dev_manager = state.device_manager.clone();
     let list: Vec<IotDeviceResult> = list.into_iter().map(|i| {
         let running = dev_manager.is_running(i.device_id);
-        IotDeviceResult{
-            model:i ,
+        IotDeviceResult {
+            model: i,
             running,
         }
     }).collect();

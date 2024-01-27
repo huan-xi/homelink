@@ -553,7 +553,7 @@ impl MiCloud {
             let description = json_map.remove("description")
                 .and_then(|f| f.as_str().map(|i| i.to_string()))
                 .unwrap_or("未知原因".to_string());
-            return Err(anyhow!("登录失败:{}",description));
+            return Err(anyhow!("登录失败,错误信息:{}",description));
         }
 
         if let Some(location) = json_map.remove("location") {

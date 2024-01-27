@@ -161,8 +161,8 @@ impl ColumnTrait for Column {
             Self::MaxLen => ColumnType::String(None).def().null(),
             Self::MappingMethod => ColumnType::Integer.def(),
             Self::CharacteristicType => ColumnType::Integer.def(),
-            Self::UnitConvertor => ColumnType::Integer.def(),
-            Self::ConvertorParam => ColumnType::String(None).def(),
+            Self::UnitConvertor => ColumnType::Integer.def().null(),
+            Self::ConvertorParam => ColumnType::String(None).def().null(),
         }
     }
 }

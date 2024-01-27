@@ -49,6 +49,14 @@ pub struct MiConvertToIotParam {
     pub did: String,
     pub device_type: IotDeviceType,
     pub name: String,
+    #[serde(default, deserialize_with = "deserialize_option_number_from_string")]
+    pub gateway_id: Option<i64>,
+}
+
+
+#[derive(serde::Deserialize, Debug)]
+pub struct QueryIotDeviceParam {
+    pub device_type: Option<IotDeviceType>,
 }
 
 

@@ -1,0 +1,9 @@
+/target/debug
+/target/expend
+/target/release/build
+/target/release/deps
+/bin/examples
+#/target
+/.idea
+/data
+/log

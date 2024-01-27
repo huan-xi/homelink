@@ -1,5 +1,7 @@
-pub use sea_orm_migration::prelude::*;
-use bin::migration::m20220101_000001_create_table;
+use sea_orm_migration::{MigrationTrait, MigratorTrait};
+
+pub mod m20220101_000001_create_table;
+mod db_utils;
 
 pub struct Migrator;
 

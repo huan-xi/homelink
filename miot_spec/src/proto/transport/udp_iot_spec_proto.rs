@@ -40,7 +40,7 @@ impl UdpMiotSpecProtocol {
         let mut socket = UdpSocket::bind("0.0.0.0:0").await?;
         socket.connect(addr).await?;
         let socket = std::sync::Arc::new(socket);
-        let (msg_sender, _) = tokio::sync::broadcast::channel(10);
+        let (msg_sender, _) = tokio::sync::broadcast::channel(1024);
         let msg = Self::discover(socket.clone().as_ref(), Duration::from_secs(30)).await?;
         //获取时间戳
         let millis = SystemTime::now()
@@ -57,7 +57,7 @@ impl UdpMiotSpecProtocol {
             token,
             msg_sender,
             id: AtomicU64::new(0),
-            timeout: Duration::from_secs(2),
+            timeout: Duration::from_millis(100),
         })
     }
 
@@ -127,7 +127,7 @@ impl MiotSpecProtocol for UdpMiotSpecProtocol {
                     }
                 };
             }
-        }).await.map_err(|f| anyhow!("调用接口响应超时"))?;
+        }).await.map_err(|f| anyhow!("调用接口响应超时,id:{}",id))?;
         if let Err(e) = &res {
             error!("await_result error:{}", e);
             //将状态改成断开
@@ -146,7 +146,7 @@ impl MiotSpecProtocol for UdpMiotSpecProtocol {
             let msg = Message::unpack(&self.token, &vec[..bytes]);
             if !msg.data.is_empty() {
                 let str = String::from_utf8(msg.data.clone()).unwrap();
-                info!("收到udp消息:{}", str);
+                debug!("收到udp消息:{}", str);
                 match serde_json::from_str::<Map<String, Value>>(str.as_str()) {
                     Ok(data) => {
                         let _ = sender.send(JsonMessage {

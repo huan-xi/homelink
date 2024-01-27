@@ -1,0 +1,12 @@
+[server]
+name = "home-gateway"
+version = "0.1.0"
+# 服务器ip 端口
+address = "0.0.0.0:5514"
+# 服务器ssl
+ssl = false
+# 响应数据压缩
+api_prefix = "/api"
+data_dir = "/data"
+[database]
+[hap_config]

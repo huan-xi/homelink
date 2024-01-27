@@ -53,10 +53,13 @@ num_enum = "0.7.2"
 bimap = { version = "0.6.3", features = ["serde"] }
 uuid = { version = "0.8", features = ["v4", "serde"] }
 deno_runtime.workspace = true
-once_cell.workspace = { workspace = true }
+once_cell = { workspace = true }
 derive_builder = "0.12.0"
 rust-embed.workspace = true
 impl_new = "0.2.1"
+sea-orm-migration = "0.12.12"
+[dev-dependencies]
+
 [features]
 default = ["sqlite"]
 #default = ["postgres", "mysql", "sqlite"]

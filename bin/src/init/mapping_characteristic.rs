@@ -296,7 +296,7 @@ impl ToChUtils {
                 let value = Self::conv_from_value(conv, new.value);
                 //读取状态
                 // debug!("set to iot value:{},{},{:?}",property_id.siid,property_id.piid,value);
-                let res = dev.set_property(property_id.siid, property_id.piid, value.clone())
+                let _ = dev.set_property(property_id.siid, property_id.piid, value.clone())
                     .await
                     .tap_err(|e| {
                         error!("设置属性失败:{}", e);

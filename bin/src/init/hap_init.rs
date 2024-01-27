@@ -147,7 +147,7 @@ async fn init_hap_accessories<C: ConnectionTrait>(conn: &C,
                 });
             }
             Err(e) => {
-                error!("初始化配件:{aid}失败:{:?}", e);
+                error!("初始化配件:{aid}失败:{e}");
             }
         }
     }

@@ -2,6 +2,7 @@ use std::net::SocketAddr;
 use std::sync::{Arc, mpsc};
 use axum::Router;
 use log::{error, info};
+use sea_orm_migration::MigratorTrait;
 use tokio::select;
 use tokio::sync::oneshot;
 use bin::api::router;
@@ -15,6 +16,7 @@ use bin::init::manager::device_manager::IotDeviceManager;
 use bin::init::manager::hap_manager::HapManage;
 use bin::js_engine::ext::env::{EnvContext};
 use bin::js_engine::init_js_engine::{init_js_engine};
+use bin::migration::Migrator;
 use hap_metadata::hap_metadata;
 
 pub fn init_context() {}
@@ -31,6 +33,8 @@ async fn main() -> anyhow::Result<()> {
     let addr = config.server.address.parse().expect("监听地址解析失败");
     // let addr = SocketAddr::new([0, 0, 0, 0].into(), 5514);
     let conn = db_conn(&config.server).await;
+    //数据库版本迁移
+    Migrator::up(&conn, None).await.unwrap();
 
     let hap_metadata = Arc::new(hap_metadata()?);
     // 初始化hap 服务器
