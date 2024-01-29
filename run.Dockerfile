@@ -6,6 +6,6 @@ WORKDIR /app
 COPY ./dist /app/dist
 COPY ./log4rs.yaml /app/log4rs.yaml
 COPY ./docker_config.toml /app/config/config.toml
-COPY ./target/release/bin /app/amps
+COPY ./target/release/bin /app/homelink
 
-CMD ["/app/amps"]
+CMD ["/app/homelink"]

@@ -15,22 +15,11 @@ use crate::js_engine::channel::main_channel::{FromModuleResp, ResultSenderPointe
 use crate::js_engine::channel::params::ExecuteSideModuleParam;
 use crate::js_engine::context::EnvContext;
 
-/*#[derive(Debug, Clone)]
-pub enum EngineEventResp {
-    /// 成功与否?
-    ExecuteSideModuleResult((i64, bool)),
 
-    /// 模块退出
-    SideModuleExit(i64),
-
-    Success,
-    Exit(String),
-}
-*/
-
+#[derive(Clone)]
 pub struct JsEngine {
     /// 向引擎发送事件，比如执行模块
-    pub sender: Arc<ToModuleSender>,
+    sender: Arc<ToModuleSender>,
     ///引擎发出广播
     pub resp_recv: ResultSenderPointer,
     // engine_ctrl: Arc<Mutex<Option<oneshot::Sender<u8>>>>,
@@ -67,6 +56,7 @@ impl JsEngine {
 }
 
 
+#[cfg(feature = "deno")]
 pub async fn init_js_engine(data_dir: String, mut context: EnvContext) -> anyhow::Result<JsEngine> {
     // js_tx 控制js 引擎的停止
     let (to_module_sender, recv) = main_channel::channel();
@@ -132,7 +122,7 @@ pub async fn init_js_engine0(data_dir: &str, context: EnvContext, resp_sender: R
 
 
     // #[cfg(feature = "deno")]
-    crate::js_engine::deno_runtime::start_deno_runtime(context,dir, js_path).await?;
+    crate::js_engine::deno_runtime::start_deno_runtime(context, dir, js_path).await?;
 
 
     let _ = resp_sender.send((0, FromModuleResp::EnginExit("end".to_string())));

@@ -1,8 +1,10 @@
 use std::sync::Arc;
+
 use once_cell::sync::OnceCell;
 use sea_orm::DatabaseConnection;
-use tokio::sync::Mutex;
+
 use hap_metadata::metadata::HapMetadata;
+
 use crate::config::cfgs::Configs;
 use crate::init::manager::device_manager::IotDeviceManager;
 use crate::init::manager::hap_manager::HapManage;

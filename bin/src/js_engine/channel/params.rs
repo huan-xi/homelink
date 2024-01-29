@@ -1,4 +1,4 @@
-use deno_runtime::deno_core::url::Url;
+use url::Url;
 use impl_new::New;
 use sea_orm::JsonValue;
 use serde::{Deserialize, Serialize};

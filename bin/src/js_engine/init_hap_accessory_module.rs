@@ -2,16 +2,16 @@ use std::fs;
 use std::path::PathBuf;
 
 use anyhow::anyhow;
-use deno_runtime::deno_core::url::Url;
+use url::Url;
 use log::error;
 use tap::TapFallible;
 
 use crate::config::context::get_app_context;
 use crate::init::manager::hap_manager::HapManage;
-use crate::js_engine::channel::params::ExecuteSideModuleParam;
+// use crate::js_engine::channel::params::ExecuteSideModuleParam;
 
 /// hap 设备作为一个module 运行
-
+#[cfg(feature = "deno")]
 pub async fn init_hap_accessory_module(manage: HapManage, ch_id: i64,aid: u64, script: &str) -> anyhow::Result<()> {
     // let (sender, recv, exit_ch) = hap_channel::channel();
     //注册到context
@@ -22,7 +22,7 @@ pub async fn init_hap_accessory_module(manage: HapManage, ch_id: i64,aid: u64, s
 
     // 执行js
     match context.js_engine
-        .execute_side_module(ExecuteSideModuleParam::new(ch_id, url)).await
+        .execute_side_module(crate::js_engine::channel::params::ExecuteSideModuleParam::new(ch_id, url)).await
         .tap_err(|e| error!("执行js错误"))
     {
         Ok(_) => {

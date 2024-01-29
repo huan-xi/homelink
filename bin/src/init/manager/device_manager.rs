@@ -14,8 +14,12 @@ use miot_spec::device::MiotDevicePointer;
 
 use crate::config::context::get_app_context;
 use crate::init::DevicePointer;
-use crate::js_engine::channel::main_channel::ToModuleEvent;
-use crate::js_engine::channel::params::OnDeviceEventParam;
+
+#[cfg(feature = "deno")]
+use crate::js_engine::channel::{
+    params::OnDeviceEventParam,
+    main_channel::ToModuleEvent
+};
 
 pub struct JsModule {
     ///与 特征脚本通信的通道
@@ -259,13 +263,14 @@ impl IotDeviceManager {
 
 
     /// 开启js 提交监听器
+    #[cfg(feature = "deno")]
     pub async fn enable_to_js(&self, did: &str) -> anyhow::Result<()> {
         let dev = self.did_map.get(did)
             .and_then(|i| self.device_map.get(i.value()))
             .ok_or(anyhow::anyhow!("设备不存在"))?;
 
         if let Entry::Vacant(entry) = self.device_id_enable_js_map.entry(*dev.key()) {
-            let sender = get_app_context().js_engine.sender.clone();
+            let sender = get_app_context().js_engine.clone();
             info!("开启js 通道:{did}");
             let did = did.to_string();
 

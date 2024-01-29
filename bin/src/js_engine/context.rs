@@ -1,12 +1,12 @@
 use sea_orm::DbConn;
 use crate::init::manager::device_manager::IotDeviceManager;
 use crate::init::manager::hap_manager::HapManage;
-use crate::js_engine::channel::main_channel;
 
 pub struct EnvContext {
     pub info: String,
     pub version: String,
-    pub main_recv: Option<main_channel::ModuleRecv>,
+    #[cfg(feature = "deno")]
+    pub main_recv: Option<crate::js_engine::channel::main_channel::ModuleRecv>,
     pub conn: DbConn,
     pub dev_manager: IotDeviceManager,
     pub hap_manager: HapManage,

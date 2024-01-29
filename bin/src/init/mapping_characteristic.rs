@@ -1,15 +1,13 @@
-use std::time::Duration;
 use anyhow::anyhow;
 use bimap::BiMap;
-use futures_util::FutureExt;
+use futures_util::{FutureExt, SinkExt};
 use lazy_static::lazy_static;
 use log::{error, info, warn};
 use sea_orm::JsonValue;
 use serde_json::Value;
 use tap::TapFallible;
-use tokio::sync::{MutexGuard, TryLockError};
-use hap::accessory::HapAccessory;
 
+use hap::accessory::HapAccessory;
 use hap::characteristic::{AsyncCharacteristicCallbacks, Characteristic, CharacteristicCallbacks, Format, HapCharacteristic, OnReadFuture, OnUpdateFuture, Perm, Unit};
 use hap::HapType;
 use miot_spec::device::common::emitter::{DataListener, EventType};
@@ -20,14 +18,17 @@ use crate::db::entity::common::Property;
 use crate::db::entity::hap_characteristic::{MappingMethod, MappingParam};
 use crate::db::entity::prelude::HapCharacteristicModel;
 use crate::hap::hap_type::MappingHapType;
-use crate::hap::hap_type::MappingHapType::{SecuritySystemCurrentState, SecuritySystemTargetState};
 use crate::hap::iot_characteristic::{CharacteristicValue, IotCharacteristic};
 use crate::hap::unit_convertor::UnitConv;
-use crate::init::{DevicePointer, HapAccessoryPointer};
+use crate::init::DevicePointer;
 use crate::init::hap_init::InitServiceContext;
-use crate::init::manager::hap_manager::HapTask;
-use crate::js_engine::channel::main_channel::{FromModuleResp, ToModuleEvent};
-use crate::js_engine::channel::params::{BindDeviceModuleParam, OnCharReadParam, OnCharUpdateParam};
+
+#[cfg(feature = "deno")]
+use crate::js_engine::channel::{
+    main_channel::{FromModuleResp, ToModuleEvent},
+    params::{BindDeviceModuleParam, OnCharReadParam, OnCharUpdateParam},
+};
+
 
 lazy_static! {
     static ref TARGET_CHAR_MAP: BiMap<MappingHapType,MappingHapType> ={
@@ -132,12 +133,15 @@ async fn set_read_update_method(ctx: InitServiceContext, cts: &mut IotCharacteri
                 return Err(anyhow!("映射参数不能为空"));
             }
         }
+        #[cfg(not(feature = "deno"))]
+        MappingMethod::JsScript => {}
+        #[cfg(feature = "deno")]
         MappingMethod::JsScript => {
 
             // 获取 channel
             let stag = ctx.stag.clone().ok_or(anyhow!("service 特征标识不能为空"))?;
             let char_tag = ch.tag.clone().ok_or(anyhow!("char 特征标识不能为空"))?;
-            let sender = get_app_context().js_engine.sender.clone();
+            let sender = get_app_context().js_engine.clone();
             let sender_c = sender.clone();
             let char_tag_c = char_tag.clone();
             let stag_c = stag.clone();

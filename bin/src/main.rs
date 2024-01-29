@@ -61,6 +61,7 @@ async fn main() -> anyhow::Result<()> {
     let js_engine = init_js_engine(config.server.data_dir.clone(), EnvContext {
         info: "home gateway".to_string(),
         version: "v1.0.0".to_string(),
+        #[cfg(feature = "deno")]
         main_recv: None,
         conn: conn.clone(),
         dev_manager: iot_device_manager.clone(),
@@ -108,8 +109,7 @@ async fn main() -> anyhow::Result<()> {
     init::hap_init::init_hap_list(&conn, hap_manager.clone(), iot_device_manager.clone()).await?;
 
     // 等待引擎退出
-    let recv = context.js_engine.resp_recv.subscribe();
-
+    // let recv = context.js_engine.resp_recv.subscribe();
     /* let engin_statue = async {
          while let Ok(event_type) = recv.recv().await {
              if let EngineEventResp::Exit(str) = event_type {

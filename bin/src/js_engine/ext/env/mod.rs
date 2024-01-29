@@ -1,16 +1,10 @@
-use std::cell::RefCell;
-use std::rc::Rc;
 use std::time::Duration;
 
 use anyhow::anyhow;
 use deno_runtime::deno_core;
-use deno_runtime::deno_core::{OpState, ResourceId};
-use deno_runtime::deno_core::error::AnyError;
 use sea_orm::JsonValue;
 use tokio::time::timeout;
 
-use crate::js_engine::channel::main_channel;
-use crate::js_engine::channel::main_channel::{ReceiverResource, ReceiverResult};
 use crate::js_engine::context::EnvContext;
 
 deno_core::extension!(deno_env,

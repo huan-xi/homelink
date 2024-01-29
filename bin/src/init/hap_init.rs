@@ -31,6 +31,7 @@ use crate::init::{DevicePointer, FuturesMutex, HapAccessoryPointer};
 use crate::init::manager::device_manager::IotDeviceManager;
 use crate::init::manager::hap_manager::HapManage;
 use crate::init::mapping_characteristic::to_characteristic;
+#[cfg(feature = "deno")]
 use crate::js_engine::init_hap_accessory_module::init_hap_accessory_module;
 
 pub async fn init_hap_list(conn: &DatabaseConnection, manage: HapManage, iot_device_map: IotDeviceManager) -> anyhow::Result<()> {
@@ -237,6 +238,7 @@ async fn init_hap_accessory<'a, C: ConnectionTrait>(conn: &C,
 
 
     // 查询script
+    #[cfg(feature = "deno")]
     if let Some(script) = hap_accessory.script {
         if !script.is_empty() {
             // 初始化hap js模块,
