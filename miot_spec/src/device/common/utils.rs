@@ -44,7 +44,7 @@ pub fn get_poll_func<'a, T: MiotSpecDevice + Sync + Send>(dev: &'a T, did: &'a s
             }
             if let Ok(results) = proto.get_properties(params, None).await {
                 for result in results {
-                    base.emitter.clone().write().await.emit(EventType::UpdateProperty(result)).await;
+                    base.emitter.write().await.emit(EventType::UpdateProperty(result)).await;
                 }
             }
         }

@@ -1,4 +1,5 @@
 use std::cmp::min;
+use std::collections::HashSet;
 use std::sync::Arc;
 use futures_util::future::BoxFuture;
 use serde::{Deserialize, Serialize};
@@ -84,7 +85,7 @@ impl Default for RetryInfo {
 pub struct BaseMiotSpecDevice {
     pub status: RwLock<DeviceStatus>,
     /// 注册轮询的属性
-    pub registered_property: Arc<RwLock<Vec<MiotSpecId>>>,
+    pub registered_property: Arc<RwLock<HashSet<MiotSpecId>>>,
 
     pub(crate) emitter: Arc<RwLock<DataEmitter<EventType>>>,
     pub tx: broadcast::Sender<EventType>,
@@ -96,7 +97,7 @@ impl Default for BaseMiotSpecDevice {
         let (tx, _) = broadcast::channel(10);
         Self {
             status: RwLock::new(DeviceStatus::Run),
-            registered_property: Arc::new(RwLock::new(Vec::new())),
+            registered_property: Arc::new(RwLock::new(HashSet::new())),
             emitter: Arc::new(RwLock::new(DataEmitter::new())),
             tx,
             retry_info: Default::default(),
@@ -161,7 +162,7 @@ pub trait MiotSpecDevice {
     /// 注册属性事件
     async fn register_property(&self, siid: i32, piid: i32) {
         let mut write = self.get_base().registered_property.write().await;
-        write.push(MiotSpecId { siid, piid });
+        write.insert(MiotSpecId { siid, piid });
     }
 
     /// 添加指定格式的数据监听器

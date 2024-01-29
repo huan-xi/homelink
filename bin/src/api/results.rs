@@ -1,3 +1,4 @@
+use std::net::SocketAddr;
 use serde::Serialize;
 use serde_json::Value;
 use hap_metadata::metadata::HapCharacteristic;
@@ -14,13 +15,17 @@ pub struct HapBridgeResult {
     #[serde(flatten)]
     pub(crate) model: HapBridgeModel,
     pub setup_uri: String,
+    pub peers:Vec<SocketAddr>,
     pub running: bool,
 }
+
 #[derive(Debug, serde::Serialize)]
 pub struct IotDeviceResult {
     #[serde(flatten)]
     pub model: IotDeviceModel,
+
     pub running: bool,
+    pub source: Option<MiotDeviceResult>,
 }
 
 #[derive(Debug, serde::Serialize)]

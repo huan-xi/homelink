@@ -1,16 +1,10 @@
-use std::path::PathBuf;
 // 创建一张表
-use anyhow::{anyhow, Result};
-use futures_util::StreamExt;
-use tokio::{
-    fs::{self, File},
-};
+use anyhow::Result;
 pub use sea_orm::{ConnectionTrait, DatabaseConnection, DatabaseTransaction, Schema};
 use sea_orm_migration::{
     prelude::*,
-    sea_orm::{DatabaseBackend, EntityTrait, IdenStatic, Statement},
+    sea_orm::{DatabaseBackend, EntityTrait, IdenStatic},
 };
-use tokio::io::{AsyncBufReadExt, BufReader};
 
 // use crate::DATA_DIR;
 
@@ -44,6 +38,7 @@ where
     Ok(())
 }
 
+#[allow(dead_code)]
 pub enum IndexType {
     Unique,
     Primary,
@@ -56,6 +51,7 @@ pub enum IndexType {
 ///  t:表格主题 `Entity`;
 /// name:索引名称;
 /// tp:索引类型 => u:unique,p:primary,i:index,f:fulltext;
+#[allow(dead_code)]
 pub async fn create_table_index<C, T>(
     manager: &SchemaManager<'_>,
     t: T,
@@ -99,6 +95,7 @@ where
 }
 
 ///  删除一张表
+#[allow(dead_code)]
 pub async fn drop_one_table<T>(manager: &SchemaManager<'_>, t: T) -> Result<(), DbErr>
 where
     T: EntityTrait + IntoTableRef + 'static,

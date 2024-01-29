@@ -2,6 +2,9 @@ pub mod main_channel;
 pub mod params;
 mod results;
 
+#[cfg(feature = "deno")]
+mod resource;
+
 pub type MsgId = u64;
 
 // #[deprecated]

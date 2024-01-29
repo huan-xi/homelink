@@ -1,11 +1,12 @@
+use anyhow::Error;
+use block_modes::BlockMode;
+use impl_new::New;
 use log::{debug, info};
 use packed_struct::derive::PackedStruct;
 use packed_struct::PackedStruct;
-use anyhow::Error;
-use block_modes::{BlockMode, Cbc};
-use impl_new::New;
 use serde::Serialize;
 use serde_json::{Map, Value};
+
 use crate::proto::transport::udp_iot_spec_proto::Utils;
 
 const HEADER_LEN: usize = 32;
@@ -85,7 +86,7 @@ impl Message {
         let mut hdr: [u8; HEADER_LEN] = Default::default();
         hdr.copy_from_slice(&buf[..HEADER_LEN]);
         let header = MessageHeader::unpack(&hdr)?;
-        info!("header:{:?}",header);
+        // info!("header:{:?}",header);
         let payload = &buf[HEADER_LEN..header.packet_length as usize];
         let data = payload.to_vec();
         Ok(Message {
@@ -124,10 +125,12 @@ pub enum ExitError {
     ConnectEmpty,
     /// token 非法
     InvalidToken,
-
     Disconnect,
     ConnectErr,
     BltConnectErr,
+    /// 米家云端异常
+    CloudError,
+    Timeout,
     Lock,
 }
 

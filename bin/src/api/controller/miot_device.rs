@@ -88,6 +88,7 @@ pub async fn sync_mi_devices(state: State<AppState>, Query(param): Query<Account
         .ok_or(anyhow::anyhow!("米家云返回数据格式错误"))?;
     for device in devices {
         //处理设备 MiotDeviceResult
+
         let dev = serde_json::from_value::<MiotDeviceResult>(device.clone());
         match dev {
             Ok(dev_result) => {
@@ -172,6 +173,9 @@ pub async fn convert_to_iot_device(state: State<AppState>, Json(param): Json<MiC
                 return err_msg("网关id不能为空");
             }
             DeviceParam::MeshParam
+        }
+        IotDeviceType::MiCloudDevice => {
+            DeviceParam::MiCloudParam
         }
         _ => {
             return err_msg("暂不支持该设备类型");

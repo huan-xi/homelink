@@ -33,7 +33,21 @@ pub enum IotDeviceType {
     MiZigbeeDevice = 5,
     /// 米家云端设备
     MiCloudDevice = 6,
+    /// 米家网关代理设备
+    GatewayProxy = 7,
     // Bl
+}
+
+impl IotDeviceType {
+    pub fn require_gw(&self) -> bool {
+        match self {
+            IotDeviceType::GatewayProxy => true,
+            IotDeviceType::MiZigbeeDevice => true,
+            IotDeviceType::MiMeshDevice => true,
+            IotDeviceType::MiBleDevice => true,
+            _ => false
+        }
+    }
 }
 
 #[derive(EnumIter, DeriveActiveEnum, Copy, Clone, Hash, Debug, PartialEq, Eq, Serialize, Deserialize, )]
@@ -48,6 +62,7 @@ pub enum SourceType {
 pub enum DeviceParam {
     WifiDeviceParam,
     MiGatewayParam,
+    MiCloudParam,
     BleParam(BleParam),
     MeshParam,
 }
@@ -87,7 +102,7 @@ fn test_ble_param() {
     println!("{:?}", a);
 }
 
-#[derive(Clone, Debug, PartialEq, DeriveModel, DeriveActiveModel, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug,PartialEq, DeriveModel, DeriveActiveModel, Eq, Serialize, Deserialize)]
 pub struct Model {
     pub device_id: i64,
     pub device_type: IotDeviceType,

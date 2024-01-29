@@ -1,10 +1,11 @@
 use std::fmt::Debug;
-use std::sync::Arc;
+use std::time::Duration;
+
 use futures_util::future::{BoxFuture, join_all};
-use impl_new::New;
-use log::{debug, info};
 use serde::Serialize;
-use crate::device::ble::value_types::BleValue;
+use tap::TapFallible;
+use tokio::time::timeout;
+
 use crate::proto::miio_proto::MiotSpecDTO;
 use crate::proto::protocol::JsonMessage;
 
@@ -47,6 +48,10 @@ impl<T> DataEmitter<T>
     }
 
     pub async fn emit(&self, event: T) {
-        join_all(self.listeners.iter().map(|listener| listener(event.clone()))).await;
+        let _ = timeout(Duration::from_secs(1), async {
+            join_all(self.listeners.iter().map(|listener| listener(event.clone()))).await;
+        }).await.tap_err(|_| {
+            log::error!("设备事件响应超时" );
+        });
     }
 }

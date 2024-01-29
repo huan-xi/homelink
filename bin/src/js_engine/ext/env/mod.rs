@@ -1,38 +1,17 @@
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::sync::Arc;
 use std::time::Duration;
+
 use anyhow::anyhow;
-use dashmap::DashMap;
 use deno_runtime::deno_core;
+use deno_runtime::deno_core::{OpState, ResourceId};
 use deno_runtime::deno_core::error::AnyError;
-use deno_runtime::deno_core::{op2, OpState, ResourceId};
-use sea_orm::{DbConn, JsonValue};
-use tokio::sync::oneshot;
+use sea_orm::JsonValue;
 use tokio::time::timeout;
-use crate::init::manager::device_manager::IotDeviceManager;
-use crate::init::manager::hap_manager::HapManage;
-use crate::js_engine::channel::{main_channel, MsgId};
-use crate::js_engine::channel::main_channel::{ReceiverResource, ReceiverResult, ToModuleEvent};
 
-
-pub struct EnvContext {
-    pub info: String,
-    pub version: String,
-    pub main_recv: Option<main_channel::ModuleRecv>,
-    pub conn: DbConn,
-    pub dev_manager: IotDeviceManager,
-    pub hap_manager: HapManage,
-    // 特征与模块通道的映射
-    // 和context_js中的map 是同一个,
-    // pub mapping_characteristic_map: Arc<DashMap<i64, MappingCharacteristicRecv>>,
-    // pub hap_module_map: HapAccessoryModuleMapPointer,
-}
-
-
-
-
-
+use crate::js_engine::channel::main_channel;
+use crate::js_engine::channel::main_channel::{ReceiverResource, ReceiverResult};
+use crate::js_engine::context::EnvContext;
 
 deno_core::extension!(deno_env,
     deps = [ deno_webidl, deno_console ],

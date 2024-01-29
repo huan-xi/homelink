@@ -8,3 +8,4 @@ Cargo.lock
 test.json
 test1.json
 bin/src/test
+dist

@@ -1,12 +1,16 @@
-use std::net::SocketAddr;
-use std::sync::{Arc, mpsc};
+#![allow(unused_variables)]
+
+use std::sync::Arc;
+
 use axum::Router;
 use log::{error, info};
 use sea_orm_migration::MigratorTrait;
 use tokio::select;
 use tokio::sync::oneshot;
+use tower_http::services::ServeDir;
+
 use bin::api::router;
-use bin::api::state::{AppState, AppStateInner};
+use bin::api::state::AppState;
 use bin::config::cfgs::Configs;
 use bin::config::context::{APP_CONTEXT, ApplicationContext, get_app_context};
 use bin::db::init::db_conn;
@@ -14,8 +18,10 @@ use bin::init;
 use bin::init::device_init::init_iot_devices;
 use bin::init::manager::device_manager::IotDeviceManager;
 use bin::init::manager::hap_manager::HapManage;
-use bin::js_engine::ext::env::{EnvContext};
-use bin::js_engine::init_js_engine::{init_js_engine};
+use bin::init::manager::mi_account_manager::MiAccountManager;
+use bin::init::Managers;
+use bin::js_engine::context::EnvContext;
+use bin::js_engine::init_js_engine::init_js_engine;
 use bin::migration::Migrator;
 use hap_metadata::hap_metadata;
 
@@ -40,11 +46,14 @@ async fn main() -> anyhow::Result<()> {
     // 初始化hap 服务器
     let iot_device_manager = IotDeviceManager::new();
     let hap_manager = HapManage::new();
+    let mi_account_manager = MiAccountManager::new(conn.clone());
+
     let app_state = AppState::new(conn.clone(), hap_metadata.clone(),
                                   iot_device_manager.clone(),
-                                  hap_manager.clone());
+                                  hap_manager.clone(), mi_account_manager.clone());
 
     let app = Router::new()
+        .nest_service("/", ServeDir::new("dist/"))
         .nest("/api", router::api())
         .with_state(app_state.clone());
 
@@ -86,14 +95,20 @@ async fn main() -> anyhow::Result<()> {
         let _ = api_server_ch_send.send(false);
     });
 
+    // 初始化hap设备
+    let manager = Managers {
+        hap_manager: hap_manager.clone(),
+        iot_device_manager: iot_device_manager.clone(),
+        mi_account_manager: mi_account_manager.clone(),
+    };
 
     // 初始化iot设备
-    init_iot_devices(&conn, iot_device_manager.clone()).await?;
-    // 初始化hap设备
-    init::hap_init::init_haps(&conn, hap_manager.clone(), iot_device_manager.clone()).await?;
+    init_iot_devices(&conn, iot_device_manager.clone(), mi_account_manager.clone()).await?;
+
+    init::hap_init::init_hap_list(&conn, hap_manager.clone(), iot_device_manager.clone()).await?;
 
     // 等待引擎退出
-    let mut recv = context.js_engine.resp_recv.subscribe();
+    let recv = context.js_engine.resp_recv.subscribe();
 
     /* let engin_statue = async {
          while let Ok(event_type) = recv.recv().await {

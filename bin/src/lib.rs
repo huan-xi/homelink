@@ -1,4 +1,7 @@
-pub(crate) mod hap;
+#![allow(unused_variables)]
+pub mod hap;
+
+
 pub mod api;
 pub mod config;
 pub mod db;

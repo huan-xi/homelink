@@ -1,36 +1,39 @@
 use std::str::FromStr;
 use std::sync::Arc;
+
 use anyhow::anyhow;
 use axum::body::HttpBody;
 use futures_util::future::{BoxFuture, join_all};
 use futures_util::FutureExt;
-use hap::{Config, HapType, MacAddress, Pin};
+use log::{error, info};
+use rand::Rng;
+use sea_orm::{ColIdx, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, JsonValue, QueryFilter};
+use tokio::sync::Mutex;
+
+use hap::{Config, MacAddress};
 use hap::accessory::{AccessoryCategory, AccessoryInformation, HapAccessory};
 use hap::accessory::bridge::BridgeAccessory;
+use hap::characteristic::configured_name::ConfiguredNameCharacteristic;
+use hap::characteristic::HapCharacteristic;
 use hap::server::{IpServer, Server};
 use hap::service::HapService;
 use hap::storage::{FileStorage, Storage};
-use log::{debug, error, info};
-use rand::Rng;
-use sea_orm::{ColIdx, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, JsonValue, ModelTrait, QueryFilter};
-use hap::characteristic::{HapCharacteristic};
-use hap::characteristic::configured_name::ConfiguredNameCharacteristic;
-use miot_spec::device::miot_spec_device::{MiotSpecDevice};
+use miot_spec::device::miot_spec_device::MiotSpecDevice;
+
 use crate::config::context::get_app_context;
-use crate::hap::iot_characteristic::IotCharacteristic;
-use crate::hap::iot_hap_accessory::{IotDeviceAccessory, IotHapAccessory};
-use crate::db::entity::prelude::{HapAccessoryColumn, HapAccessoryEntity, HapAccessoryModel, HapBridgeEntity, HapBridgeColumn, HapCharacteristicEntity, HapCharacteristicModel, HapServiceColumn, HapServiceEntity, HapServiceModel, HapBridgeModel};
+use crate::db::entity::prelude::{HapAccessoryColumn, HapAccessoryEntity, HapAccessoryModel, HapBridgeColumn, HapBridgeEntity, HapBridgeModel, HapCharacteristicEntity, HapCharacteristicModel, HapServiceColumn, HapServiceEntity, HapServiceModel};
 use crate::db::SNOWFLAKE;
-use crate::init::{DevicePointer, FuturesMutex, HapAccessoryPointer};
+use crate::hap::iot_characteristic::IotCharacteristic;
+use crate::hap::iot_hap_accessory::IotHapAccessory;
 use crate::hap::iot_hap_service::IotHapService;
-use crate::hap::rand_utils::{compute_setup_hash, pin_code_from_str, rand_pin_code};
-use crate::init::manager::device_manager::{IotDeviceManager, IotDeviceManagerInner};
+use crate::hap::rand_utils::{compute_setup_hash, pin_code_from_str};
+use crate::init::{DevicePointer, FuturesMutex, HapAccessoryPointer};
+use crate::init::manager::device_manager::IotDeviceManager;
 use crate::init::manager::hap_manager::HapManage;
-use crate::init::mapping_characteristic::{to_characteristic, ToChUtils};
+use crate::init::mapping_characteristic::to_characteristic;
 use crate::js_engine::init_hap_accessory_module::init_hap_accessory_module;
 
-
-pub async fn init_haps(conn: &DatabaseConnection, manage: HapManage, iot_device_map: IotDeviceManager) -> anyhow::Result<()> {
+pub async fn init_hap_list(conn: &DatabaseConnection, manage: HapManage, iot_device_map: IotDeviceManager) -> anyhow::Result<()> {
     let bridges = HapBridgeEntity::find()
         .filter(HapBridgeColumn::Disabled.eq(false))
         .all(conn)
@@ -42,13 +45,19 @@ pub async fn init_haps(conn: &DatabaseConnection, manage: HapManage, iot_device_
     Ok(())
 }
 
+#[test]
+pub fn print_dir() {
+    let u64: u64 = 1201411032090673152;
+    let hex = format!("{:x}", u64);
+    println!("{:?}", hex);
+}
+
 /// 添加单个bridge 到管理器中
 pub async fn add_hap_bridge<C>(conn: &C, bridge: HapBridgeModel, manage: HapManage, iot_device_map: IotDeviceManager) -> anyhow::Result<()>
     where C: ConnectionTrait, {
     let config = &get_app_context().config;
 
-    let hex = format!("{:x}", bridge.bridge_id);
-    let str = format!("{}/{}_{}", config.server.data_dir, "hap", hex);
+    let str = format!("{}/{}_{}", config.server.data_dir, "hap", bridge.pin_code);
     let mut storage = FileStorage::new(str.as_str()).await?;
     let bid = bridge.bridge_id;
 
@@ -176,7 +185,7 @@ async fn init_hap_accessory<'a, C: ConnectionTrait>(conn: &C,
         .map(|f| f.to_string())
         .unwrap_or("未知制造商".to_string());
     // 可以从设备信息中获取
-    let mut info = AccessoryInformation {
+    let info = AccessoryInformation {
         name,
         model: dev_info.model.clone(),
         firmware_revision: dev_info.firmware_revision.clone(),
@@ -187,9 +196,14 @@ async fn init_hap_accessory<'a, C: ConnectionTrait>(conn: &C,
         ..Default::default()
     };
     // SwitchAccessory::new(1, info.clone())?;
-    let mut cid = 1;
-    let mut service = info.to_service(cid, aid)?;
-    cid += service.get_characteristics().len() as u64 + 1;
+    let mut service = info.to_service(1, aid)?;
+    let ids: Vec<u64> = service.get_characteristics()
+        .into_iter()
+        .map(|e| e.get_id())
+        .collect();
+    info!("特征id:{:?}", ids);
+    let mut cid = ids.last().unwrap_or(&0) + 1;
+    // cid += service.get_characteristics().len() as u64 + 1;
     hss.push(Box::new(service));
     // 初始化子服务
     let services = HapServiceEntity::find()
@@ -200,17 +214,27 @@ async fn init_hap_accessory<'a, C: ConnectionTrait>(conn: &C,
     if services.is_empty() {
         return Err(anyhow!("配件:{},无服务",name_c));
     };
-    let ha = IotHapAccessory::new(aid, hss);
-    let accessory = Arc::new(FuturesMutex::new(Box::new(ha) as Box<dyn HapAccessory>));
+    let accessory = Arc::new(tokio::sync::Mutex::new(Box::new(IotHapAccessory::new(aid, hss)) as Box<dyn HapAccessory>));
     let ch_id = SNOWFLAKE.next_id();
     // 注册到manage 上
     hap_manage.put_accessory_ch(aid, ch_id, false).await;
 
     for service in services.into_iter() {
-        let len = add_service(aid, cid, service, device.clone(), accessory.clone()).await?;
+        let ctx = InitServiceContext {
+            aid,
+            sid: cid,
+            stag: service.0.tag.clone(),
+            device: device.clone(),
+            accessory: accessory.clone(),
+            hap_manage: hap_manage.clone(),
+        };
+        let len = add_service(ctx, service).await?;
         cid += len as u64 + 1;
         // 转成服务, 服务需要服务类型和服务的必填特征
     }
+    //检测特征id 是否重复
+    check_ids(name_c, &accessory).await?;
+
 
     // 查询script
     if let Some(script) = hap_accessory.script {
@@ -223,56 +247,69 @@ async fn init_hap_accessory<'a, C: ConnectionTrait>(conn: &C,
     Ok(accessory.clone())
 }
 
+async fn check_ids(name_c: String, accessory: &Arc<Mutex<Box<dyn HapAccessory>>>) -> anyhow::Result<()> {
+    let mut ids = vec![];
+    for ch in accessory.lock().await.get_services() {
+        for ch in ch.get_characteristics() {
+            let id = ch.get_id();
+            if ids.contains(&id) {
+                return Err(anyhow!("配件:{},特征id:{}重复",name_c,id));
+            }
+            ids.push(id);
+        }
+    }
+    Ok(())
+}
+
+#[derive(Clone)]
+pub struct InitServiceContext {
+    pub aid: u64,
+    /// 特征id
+    pub sid: u64,
+    pub stag: Option<String>,
+    /// 设备指针
+    pub device: DevicePointer,
+    pub accessory: HapAccessoryPointer,
+    pub hap_manage: HapManage,
+}
 
 /// 服务映射
 /// cid 自增的 每次+特征的长度
-async fn add_service(aid: u64, cid: u64, service_chs: (HapServiceModel, Vec<HapCharacteristicModel>), device: DevicePointer, accessory: HapAccessoryPointer) -> anyhow::Result<usize> {
+async fn add_service(ctx: InitServiceContext, service_chs: (HapServiceModel, Vec<HapCharacteristicModel>)) -> anyhow::Result<usize> {
     let service = service_chs.0;
     let chs = service_chs.1;
-    let mut hap_service = IotHapService::new(cid, aid, service.service_type.into());
+    let mut hap_service = IotHapService::new(ctx.sid, ctx.aid, service.service_type.into());
     let stag = service.tag.clone();
-    let chs: Vec<BoxFuture<anyhow::Result<(Option<String>, IotCharacteristic)>>> = chs.into_iter()
-        .filter(|ch| !ch.disabled)
-        .enumerate()
-        .into_iter()
-        .map(|(index, ch)| {
-            let dev = device.clone();
-            let acc = accessory.clone();
-            let stag = stag.clone();
-            async move {
-                let c_tag = ch.tag.clone();
-                let cts = to_characteristic(cid, aid, stag, index, ch, dev, acc).await?;
-                Ok((c_tag, cts))
-            }.boxed()
-        }).collect();
-
-    let chs_list = join_all(chs).await;
     let mut success = false;
-    for ch in chs_list.into_iter() {
-        match ch {
-            Ok((tag, cts)) => {
-                hap_service.push_characteristic(tag, Box::new(cts));
+    for (index, ch) in chs.into_iter()
+        .filter(|ch| !ch.disabled).enumerate().into_iter() {
+        let ctx = ctx.clone();
+        let c_tag = stag.clone();
+        match to_characteristic(ctx, index, ch).await {
+            Ok(cts) => {
+                hap_service.push_characteristic(c_tag, Box::new(cts));
                 success = true;
             }
             Err(e) => {
-                error!("转换失败特征:{:?}", e);
+                error!("特征映射失败:{:?}", e);
             }
-        }
+        };
     }
+
     // for (index, ch) in chs.into_iter().enumerate() {}
     let len = hap_service.get_characteristics().len();
     // 设置名称
     if let Some(n) = service.name.clone() {
         if !n.is_empty() {
-            let id = cid + len as u64 + 1;
-            let mut name = ConfiguredNameCharacteristic::new(id, aid);
+            let id = ctx.sid + len as u64 + 1;
+            let mut name = ConfiguredNameCharacteristic::new(id, ctx.aid);
             name.set_value(JsonValue::String(n)).await?;
             hap_service.push_characteristic(Some("configured-name".to_string()), Box::new(name));
         }
     };
 
     if success {
-        accessory.lock().await.push_service(service.tag, Box::new(hap_service));
+        ctx.accessory.lock().await.push_service(service.tag, Box::new(hap_service));
     } else {
         error!("服务:{:?}没有可用的特征", service);
     }

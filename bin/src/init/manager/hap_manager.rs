@@ -4,10 +4,10 @@ use std::sync::Arc;
 use anyhow::{anyhow, Error};
 use futures_util::lock::Mutex;
 use impl_new::New;
-use log::{error, info};
+use log::{error, info, warn};
 use serde_json::Value;
 use tap::TapFallible;
-use hap::Config;
+use hap::{Config, pointer};
 use hap::server::{IpServer, Server};
 use crate::init::hap_init::AccessoryRelation;
 use crate::init::HapAccessoryPointer;
@@ -62,10 +62,34 @@ pub struct HapManageInner {
 }
 
 impl HapManageInner {
+    pub fn get_bridge_server_peer(&self, bid: i64) -> Option<pointer::Peers> {
+        self.server_map.get(&bid)
+            .map(|i| i.server.peers_pointer().clone())
+    }
     pub fn get_bridge_server_config(&self, bid: i64) -> Option<Arc<Mutex<Config>>> {
         self.server_map.get(&bid)
             .map(|i| i.server.config_pointer().clone())
     }
+
+    pub(crate) fn update_char_value_by_accessory(&self, accessory: HapAccessoryPointer, sid: u64, cid: u64, value: Value) {
+        tokio::spawn(async move {
+            match accessory.lock()
+                .await
+                .get_id_mut_service(sid)
+                .and_then(|s| s.get_id_mut_characteristic(cid)) {
+                None => {
+                    warn!("特征:{}不存在",cid);
+                }
+                Some(cts) => {
+                    //类型转换器,设置值
+                    if let Err(e) = cts.set_value(value).await {
+                        warn!("设置特征值失败:{:?}",e);
+                    }
+                }
+            };
+        });
+    }
+
     pub(crate) async fn update_char_value(&self, aid: u64, service_tag: String, char_tag: String, value: Value) -> anyhow::Result<()> {
         let accessory = self.aid_map.get(&aid)
             .ok_or(anyhow!("设备:{}不存在",aid))
@@ -138,7 +162,7 @@ impl HapManageInner {
             loop {
                 tokio::select! {
                     Ok(val)= recv=>{
-                        error!("收到hap服务:{}退出指令,{}",bid,val);
+                        info!("收到hap服务:{}退出指令,{}",bid,val);
                         break
                     }
                     _= task=>break,

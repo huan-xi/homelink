@@ -2,17 +2,19 @@ use std::borrow::Cow;
 use std::cell::RefCell;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
+
 use anyhow::anyhow;
-use deno_runtime::deno_core::{Resource, v8};
-use serde_aux::prelude::deserialize_number_from_string;
-use sea_orm::JsonValue;
-use tokio::sync::{broadcast, mpsc, oneshot};
-use crate::js_engine::channel::MsgId;
+
 use futures_util::FutureExt;
 use impl_new::New;
 use log::info;
+use sea_orm::JsonValue;
 use serde::{Deserialize, Serialize};
+use serde_aux::prelude::deserialize_number_from_string;
+use tokio::sync::{broadcast, mpsc};
 use tokio::time::timeout;
+
+use crate::js_engine::channel::MsgId;
 use crate::js_engine::channel::params::{BindDeviceModuleParam, ExecuteSideModuleParam, OnCharReadParam, OnCharUpdateParam, OnDeviceEventParam, U64Value};
 
 pub type ResultSenderPointer = Arc<broadcast::Sender<(MsgId, FromModuleResp)>>;
@@ -164,14 +166,9 @@ impl ReceiverResource {
     }
 }
 
-// pub struct SendResource(pub Arc<ResultSenderPointer>);
 
 
-impl Resource for ReceiverResource {
-    fn name(&self) -> Cow<str> {
-        "ReceiverResource".into()
-    }
-}
+
 
 impl ModuleRecv {
     pub fn new(result_sender: ResultSenderPointer) -> (Self, mpsc::Sender<(MsgId, ToModuleEvent)>) {

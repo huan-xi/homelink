@@ -1,18 +1,20 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
+
 use anyhow::anyhow;
 use futures_util::StreamExt;
-use log::{debug, error, info};
+use log::{debug, error};
 use paho_mqtt::{AsyncClient, Message};
+use paho_mqtt as mqtt;
+pub use paho_mqtt::Message as MqttMessage;
 use serde_json::{Map, Value};
 use tokio::sync::broadcast::{Receiver, Sender};
 use tokio::sync::RwLock;
 use tokio::time::timeout;
-use crate::proto::miio_proto::{MiotSpecProtocol, MsgCallback};
+
+use crate::proto::miio_proto::MiotSpecProtocol;
 use crate::proto::protocol::JsonMessage;
-pub use paho_mqtt::Message as MqttMessage;
-use paho_mqtt as mqtt;
 
 /// 基于 miio 的网关传输协议
 pub struct OpenMiIOMqttSpecProtocol {

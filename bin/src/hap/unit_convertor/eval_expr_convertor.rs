@@ -1,22 +1,44 @@
+use evalexpr::{ContextWithMutableVariables, eval_with_context_mut, HashMapContext, Value as EvalValue};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+
 use crate::hap::unit_convertor::{Convertor, ConvertorParamType};
-
-use evalexpr::{Context, ContextWithMutableVariables, eval, eval_with_context_mut, HashMapContext, Value as EvalValue};
-
 
 /// 表达式转换
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
 pub struct EvalExprParam {
-    /// 转成指定值
+    /// 转成hap定值
     pub to_expr: String,
-    /// 从指定值转
+    /// 从hap 转成其他类型
     pub from_expr: String,
     /// 是否是成反比
     pub is_inverse: bool,
 }
-
+/// val+1
 pub struct EvalExprConvertor;
+
+
+
+pub fn eval_expr(param: Option<ConvertorParamType>, value: Value, expr_func: fn(EvalExprParam) -> String) -> anyhow::Result<Value> {
+    if let Some(ConvertorParamType::EvalExpr(param)) = param {
+        let mut context = HashMapContext::new();
+        context.set_value("val".to_string(), json_value_to_eval_value(value)?)?;
+        let expr = expr_func(param);
+        let val = eval_with_context_mut(expr.as_str(), &mut context)?;
+        return Ok(json_value_from_eval_value(val)?);
+    }
+    return Err(anyhow::anyhow!("不支持该类型"));
+}
+
+impl Convertor for EvalExprConvertor {
+    fn to(&self, param: Option<ConvertorParamType>, value: Value) -> anyhow::Result<Value> {
+        eval_expr(param, value,|param| param.to_expr)
+    }
+
+    fn from(&self, param: Option<ConvertorParamType>, value: Value) -> anyhow::Result<Value> {
+        eval_expr(param, value,|param| param.from_expr)
+    }
+}
 
 
 fn json_value_to_eval_value(value: Value) -> anyhow::Result<EvalValue> {
@@ -68,26 +90,4 @@ fn json_value_from_eval_value(value: EvalValue) -> anyhow::Result<Value> {
         }
     }
 }
-
-pub fn eval_expr(param: Option<ConvertorParamType>, value: Value, expr_func: fn(EvalExprParam) -> String) -> anyhow::Result<Value> {
-    if let Some(ConvertorParamType::EvalExpr(param)) = param {
-        let mut context = HashMapContext::new();
-        context.set_value("val".to_string(), json_value_to_eval_value(value)?)?;
-        let expr = expr_func(param);
-        let val = eval_with_context_mut(expr.as_str(), &mut context)?;
-        return Ok(json_value_from_eval_value(val)?);
-    }
-    return Err(anyhow::anyhow!("不支持该类型"));
-}
-
-impl Convertor for EvalExprConvertor {
-    fn to(&self, param: Option<ConvertorParamType>, value: Value) -> anyhow::Result<Value> {
-        eval_expr(param, value,|param| param.to_expr)
-    }
-
-    fn from(&self, param: Option<ConvertorParamType>, value: Value) -> anyhow::Result<Value> {
-        eval_expr(param, value,|param| param.from_expr)
-    }
-}
-
 

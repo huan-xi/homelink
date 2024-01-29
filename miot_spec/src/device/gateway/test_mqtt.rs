@@ -1,7 +1,8 @@
-use futures::{executor::block_on, stream::StreamExt};
-use paho_mqtt as mqtt;
-use std::{ process, time::Duration};
+use std::{process, time::Duration};
+
+use futures::stream::StreamExt;
 use log::info;
+use paho_mqtt as mqtt;
 
 // The topics to which we subscribe.
 const TOPICS: &[&str] = &["central/report"];

@@ -1,4 +1,3 @@
-use deno_runtime::deno_core::v8::String;
 use crate::db::entity::iot_device::IotDeviceType;
 
 /// 配件模板

@@ -1,13 +1,13 @@
 use std::fs;
 use std::path::PathBuf;
-use std::sync::Arc;
+
 use anyhow::anyhow;
 use deno_runtime::deno_core::url::Url;
 use log::error;
 use tap::TapFallible;
+
 use crate::config::context::get_app_context;
-use crate::db::SNOWFLAKE;
-use crate::init::manager::hap_manager::{HapManage};
+use crate::init::manager::hap_manager::HapManage;
 use crate::js_engine::channel::params::ExecuteSideModuleParam;
 
 /// hap 设备作为一个module 运行

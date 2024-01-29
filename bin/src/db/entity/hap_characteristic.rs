@@ -27,12 +27,13 @@ pub enum MappingMethod {
     None = -1,
     /// miot spec 设备属性映射
     PropMapping = 1,
+    /// 固定值
+    FixValue = 2,
     /// js context sys.dev.get_ps
     /// 当前设备读取属性
     /// 读取数值-> dev.get_ps()
     JsScript = 3,
 }
-
 
 
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize, FromJsonQueryResult)]

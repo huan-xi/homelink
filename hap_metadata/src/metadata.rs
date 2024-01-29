@@ -1,6 +1,8 @@
 use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+
 use crate::utils;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -144,11 +146,11 @@ impl From<SystemMetadata> for HapMetadata {
         let mut m = v.plist_dictionary;
 
         // rename mislabeled services
-        let mut accessory_information_service = m.hap.services.get_mut("accessory-information").unwrap();
+        let  accessory_information_service = m.hap.services.get_mut("accessory-information").unwrap();
         accessory_information_service.name = "Accessory Information".to_string();
-        let mut fan_v2_service = m.hap.services.get_mut("fanv2").unwrap();
+        let  fan_v2_service = m.hap.services.get_mut("fanv2").unwrap();
         fan_v2_service.name = "Fan v2".to_string();
-        let mut smart_speaker_service = m.hap.services.get_mut("smart-speaker").unwrap();
+        let  smart_speaker_service = m.hap.services.get_mut("smart-speaker").unwrap();
         smart_speaker_service.name = "Smart Speaker".to_string();
 
         let mut sorted_categories = m.homekit.categories.iter().map(|(_, v)| v.clone()).collect::<Vec<_>>();

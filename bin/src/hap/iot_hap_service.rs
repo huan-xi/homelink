@@ -1,9 +1,11 @@
 use std::collections::HashMap;
+
+use serde::{Serialize, Serializer};
+use serde::ser::SerializeStruct;
+
 use hap::characteristic::HapCharacteristic;
 use hap::HapType;
 use hap::service::HapService;
-use serde::{Serialize, Serializer};
-use serde::ser::SerializeStruct;
 
 pub struct IotHapService {
     /// Instance ID of the Switch service.
@@ -97,8 +99,12 @@ impl HapService for IotHapService {
     }
 
     fn get_mut_characteristic(&mut self, hap_type: HapType) -> Option<&mut dyn HapCharacteristic> {
-        // self.characteristic_map.get_mut(&hap_type).map(|i| i.as_mut() as &mut dyn HapCharacteristic )
-        todo!("please use get_id_mut_characteristic");
+        for characteristic in self.get_mut_characteristics() {
+            if characteristic.get_type() == hap_type {
+                return Some(characteristic);
+            }
+        }
+        None
     }
 
     fn get_characteristics(&self) -> Vec<&dyn HapCharacteristic> {

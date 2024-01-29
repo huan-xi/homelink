@@ -1,11 +1,12 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
 use aes::Aes128;
 use anyhow::anyhow;
 use async_trait::async_trait;
-use block_modes::block_padding::Pkcs7;
 use block_modes::{BlockMode, Cbc};
+use block_modes::block_padding::Pkcs7;
 use futures_util::{FutureExt, TryStreamExt};
 use log::{debug, error, info};
 use serde_json::{Map, Value};
@@ -13,8 +14,8 @@ use tap::TapFallible;
 use tokio::net::UdpSocket;
 use tokio::sync::broadcast::{Receiver, Sender};
 use tokio::time::timeout;
-use crate::proto::miio_proto::{MiotSpecDTO, MiotSpecProtocol, MiotSpecProtocolPointer, MsgCallback};
-use crate::proto::protocol;
+
+use crate::proto::miio_proto::MiotSpecProtocol;
 use crate::proto::protocol::{JsonMessage, Message, MessageHeader};
 use crate::utils::timestamp;
 
@@ -35,7 +36,7 @@ pub struct UdpMiotSpecProtocol {
 }
 
 impl UdpMiotSpecProtocol {
-    pub async fn new(ip: &str, port: u32, token: [u8; 16]) -> anyhow::Result<Self> {
+    pub async fn new(ip: &str, port: u32, token: [u8; 16],timeout: Duration) -> anyhow::Result<Self> {
         let addr: std::net::SocketAddr = format!("{}:{}", ip, port).parse().unwrap();
         let mut socket = UdpSocket::bind("0.0.0.0:0").await?;
         socket.connect(addr).await?;
@@ -57,7 +58,7 @@ impl UdpMiotSpecProtocol {
             token,
             msg_sender,
             id: AtomicU64::new(0),
-            timeout: Duration::from_millis(100),
+            timeout,
         })
     }
 

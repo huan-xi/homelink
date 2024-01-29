@@ -1,24 +1,21 @@
-use std::fs;
 use std::ops::Deref;
-use std::path::PathBuf;
-use std::sync::{Arc};
+use std::sync::Arc;
+
 use axum::body::HttpBody;
 use dashmap::DashMap;
 use dashmap::mapref::entry::Entry;
-use dashmap::mapref::one::{Ref, RefMut};
-use deno_runtime::deno_fetch::reqwest::Url;
 use futures_util::FutureExt;
 use log::{error, info};
-use sea_orm::JsonValue;
-use tap::TapFallible;
-use tokio::sync::{broadcast, mpsc, oneshot};
+use tokio::sync::oneshot;
+
 use miot_spec::device::common::emitter::EventType;
-use miot_spec::device::miot_spec_device::{MiotSpecDevice};
+use miot_spec::device::miot_spec_device::MiotSpecDevice;
 use miot_spec::device::MiotDevicePointer;
+
 use crate::config::context::get_app_context;
-use crate::init::{DevicePointer};
+use crate::init::DevicePointer;
 use crate::js_engine::channel::main_channel::ToModuleEvent;
-use crate::js_engine::channel::params::{OnCharReadParam, OnDeviceEventParam};
+use crate::js_engine::channel::params::OnDeviceEventParam;
 
 pub struct JsModule {
     ///与 特征脚本通信的通道
@@ -146,29 +143,29 @@ impl DeviceWithJsEngine {
 pub struct DeviceTask {
     dev: DevicePointer,
     /// 关闭整个任务
-    close_sender: tokio::sync::oneshot::Sender<bool>,
+    close_sender: oneshot::Sender<bool>,
     // exit_recv: tokio::sync::oneshot::Receiver<bool>,
 }
 
 
 pub struct IotDeviceManagerInner {
-    device_map: dashmap::DashMap<i64, DeviceTask>,
-    did_map: dashmap::DashMap<String, i64>,
-    device_id_enable_js_map: dashmap::DashMap<i64, bool>,
+    device_map: DashMap<i64, DeviceTask>,
+    did_map: DashMap<String, i64>,
+    device_id_enable_js_map: DashMap<i64, bool>,
 }
 
 
 impl IotDeviceManagerInner {
     pub fn new() -> Self {
         Self {
-            device_map: dashmap::DashMap::new(),
+            device_map: DashMap::new(),
             did_map: Default::default(),
             device_id_enable_js_map: Default::default(),
         }
     }
     pub fn push_device(&self, device_id: i64, device: DevicePointer) {
         let dev_c = device.clone();
-        let (close_sender, recv) = tokio::sync::oneshot::channel();
+        let (close_sender, recv) = oneshot::channel();
 
         let device = DeviceTask {
             dev: device,
@@ -252,6 +249,14 @@ impl IotDeviceManager {
     pub fn is_running(&self, id: i64) -> bool {
         self.device_map.contains_key(&id)
     }
+    pub fn stop_device(&self, id: i64) -> anyhow::Result<()> {
+        let dev = self.device_map.remove(&id);
+        if let Some((id,task)) = dev{
+            let _ = task.close_sender.send(true);
+        }
+        Ok(())
+    }
+
 
     /// 开启js 提交监听器
     pub async fn enable_to_js(&self, did: &str) -> anyhow::Result<()> {

@@ -11,18 +11,33 @@ use hap::characteristic::saturation::SaturationCharacteristic;
 use hap::service::lightbulb::LightbulbService;
 use serde::{Deserialize, Serialize, Serializer};
 use serde_json::json;
+use hap::characteristic::active::ActiveCharacteristic;
+use hap::characteristic::cooling_threshold_temperature::CoolingThresholdTemperatureCharacteristic;
+use hap::characteristic::current_fan_state::CurrentFanStateCharacteristic;
+use hap::characteristic::current_heater_cooler_state::CurrentHeaterCoolerStateCharacteristic;
+use hap::characteristic::current_heating_cooling_state::CurrentHeatingCoolingStateCharacteristic;
+use hap::characteristic::heating_threshold_temperature::HeatingThresholdTemperatureCharacteristic;
+use hap::characteristic::lock_physical_controls::LockPhysicalControlsCharacteristic;
+use hap::characteristic::outlet_in_use::OutletInUseCharacteristic;
+use hap::characteristic::rotation_speed::RotationSpeedCharacteristic;
+use hap::characteristic::swing_mode::SwingModeCharacteristic;
+use hap::characteristic::target_fan_state::TargetFanStateCharacteristic;
+use hap::characteristic::target_heater_cooler_state::TargetHeaterCoolerStateCharacteristic;
+use hap::characteristic::target_heating_cooling_state::TargetHeatingCoolingStateCharacteristic;
+use hap::characteristic::target_temperature::TargetTemperatureCharacteristic;
+use hap::characteristic::temperature_display_units::TemperatureDisplayUnitsCharacteristic;
 use crate::hap::hap_type::MappingHapType;
 
-#[derive(Debug, Default, Clone,PartialEq,Eq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct CharacteristicValue {
     pub(crate) value: serde_json::Value,
 }
+
 impl CharacteristicValue {
     pub fn new(value: serde_json::Value) -> Self {
         Self { value }
     }
 }
-
 
 
 impl Into<serde_json::Value> for CharacteristicValue {
@@ -79,6 +94,51 @@ impl IotCharacteristic {
             MappingHapType::ContactSensor => {
                 // ContactSensorService::new(0, 0);
                 Some(Box::new(ContactSensorStateCharacteristic::new(0, 0)))
+            }
+            MappingHapType::Outlet => {
+                Some(Box::new(OutletInUseCharacteristic::new(0, 0)))
+            }
+            MappingHapType::TemperatureDisplayUnits => {
+                Some(Box::new(TemperatureDisplayUnitsCharacteristic::new(0, 0)))
+            }
+            MappingHapType::TargetHeaterCoolerState=>{
+                Some(Box::new(TargetHeaterCoolerStateCharacteristic::new(0, 0)))
+            }
+            MappingHapType::CurrentHeaterCoolerState=>{
+                Some(Box::new(CurrentHeaterCoolerStateCharacteristic::new(0, 0)))
+            }
+            MappingHapType::TargetTemperature=>{
+                Some(Box::new(TargetTemperatureCharacteristic::new(0, 0)))
+            }
+            MappingHapType::TargetHeatingCoolingState=>{
+                Some(Box::new(TargetHeatingCoolingStateCharacteristic::new(0, 0)))
+            }
+            MappingHapType::CurrentHeatingCoolingState=>{
+                Some(Box::new(CurrentHeatingCoolingStateCharacteristic::new(0, 0)))
+            }
+            MappingHapType::CoolingThresholdTemperature=>{
+                Some(Box::new(CoolingThresholdTemperatureCharacteristic::new(0, 0)))
+            }
+            MappingHapType::HeatingThresholdTemperature=>{
+                Some(Box::new(HeatingThresholdTemperatureCharacteristic::new(0, 0)))
+            }
+            MappingHapType::RotationSpeed=>{
+                Some(Box::new(RotationSpeedCharacteristic::new(0, 0)))
+            }
+            MappingHapType::SwingMode=>{
+                Some(Box::new(SwingModeCharacteristic::new(0, 0)))
+            }
+            MappingHapType::LockPhysicalControls=>{
+                Some(Box::new(LockPhysicalControlsCharacteristic::new(0, 0)))
+            }
+            MappingHapType::TargetFanState=>{
+                Some(Box::new(TargetFanStateCharacteristic::new(0, 0)))
+            }
+            MappingHapType::CurrentFanState=>{
+                Some(Box::new(CurrentFanStateCharacteristic::new(0, 0)))
+            }
+            MappingHapType::Active=>{
+                Some(Box::new(ActiveCharacteristic::new(0, 0)))
             }
             _ => None
         }

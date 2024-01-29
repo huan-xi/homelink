@@ -13,8 +13,16 @@ pub mod manager;
 
 
 pub type FuturesMutex<T> = futures_util::lock::Mutex<T>;
-pub type HapAccessoryPointer = Arc<FuturesMutex<Box<dyn HapAccessory>>>;
+pub type TokioMutex<T> = tokio::sync::Mutex<T>;
+pub type HapAccessoryPointer = Arc<TokioMutex<Box<dyn HapAccessory>>>;
 pub type AFuturesMutex<T> = Arc<futures_util::lock::Mutex<T>>;
 pub type DevicePointer = DeviceWithJsEngine;
 // pub type DevicePointer = Arc<RwLock<IotDeviceAccessory>>;
 pub type DeviceMap = DashMap<i64, DevicePointer>;
+
+
+pub struct Managers{
+    pub hap_manager: manager::hap_manager::HapManage,
+    pub iot_device_manager: manager::device_manager::IotDeviceManager,
+    pub mi_account_manager: manager::mi_account_manager::MiAccountManager,
+}

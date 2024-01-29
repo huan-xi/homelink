@@ -1,6 +1,6 @@
-use std::fs::File;
 use anyhow::anyhow;
 use rust_embed::RustEmbed;
+
 use crate::metadata::{HapMetadata, SystemMetadata};
 
 pub mod metadata;
@@ -17,7 +17,7 @@ pub fn hap_metadata() -> anyhow::Result<HapMetadata> {
         .ok_or(anyhow::anyhow!("system.json not found"))?;
     let bytes = file.data.as_ref();
     let metadata: SystemMetadata = serde_json::from_slice(bytes)
-        .map_err(|e| anyhow!("json 格式不正确"))?;
+        .map_err(|_e| anyhow!("json 格式不正确"))?;
     Ok(HapMetadata::from(metadata))
 }
 

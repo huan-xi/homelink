@@ -2,11 +2,10 @@ use std::fs;
 use std::fs::{create_dir_all, File};
 use std::io::BufReader;
 use std::path::PathBuf;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
+
 use log::{error, warn};
 use reqwest_cookie_store::{CookieStore, CookieStoreMutex};
-use tokio::sync::Mutex;
-use crate::cloud::MiCloud;
 
 #[derive(Debug)]
 pub struct CookieState {

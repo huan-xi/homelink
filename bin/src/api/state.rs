@@ -24,6 +24,7 @@ impl AppStateInner {
                hap_metadata: Arc<HapMetadata>,
                device_manager: IotDeviceManager,
                hap_manager: HapManage,
+               mi_account_manager: MiAccountManager,
     ) -> Self {
         let conn_c = conn.clone();
         Self {
@@ -31,7 +32,7 @@ impl AppStateInner {
             hap_metadata,
             device_manager,
             hap_manager,
-            mi_account_manager:MiAccountManager::new(conn_c),
+            mi_account_manager,
         }
     }
 
@@ -49,9 +50,9 @@ pub struct AppState {
 impl AppState {
     pub fn new(conn: DatabaseConnection, hap_metadata: Arc<HapMetadata>,
                device_manager: IotDeviceManager,
-               hap_manager: HapManage, ) -> Self {
+               hap_manager: HapManage,mi_account_manager: MiAccountManager, ) -> Self {
         Self {
-            inner: Arc::new(AppStateInner::new(conn, hap_metadata, device_manager, hap_manager)),
+            inner: Arc::new(AppStateInner::new(conn, hap_metadata, device_manager, hap_manager,mi_account_manager)),
         }
     }
 }

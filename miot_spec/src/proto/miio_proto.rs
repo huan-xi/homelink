@@ -1,6 +1,6 @@
-use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
+
 use futures_util::future::join;
 use hex::FromHex;
 use impl_new::New;
@@ -8,12 +8,15 @@ use log::info;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tokio::sync::broadcast;
+
 use crate::proto::protocol::JsonMessage;
 
 // pub type MiotSpecProtocolPointer = Arc<Box<dyn MiotSpecProtocol + Send + Sync + 'static>>;
 pub type MiotSpecProtocolPointer = Arc<dyn MiotSpecProtocol + Send + Sync + 'static>;
 pub type MsgCallback = Box<dyn Fn(JsonMessage) + Send + Sync>;
 
+pub const METHOD_GET_PROPERTIES: &str = "get_properties";
+pub const METHOD_SET_PROPERTIES: &str = "set_properties";
 /// 米家协议 发送和接收miio 指令
 #[async_trait::async_trait]
 pub trait MiotSpecProtocol {
@@ -69,7 +72,8 @@ pub trait MiotSpecProtocol {
     async fn set_properties(&self, params: Vec<MiotSpecDTO>, timeout_val: Option<Duration>) -> anyhow::Result<Vec<MiotSpecDTO>> {
         info!("set_properties value:{:?}", params);
         let mut result = self.call_rpc("set_properties", params, timeout_val).await?;
-        let value = result.data.remove("result")
+        let value = result.data
+            .remove("result")
             .ok_or(anyhow::anyhow!("无result 节点"))?;
         let miot_specs: Vec<MiotSpecDTO> = serde_json::from_value(value)?;
         //value 转成 MiotSpecDTO
@@ -77,7 +81,7 @@ pub trait MiotSpecProtocol {
         Ok(miot_specs)
     }
     async fn get_properties(&self, params: Vec<MiotSpecDTO>, timeout_val: Option<Duration>) -> anyhow::Result<Vec<MiotSpecDTO>> {
-        let mut result = self.call_rpc("get_properties", params, timeout_val).await?;
+        let mut result = self.call_rpc(METHOD_GET_PROPERTIES, params, timeout_val).await?;
         let value = result.data.remove("result")
             .ok_or(anyhow::anyhow!("properties 无result"))?;
         let miot_specs: Vec<MiotSpecDTO> = serde_json::from_value(value)?;

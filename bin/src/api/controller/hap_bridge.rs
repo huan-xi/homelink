@@ -1,19 +1,19 @@
 use axum::extract::{Path, Query, State};
 use axum::Json;
-use deno_runtime::deno_core::Op;
+use sea_orm::{ActiveEnum, ConnectionTrait, EntityTrait, IntoActiveModel};
 use sea_orm::ActiveValue::Set;
-use sea_orm::{ActiveEnum, ConnectionTrait, EntityTrait, IntoActiveModel, PaginatorTrait, QueryResult, TransactionTrait};
 use sea_orm::prelude::Expr;
-use crate::api::output::{ApiResp, ApiResult, ok_data, output_err_msg};
-use crate::api::params::{AddHapBridgeParam, DisableParam};
-use crate::api::state::AppState;
-use crate::db::entity::prelude::{HapBridgeActiveModel, HapBridgeColumn, HapBridgeEntity, HapBridgeModel, IotDeviceEntity};
+
 use crate::{api_err, err_msg};
+use crate::api::output::{ApiResp, ApiResult, ok_data};
+use crate::api::params::{AddHapBridgeParam, DisableParam};
 use crate::api::results::HapBridgeResult;
+use crate::api::state::AppState;
+use crate::db::entity::prelude::{HapBridgeActiveModel, HapBridgeColumn, HapBridgeEntity, HapBridgeModel};
+use crate::db::init::SeaQuery;
 use crate::db::SNOWFLAKE;
 use crate::hap::rand_utils::{gen_homekit_setup_uri_default, rand_mac_addr, rand_pin_code, rand_setup_id};
-use crate::db::init::SeaQuery;
-use crate::init::hap_init::{add_hap_bridge};
+use crate::init::hap_init::add_hap_bridge;
 
 /// 添加桥接器
 pub async fn add(state: State<AppState>, Json(param): Json<AddHapBridgeParam>) -> ApiResult<()> {
@@ -83,20 +83,29 @@ pub async fn list(state: State<AppState>) -> ApiResult<Vec<HapBridgeResult>> {
         .all(state.conn())
         .await?;
     let manager = state.hap_manager.clone();
-    let list = list.into_iter().map(|i| {
+    let mut r_list = vec![];
+    for i in list {
         let config = manager.get_bridge_server_config(i.bridge_id);
-
+        let peers = manager.get_bridge_server_peer(i.bridge_id);
+        let peers=match peers {
+            None => vec![],
+            Some(s) => {
+                s.read().await.keys().map(|i|i.clone()).collect()
+            }
+        };
         let setup_uri = gen_homekit_setup_uri_default(
             i.pin_code as u64, i.category.to_value() as u64,
             i.setup_id.clone());
-        HapBridgeResult {
+        r_list.push(HapBridgeResult {
             model: i,
             setup_uri,
+            peers,
             running: config.is_some(),
-        }
-    }).collect();
+        });
+    }
 
-    Ok(ApiResp::with_data(list))
+
+    Ok(ApiResp::with_data(r_list))
 }
 
 

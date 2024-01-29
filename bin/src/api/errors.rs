@@ -3,13 +3,20 @@ use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use log::error;
 use sea_orm::DbErr;
+use strum_macros::Display;
+use thiserror::Error;
 use crate::api::output::ApiResp;
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum ApiError {
+    #[error("DbErr")]
     DbErr(DbErr),
+    #[error("{0}")]
     Msg(String),
+    #[error("{0}")]
     StrMsg(&'static str),
+    #[error("json 序列化错误")]
+    SerdeJsonError(#[from] serde_json::Error),
 }
 
 impl ApiError {

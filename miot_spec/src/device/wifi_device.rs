@@ -1,15 +1,15 @@
-use std::sync::{Arc};
+use std::sync::Arc;
 use std::time::Duration;
-use futures_util::future::{BoxFuture, join};
+
 use hex::FromHex;
-use crate::device::miot_spec_device::{BaseMiotSpecDevice, DeviceInfo, MiotSpecDevice};
-use crate::proto::miio_proto::{MiotSpecProtocolPointer, MiotSpecDTO, MiotSpecId};
-use futures_util::FutureExt;
 use log::{error, info};
 use tap::TapFallible;
 use tokio::select;
 use tokio::sync::RwLock;
+
 use crate::device::common::utils::get_poll_func;
+use crate::device::miot_spec_device::{BaseMiotSpecDevice, DeviceInfo, MiotSpecDevice};
+use crate::proto::miio_proto::MiotSpecProtocolPointer;
 use crate::proto::protocol::ExitError;
 use crate::proto::protocol::ExitError::ConnectErr;
 use crate::proto::transport::udp_iot_spec_proto::UdpMiotSpecProtocol;
@@ -21,7 +21,9 @@ pub struct WifiDevice {
     proto: Arc<RwLock<Option<MiotSpecProtocolPointer>>>,
     /// 轮询间隔
     pub interval: Duration,
-
+    /// 超时时间
+    /// udp 协议并发高可能不会返回数据
+    timeout: Duration,
 }
 
 #[async_trait::async_trait]
@@ -42,7 +44,7 @@ impl MiotSpecDevice for WifiDevice {
         self.connect().await
     }
     /// 连接协议,并且监听
-    async fn run(&self) -> Result<(), ExitError>{
+    async fn run(&self) -> Result<(), ExitError> {
         let proto = self.connect().await?;
         //开启状态获取
         let listen = proto.start_listen();
@@ -77,7 +79,7 @@ impl WifiDevice {
         let ip = self.info.localip.as_ref()
             .ok_or(ExitError::ConnectEmpty)?; // .expect("ip 不能为空");
         let port = 54321;
-        let udp = UdpMiotSpecProtocol::new(ip.as_str(), port, token_bytes)
+        let udp = UdpMiotSpecProtocol::new(ip.as_str(), port, token_bytes, self.timeout)
             .await
             .tap_err(|e| error!("udp 连接:{}:{}失败:{}",ip,port ,e))
             .map_err(|_| ConnectErr)?;
@@ -93,6 +95,7 @@ impl WifiDevice {
             info,
             proto: Arc::new(RwLock::new(None)),
             interval: Duration::from_secs(120),
+            timeout: Duration::from_millis(2000),
         })
     }
 }

@@ -1,7 +1,7 @@
 use std::str::FromStr;
 use anyhow::anyhow;
 use sea_orm::ActiveValue::Set;
-use sea_orm::{ActiveValue, JsonValue};
+use sea_orm::{ActiveValue, JsonValue, NotSet};
 use crate::hap::hap_type::MappingHapType;
 use serde_aux::prelude::deserialize_number_from_string;
 use crate::db::entity::hap_characteristic::{BleToSensorParam, DbBleValueType, MappingMethod, MappingParam, MiotSpecParam};
@@ -59,6 +59,14 @@ pub struct QueryIotDeviceParam {
     pub device_type: Option<IotDeviceType>,
 }
 
+#[derive(serde::Deserialize, Debug)]
+pub struct TestPropParam {
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    pub siid: i32,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    pub piid: i32,
+    pub value: Option<JsonValue>,
+}
 
 #[derive(serde::Deserialize, Debug)]
 pub struct AddServiceParam {
@@ -139,7 +147,7 @@ impl CharacteristicParam {
             }
             _ => None,
         };
-        Ok(HapCharacteristicActiveModel {
+        let model = HapCharacteristicActiveModel {
             cid: Default::default(),
             characteristic_type: Set(self.characteristic_type),
             mapping_method: Set(self.mapping_method),
@@ -155,9 +163,15 @@ impl CharacteristicParam {
             service_id: Set(service_id),
             disabled: Set(false),
             // fixed_value: Default::default(),
-            convertor_param: Set(self.convertor_param),
+            convertor_param: match self.convertor_param {
+                None => NotSet,
+                Some(s) => Set(Some(s))
+            },
             fixed_value: Set(self.fixed_value),
-        })
+        };
+
+
+        Ok(model)
     }
 }
 
@@ -171,6 +185,10 @@ pub struct DisableParam {
 pub struct UpdateHapAccessoryParam {
     pub name: Option<String>,
     pub memo: Option<String>,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    pub bridge_id: i64,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    pub device_id: i64,
     pub hap_type: Option<MappingHapType>,
     // pub script: Option<String>,
     // pub register_props: PropertyVec,
@@ -183,6 +201,8 @@ impl UpdateHapAccessoryParam {
             name: Set(self.name),
             memo: Set(self.memo),
             hap_type: Set(self.hap_type),
+            bridge_id: Set(self.bridge_id),
+            device_id: Set(self.device_id),
             // script: Set(self.script),
             // register_props: Set(self.register_props),
             ..Default::default()

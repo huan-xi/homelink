@@ -7,7 +7,6 @@ use crate::api::output::{ApiResp, ApiResult, err_msg, err_msg_string};
 use crate::api::state::AppState;
 use crate::db::entity::prelude::{HapAccessoryActiveModel, HapAccessoryEntity, HapCharacteristicActiveModel, HapCharacteristicColumn, HapCharacteristicEntity, HapCharacteristicModel, HapServiceColumn, HapServiceEntity, HapServiceModel};
 use sea_orm::{ActiveModelTrait, EntityTrait, PaginatorTrait, QueryFilter};
-use crate::api::errors::ApiError;
 use crate::api::params::{CharacteristicParam, AddServiceParam, DisableParam};
 use crate::api_err;
 use crate::db::SNOWFLAKE;

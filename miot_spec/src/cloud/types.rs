@@ -1,4 +1,4 @@
-use serde::{Deserialize};
+use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
 struct Data {
@@ -16,10 +16,14 @@ struct Data {
     parent_model: Option<String>,
     show_mode: Option<i32>,
     model: Option<String>,
-    adminFlag: Option<i32>,
-    shareFlag: Option<i32>,
-    permitLevel: Option<i32>,
-    isOnline: Option<bool>,
+    #[serde(rename = "camelCase")]
+    admin_flag: Option<i32>,
+    #[serde(rename = "camelCase")]
+    share_flag: Option<i32>,
+    #[serde(rename = "camelCase")]
+    permit_level: Option<i32>,
+    #[serde(rename = "camelCase")]
+    is_online: Option<bool>,
     desc: Option<String>,
     extra: Option<Extra>,
     uid: Option<u64>,

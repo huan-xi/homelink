@@ -1,32 +1,42 @@
 use std::sync::Arc;
 use std::time::Duration;
 use futures_util::future::BoxFuture;
-use impl_new::New;
+
 use crate::device::miot_spec_device::{BaseMiotSpecDevice, DeviceInfo, MiotSpecDevice};
 use crate::proto::miio_proto::MiotSpecProtocolPointer;
 use crate::proto::protocol::ExitError;
 use crate::proto::transport::cloud_miio_proto::CloudMiioProto;
 
 /// 通过云端接入的设备
-pub struct MiCloudDevice {
+pub struct MiCloudDevice<T: MiCloudExt> {
     pub base: BaseMiotSpecDevice,
     pub info: DeviceInfo,
     ///协议
-    proto: Arc<CloudMiioProto>,
+    ext: T,
 }
 
-impl MiCloudDevice {
-    pub fn new(info: DeviceInfo, proto: Arc<CloudMiioProto>) -> Self {
+//定义一个获取写一个的闭包
+pub type MiCloudProtoGetFunc = Box<dyn Fn() -> BoxFuture<'static, Result<MiotSpecProtocolPointer, ExitError>> + Send + Sync + 'static>;
+
+
+#[async_trait::async_trait]
+pub trait MiCloudExt {
+    async fn get_proto(&self) -> Result<MiotSpecProtocolPointer, ExitError>;
+    async fn register_property(&self, siid: i32, piid: i32);
+}
+
+impl<T: MiCloudExt> MiCloudDevice<T> {
+    pub fn new(info: DeviceInfo, ext: T) -> Self {
         Self {
             base: Default::default(),
             info,
-            proto,
+            ext,
         }
     }
 }
 
 #[async_trait::async_trait]
-impl MiotSpecDevice for MiCloudDevice {
+impl<T: MiCloudExt + Send + Sync> MiotSpecDevice for MiCloudDevice<T> {
     fn get_info(&self) -> &DeviceInfo {
         &self.info
     }
@@ -36,7 +46,7 @@ impl MiotSpecDevice for MiCloudDevice {
     }
 
     async fn get_proto(&self) -> Result<MiotSpecProtocolPointer, ExitError> {
-        Ok(self.proto.clone())
+        self.ext.get_proto().await
     }
     async fn run(&self) -> Result<(), ExitError> {
         // let proto = self.proto.clone();
@@ -49,8 +59,6 @@ impl MiotSpecDevice for MiCloudDevice {
         Ok(())
     }
     async fn register_property(&self, siid: i32, piid: i32) {
-        //todo 注册到设备组上
-
-        todo!()
+        self.ext.register_property(siid, piid).await
     }
 }

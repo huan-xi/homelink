@@ -1,10 +1,10 @@
 use std::time::Duration;
-use futures_util::future::BoxFuture;
-use futures_util::{FutureExt, StreamExt};
+
 use crate::device::miot_spec_device::{BaseMiotSpecDevice, DeviceInfo, MiotSpecDevice};
 use crate::device::MiotDevicePointer;
 use crate::proto::miio_proto::MiotSpecProtocolPointer;
 use crate::proto::protocol::ExitError;
+
 // mesh 设备
 pub struct MeshDevice {
     info: DeviceInfo,
