@@ -95,6 +95,9 @@ async fn set_read_update_method(ctx: InitServiceContext, cts: &mut IotCharacteri
     let cid = cts.get_id();
     let unit_conv = UnitConv(ch.unit_convertor.clone(), ch.convertor_param.clone());
     match ch.mapping_method {
+        MappingMethod::AccessoryModel | MappingMethod::JsScript => {
+            //模型接管什么都不需要做
+        }
         MappingMethod::None => {
             let cts_c = cts.get_type();
             //不映射属性
@@ -132,84 +135,6 @@ async fn set_read_update_method(ctx: InitServiceContext, cts: &mut IotCharacteri
             } else {
                 return Err(anyhow!("映射参数不能为空"));
             }
-        }
-        #[cfg(not(feature = "deno"))]
-        MappingMethod::JsScript => {}
-        #[cfg(feature = "deno")]
-        MappingMethod::JsScript => {
-
-            // 获取 channel
-            let stag = ctx.stag.clone().ok_or(anyhow!("service 特征标识不能为空"))?;
-            let char_tag = ch.tag.clone().ok_or(anyhow!("char 特征标识不能为空"))?;
-            let sender = get_app_context().js_engine.clone();
-            let sender_c = sender.clone();
-            let char_tag_c = char_tag.clone();
-            let stag_c = stag.clone();
-            let read = move || {
-                let char_tag = char_tag_c.clone();
-                let stag = stag_c.clone();
-                let sender = sender_c.clone();
-                async move {
-                    let ch_id = get_app_context()
-                        .hap_manager
-                        .get_accessory_ch_id(ctx.aid).await?;
-
-                    let resp = sender.send(ToModuleEvent::OnCharRead(OnCharReadParam {
-                        ch_id,
-                        service_tag: stag,
-                        char_tag,
-                    })).await?;
-                    if let FromModuleResp::CharReadResp(value) = resp {
-                        return Ok(value.value.map(|f| CharacteristicValue::new(f)));
-                    }
-                    Err(anyhow!("未知错误"))?
-                }.boxed()
-            };
-            cts.on_read_async(Some(read));
-            let sender_c = sender.clone();
-            let char_tag_c = char_tag.clone();
-            let update = move |old_val: CharacteristicValue, new_val: CharacteristicValue| {
-                let sender = sender_c.clone();
-                let char_tag = char_tag_c.clone();
-                let stag = stag.clone();
-                async move {
-                    if old_val == new_val {
-                        return Ok(());
-                    };
-                    let ch_id = get_app_context()
-                        .hap_manager
-                        .get_accessory_ch_id(ctx.aid)
-                        .await?;
-                    // 像js 发送更新事件
-                    let _ = sender.send(ToModuleEvent::OnCharUpdate(OnCharUpdateParam {
-                        ch_id,
-                        service_tag: stag,
-                        old_value: old_val.value,
-                        char_tag,
-                        new_value: new_val.value,
-                    })).await?;
-
-                    Ok(())
-                }.boxed()
-            };
-            cts.on_update_async(Some(update));
-            //注册事件,dev 将事件 发送到js,js调用ch 的 事件处理方法,可以复用消息
-            let did = ctx.device.get_info().did.clone();
-            get_app_context().device_manager.enable_to_js(did.as_str()).await?;
-
-            // crate::js_engine::channel::main_channel::ToModuleEvent
-            let ch_id = get_app_context()
-                .hap_manager
-                .get_accessory_ch_id(ctx.aid).await?;
-
-            let _ = get_app_context()
-                .js_engine
-                .send(
-                    ToModuleEvent::BindDeviceModule(BindDeviceModuleParam {
-                        ch_id,
-                        dev_id: did,
-                    })).await
-                .map_err(|f| anyhow!("绑定事件通道失败"))?;
         }
     }
 
@@ -281,8 +206,8 @@ impl ToChUtils {
                             tokio::spawn(async move {
                                 match accessory.lock()
                                     .await
-                                    .get_id_mut_service(ctx.sid)
-                                    .and_then(|s| s.get_id_mut_characteristic(cid)) {
+                                    .get_mut_service_by_id(ctx.sid)
+                                    .and_then(|s| s.get_mut_characteristic_by_id(cid)) {
                                     None => {
                                         warn!("特征:{}不存在",cid)
                                     }
@@ -379,7 +304,7 @@ impl ToChUtils {
                         let sid = ctx.sid;
                         let value = new.value.clone();
                         tokio::spawn(async move {
-                            if let Some(svc) = accessory.lock().await.get_id_mut_service(sid) {
+                            if let Some(svc) = accessory.lock().await.get_mut_service_by_id(sid) {
                                 if let Some(curr) = svc.get_mut_characteristic(curr) {
                                     if let Err(e) = curr.set_value(value).await {
                                         warn!("设置curr特征失败:{:?}", e);

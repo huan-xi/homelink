@@ -29,6 +29,8 @@ pub enum MappingMethod {
     PropMapping = 1,
     /// 固定值
     FixValue = 2,
+    /// 模型接管
+    AccessoryModel = 4,
     /// js context sys.dev.get_ps
     /// 当前设备读取属性
     /// 读取数值-> dev.get_ps()

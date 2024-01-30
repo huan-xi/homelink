@@ -47,6 +47,7 @@ pub fn api() -> Router<AppState> {
                   .route("/list", get(controller::hap_bridge::list))
                   .route("/disable/:id", put(controller::hap_bridge::disable))
                   .route("/restart/:id", put(controller::hap_bridge::restart))
+                  .route("/:id", delete(controller::hap_bridge::delete))
                   .route("/", post(controller::hap_bridge::add))
               ,
         )

@@ -107,8 +107,15 @@ impl HapService for IotHapService {
         None
     }
 
+    fn get_mut_characteristic_by_id(&mut self, id: u64) -> Option<&mut dyn HapCharacteristic> {
+        self.characteristic_map.get_mut(&id).map(|i| i.as_mut() as &mut dyn HapCharacteristic)
+    }
     fn get_characteristics(&self) -> Vec<&dyn HapCharacteristic> {
         self.characteristic_map.iter().map(|i| i.1.as_ref()).collect()
+    }
+
+    fn get_mut_characteristics(&mut self) -> Vec<&mut dyn HapCharacteristic> {
+        self.characteristic_map.iter_mut().map(|mut i| i.1.as_mut() as &mut dyn HapCharacteristic).collect()
     }
     fn get_mut_characteristics_by_tag(&mut self, tag: &str) -> Vec<&mut dyn HapCharacteristic> {
         let ids = self.tag_id_map.get(tag);
@@ -118,13 +125,6 @@ impl HapService for IotHapService {
                 .map(|i| i.as_mut() as &mut dyn HapCharacteristic).collect();
         }
         vec![]
-    }
-
-    fn get_mut_characteristics(&mut self) -> Vec<&mut dyn HapCharacteristic> {
-        self.characteristic_map.iter_mut().map(|mut i| i.1.as_mut() as &mut dyn HapCharacteristic).collect()
-    }
-    fn get_id_mut_characteristic(&mut self, id: u64) -> Option<&mut dyn HapCharacteristic> {
-        self.characteristic_map.get_mut(&id).map(|i| i.as_mut() as &mut dyn HapCharacteristic)
     }
 }
 

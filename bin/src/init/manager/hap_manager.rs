@@ -75,8 +75,8 @@ impl HapManageInner {
         tokio::spawn(async move {
             match accessory.lock()
                 .await
-                .get_id_mut_service(sid)
-                .and_then(|s| s.get_id_mut_characteristic(cid)) {
+                .get_mut_service_by_id(sid)
+                .and_then(|s| s.get_mut_characteristic_by_id(cid)) {
                 None => {
                     warn!("特征:{}不存在",cid);
                 }

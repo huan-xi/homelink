@@ -24,7 +24,9 @@ pub struct Model {
     /// 运行js脚本,接管特征的读写事件
     pub script: Option<String>,
     /// 注册属性,用户轮询映射到js脚本
-    pub register_props: PropertyVec,
+    pub listening_props: PropertyVec,
+    ///配件模型
+    pub model: Option<String>,
     pub name: Option<String>,
     pub memo: Option<String>,
     pub info: Option<String>,
@@ -37,9 +39,10 @@ pub enum Column {
     BridgeId,
     Disabled,
     HapType,
-    RegisterProps,
+    ListeningProps,
     Name,
     Script,
+    Model,
     Memo,
     Info,
 }
@@ -71,9 +74,10 @@ impl ColumnTrait for Column {
             Self::Disabled => ColumnType::Boolean.def(),
             Self::HapType => ColumnType::Integer.def().null(),
             Self::Name => ColumnType::String(None).def().null(),
-            Self::RegisterProps => ColumnType::String(None).def().null(),
+            Self::ListeningProps => ColumnType::String(None).def().null(),
             Self::Script => ColumnType::String(None).def().null(),
             Self::Memo => ColumnType::String(None).def().null(),
+            Self::Model => ColumnType::String(None).def().null(),
             Self::Info => ColumnType::String(None).def().null(),
             Self::Aid => ColumnType::Integer.def().null(),
         }

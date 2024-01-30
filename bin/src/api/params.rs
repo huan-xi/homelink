@@ -90,7 +90,7 @@ pub struct AddHapAccessoryParam {
     script: Option<String>,
     disabled: Option<bool>,
     hap_type: Option<MappingHapType>,
-    register_props: PropertyVec,
+    listening_props: PropertyVec,
 }
 
 impl AddHapAccessoryParam {
@@ -105,7 +105,8 @@ impl AddHapAccessoryParam {
             hap_type: Set(self.hap_type),
             info: Default::default(),
             script: Set(self.script),
-            register_props: Set(self.register_props),
+            listening_props: Set(self.listening_props),
+            model: Default::default(),
         })
     }
 }
@@ -175,6 +176,11 @@ impl CharacteristicParam {
     }
 }
 
+
+#[derive(serde::Deserialize, Debug)]
+pub struct HapBridgeListParam {
+
+}
 
 #[derive(serde::Deserialize, Debug)]
 pub struct DisableParam {

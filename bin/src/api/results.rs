@@ -3,6 +3,7 @@ use serde::Serialize;
 use serde_json::Value;
 use hap_metadata::metadata::HapCharacteristic;
 use crate::db::entity::prelude::{HapAccessoryModel, HapBridgeEntity, HapBridgeModel, IotDeviceModel};
+use crate::hap::models::AccessoryModel;
 
 #[derive(Debug, serde::Serialize)]
 pub struct UserInfoResult {
@@ -15,8 +16,11 @@ pub struct HapBridgeResult {
     #[serde(flatten)]
     pub(crate) model: HapBridgeModel,
     pub setup_uri: String,
-    pub peers:Vec<SocketAddr>,
+    pub peers: Vec<SocketAddr>,
     pub running: bool,
+
+    pub accessory_count: u64,
+    pub is_paired: bool,
 }
 
 #[derive(Debug, serde::Serialize)]

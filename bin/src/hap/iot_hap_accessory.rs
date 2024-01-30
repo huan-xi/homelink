@@ -7,6 +7,7 @@ use serde::{Serialize, Serializer};
 use serde::ser::SerializeStruct;
 use tokio::sync::Mutex;
 use miot_spec::device::miot_spec_device::MiotSpecDevice;
+use crate::hap::models::{AccessoryModel, AccessoryModelExt, AccessoryModelExtPointer};
 
 /// 一个设备可能存在多个配件
 /// 一个配件多个服务，一个服务多个特征值
@@ -49,10 +50,11 @@ pub struct IotHapAccessory {
     /// Switch service.
     pub services: HashMap<u64, Box<dyn HapService>>,
     pub tag_ids_map: HashMap<String, Vec<u64>>,
+    pub model_ext: Option<AccessoryModel>,
 }
 
 impl IotHapAccessory {
-    pub fn new(id: u64, scv_list: Vec<Box<dyn HapService>>) -> Self {
+    pub fn new(id: u64, scv_list: Vec<Box<dyn HapService>>, model_ext: Option<AccessoryModel>) -> Self {
         let mut services = HashMap::new();
         scv_list.into_iter().for_each(|i| {
             services.insert(i.get_id(), i);
@@ -62,8 +64,13 @@ impl IotHapAccessory {
             id,
             services,
             tag_ids_map: Default::default(),
+            model_ext,
         }
     }
+    pub fn on_read() {
+
+    }
+
 }
 
 impl HapAccessory for IotHapAccessory {
@@ -78,9 +85,17 @@ impl HapAccessory for IotHapAccessory {
     fn get_service(&self, hap_type: HapType) -> Option<&dyn HapService> {
         todo!()
     }
-    fn get_id_mut_service(&mut self, id: u64) -> Option<&mut dyn HapService> {
-        self.services.get_mut(&id).map(|i| i.as_mut() as &mut dyn HapService)
+    fn get_mut_service(&mut self, hap_type: HapType) -> Option<&mut dyn HapService> {
+        todo!()
     }
+    fn get_services(&self) -> Vec<&dyn HapService> {
+        self.services.iter().map(|i| i.1.as_ref()).collect()
+    }
+
+    fn get_mut_services<'a>(&'a mut self) -> Vec<&'a mut dyn HapService> {
+        self.services.values_mut().map(|i| i.as_mut() as (&mut dyn HapService )).collect()
+    }
+
     fn push_service(&mut self, tag: Option<String>, service: Box<dyn HapService>) {
         if let Some(tag) = tag {
             self.tag_ids_map.entry(tag)
@@ -90,17 +105,6 @@ impl HapAccessory for IotHapAccessory {
         self.services.insert(service.get_id(), service);
     }
 
-    fn get_mut_service(&mut self, hap_type: HapType) -> Option<&mut dyn HapService> {
-        todo!()
-    }
-
-    fn get_services(&self) -> Vec<&dyn HapService> {
-        self.services.iter().map(|i| i.1.as_ref()).collect()
-    }
-
-    fn get_mut_services<'a>(&'a mut self) -> Vec<&'a mut dyn HapService> {
-        self.services.values_mut().map(|i| i.as_mut() as (&mut dyn HapService )).collect()
-    }
     fn get_mut_services_by_tag(&mut self, tag: &str) -> Vec<&mut dyn HapService> {
         let ids = self.tag_ids_map.get(tag);
         if let Some(ids) = ids {
@@ -110,6 +114,9 @@ impl HapAccessory for IotHapAccessory {
                 .map(|i| i.as_mut() as (&mut dyn HapService )).collect();
         }
         vec![]
+    }
+    fn get_mut_service_by_id(&mut self, id: u64) -> Option<&mut dyn HapService> {
+        self.services.get_mut(&id).map(|i| i.as_mut() as &mut dyn HapService)
     }
 }
 

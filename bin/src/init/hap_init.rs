@@ -3,7 +3,6 @@ use std::sync::Arc;
 
 use anyhow::anyhow;
 use axum::body::HttpBody;
-use futures_util::future::{BoxFuture, join_all};
 use futures_util::FutureExt;
 use log::{error, info};
 use rand::Rng;
@@ -26,6 +25,7 @@ use crate::db::SNOWFLAKE;
 use crate::hap::iot_characteristic::IotCharacteristic;
 use crate::hap::iot_hap_accessory::IotHapAccessory;
 use crate::hap::iot_hap_service::IotHapService;
+use crate::hap::models::{ AccessoryModel, AccessoryModelContext};
 use crate::hap::rand_utils::{compute_setup_hash, pin_code_from_str};
 use crate::init::{DevicePointer, FuturesMutex, HapAccessoryPointer};
 use crate::init::manager::device_manager::IotDeviceManager;
@@ -166,6 +166,7 @@ async fn init_hap_accessories<C: ConnectionTrait>(conn: &C,
 
 /// 初始化配件的设备
 /// 需要建立配件与设备的关系,处理设备情况
+/// 像设备注册监听属性,销毁配件时候需要移除监听
 async fn init_hap_accessory<'a, C: ConnectionTrait>(conn: &C,
                                                     hap_manage: HapManage,
                                                     device: DevicePointer, hap_accessory: HapAccessoryModel) -> anyhow::Result<HapAccessoryPointer> {
@@ -215,7 +216,16 @@ async fn init_hap_accessory<'a, C: ConnectionTrait>(conn: &C,
     if services.is_empty() {
         return Err(anyhow!("配件:{},无服务",name_c));
     };
-    let accessory = Arc::new(tokio::sync::Mutex::new(Box::new(IotHapAccessory::new(aid, hss)) as Box<dyn HapAccessory>));
+
+
+    let model = if let Some(model) = hap_accessory.model {
+        let ctx = AccessoryModelContext {};
+        Some(AccessoryModel::new(ctx, model.as_str())?)
+    } else {
+        None
+    };
+
+    let accessory = Arc::new(Mutex::new(Box::new(IotHapAccessory::new(aid, hss, model)) as Box<dyn HapAccessory>));
     let ch_id = SNOWFLAKE.next_id();
     // 注册到manage 上
     hap_manage.put_accessory_ch(aid, ch_id, false).await;
@@ -245,6 +255,7 @@ async fn init_hap_accessory<'a, C: ConnectionTrait>(conn: &C,
             init_hap_accessory_module(hap_manage, ch_id, aid, script.as_str()).await?;
         };
     };
+
 
     Ok(accessory.clone())
 }

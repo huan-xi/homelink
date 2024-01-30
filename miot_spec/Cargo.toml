@@ -20,7 +20,7 @@ futures-util = "0.3.30"
 futures = "0.3.30"
 reqwest = { version = "0.11.20", features = ["cookies", "json"] }
 rand = "0.8.5"
-paho-mqtt = "0.12.3"
+paho-mqtt = { version = "0.12.3", default-features = false, features = ["vendored-ssl"] }
 mini-telnet = "0.1.8"
 
 base64.workspace = true
