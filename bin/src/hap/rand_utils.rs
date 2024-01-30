@@ -1,12 +1,11 @@
 use std::iter::repeat;
-use base64::alphabet::STANDARD;
+
 use base64::Engine;
 use base64::prelude::BASE64_STANDARD;
 use crypto::digest::Digest;
-use crypto::sha2;
 use crypto::sha2::Sha512;
 use rand::Rng;
-use hap::accessory::AccessoryCategory;
+
 use hap::Pin;
 
 const BASE36: [char; 36] = [

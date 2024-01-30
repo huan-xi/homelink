@@ -7,8 +7,10 @@ use impl_new::New;
 use log::{error, info, warn};
 use serde_json::Value;
 use tap::TapFallible;
-use hap::{Config, pointer};
+use hap::{Config, HapType, pointer};
+use hap::characteristic::HapCharacteristic;
 use hap::server::{IpServer, Server};
+use hap::service::HapService;
 use crate::init::hap_init::AccessoryRelation;
 use crate::init::HapAccessoryPointer;
 
@@ -53,7 +55,7 @@ pub struct AccessoryInfo {
 pub struct HapManageInner {
     server_map: dashmap::DashMap<i64, HapTask>,
     // 配件id关系
-    aid_map: dashmap::DashMap<u64, AccessoryInfo>,
+    accessory_map: dashmap::DashMap<u64, AccessoryInfo>,
     /// 每个配件同时只能运行一个
     aid_ch_map: dashmap::DashMap<u64, ChannelInfo>,
     /// 配件与设备的关系
@@ -90,8 +92,42 @@ impl HapManageInner {
         });
     }
 
+    ///根据id更新, todo 可重入修复
+    pub(crate) async fn update_char_value_by_id(&self, aid: u64, sid: u64, ctag: HapType, value: Value) -> anyhow::Result<()> {
+        let accessory = self.accessory_map.get(&aid)
+            .ok_or(anyhow!("设备:{}不存在",aid))?
+            .accessory.clone();
+        tokio::spawn(async move {
+            match accessory.lock()
+                .await
+                .get_mut_service_by_id(sid) {
+                None => {
+                    warn!("服务:{}不存在",sid);
+                }
+                Some(s) => {
+                    match s.get_mut_characteristic(ctag) {
+                        None => {
+                            warn!("特征:{:?}不存在",ctag);
+                        }
+                        Some(c) => {
+                            match c.set_value(value).await {
+                                Ok(_) => {
+                                    info!("设置特征值成功");
+                                }
+                                Err(e) => {
+                                    warn!("设置特征值失败:{:?}",e);
+                                }
+                            };
+                        }
+                    }
+                }
+            }
+        });
+        Ok(())
+    }
+
     pub(crate) async fn update_char_value(&self, aid: u64, service_tag: String, char_tag: String, value: Value) -> anyhow::Result<()> {
-        let accessory = self.aid_map.get(&aid)
+        let accessory = self.accessory_map.get(&aid)
             .ok_or(anyhow!("设备:{}不存在",aid))
             .tap_err(|e| error!("{}",e))?;
 
@@ -152,7 +188,7 @@ impl HapManageInner {
                 accessory: rel.accessory,
             };
             self.dev_aid_map.insert(rel.device_id, rel.aid);
-            self.aid_map.insert(rel.aid, info);
+            self.accessory_map.insert(rel.aid, info);
         }
         tokio::spawn(async move {
             let task = async move {

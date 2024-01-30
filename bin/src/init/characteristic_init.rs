@@ -18,7 +18,7 @@ use crate::db::entity::common::Property;
 use crate::db::entity::hap_characteristic::{MappingMethod, MappingParam};
 use crate::db::entity::prelude::HapCharacteristicModel;
 use crate::hap::hap_type::MappingHapType;
-use crate::hap::iot_characteristic::{CharacteristicValue, IotCharacteristic};
+use crate::hap::iot::iot_characteristic::{CharacteristicValue, IotCharacteristic};
 use crate::hap::unit_convertor::UnitConv;
 use crate::init::DevicePointer;
 use crate::init::hap_init::InitServiceContext;

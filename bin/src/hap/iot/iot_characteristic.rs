@@ -10,7 +10,7 @@ use hap::characteristic::power_state::PowerStateCharacteristic;
 use hap::characteristic::saturation::SaturationCharacteristic;
 use hap::service::lightbulb::LightbulbService;
 use serde::{Deserialize, Serialize, Serializer};
-use serde_json::json;
+use serde_json::{json, Value};
 use hap::characteristic::active::ActiveCharacteristic;
 use hap::characteristic::cooling_threshold_temperature::CoolingThresholdTemperatureCharacteristic;
 use hap::characteristic::current_fan_state::CurrentFanStateCharacteristic;
@@ -190,6 +190,10 @@ impl HapCharacteristic for IotCharacteristic {
     }
 
     async fn get_value(&mut self) -> hap::Result<serde_json::Value> { HapCharacteristic::get_value(&mut self.0).await }
+
+    fn get_raw_value(&self) -> Value {
+        HapCharacteristic::get_raw_value(&self.0)
+    }
 
     async fn set_value(&mut self, value: serde_json::Value) -> hap::Result<()> {
         HapCharacteristic::set_value(&mut self.0, value).await

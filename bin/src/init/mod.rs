@@ -6,10 +6,11 @@ use crate::init::manager::device_manager::DeviceWithJsEngine;
 
 pub mod hap_init;
 pub mod device_init;
-mod mapping_characteristic;
+mod characteristic_init;
 /// 米家转换模板
 pub mod template;
 pub mod manager;
+mod accessory_init;
 
 
 pub type FuturesMutex<T> = futures_util::lock::Mutex<T>;

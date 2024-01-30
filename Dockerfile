@@ -22,9 +22,9 @@ FROM alpine AS runtime
 #USER myuser
 WORKDIR /app
 
-COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/bin /app/home-gateway
+COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/bin /app/homelink
 COPY --from=planner /app/log4rs.yaml /app/log4rs.yaml
-COPY --from=planner /app/docker_config.toml /app/config/config.toml
+COPY --from=planner /app/docker_config.toml /app/config.toml
 COPY --from=planner /app/dist /app/dist
 
-CMD ["/app/home-gateway"]
+CMD ["/app/homelink"]
