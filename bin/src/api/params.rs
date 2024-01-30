@@ -6,11 +6,13 @@ use crate::hap::hap_type::MappingHapType;
 use serde_aux::prelude::deserialize_number_from_string;
 use crate::db::entity::hap_characteristic::{BleToSensorParam, DbBleValueType, MappingMethod, MappingParam, MiotSpecParam};
 use serde_aux::prelude::deserialize_option_number_from_string;
+use hap::characteristic::Format;
 use hap::HapType;
 use crate::db::entity::common::{Property, PropertyVec};
 use crate::db::entity::hap_bridge::BridgeCategory;
 use crate::db::entity::iot_device::IotDeviceType;
 use crate::db::entity::prelude::{HapAccessoryActiveModel, HapCharacteristicActiveModel};
+use crate::hap::iot::iot_characteristic::CharacteristicValue;
 use crate::hap::unit_convertor::{ConvertorParamType, UnitConvertor};
 
 #[derive(serde::Deserialize, Debug)]
@@ -148,6 +150,8 @@ impl CharacteristicParam {
             }
             _ => None,
         };
+        let format: Format = serde_json::from_str(format!("\"{}\"", self.format.as_str()).as_str())
+            .map_err(|e| anyhow!("格式转换错误:{:?}", e))?;
         let model = HapCharacteristicActiveModel {
             cid: Default::default(),
             characteristic_type: Set(self.characteristic_type),
@@ -156,8 +160,8 @@ impl CharacteristicParam {
             name: Set(self.name),
             format: Set(self.format),
             unit: Set(self.unit),
-            min_value: Set(self.min_value),
-            max_value: Set(self.max_value),
+            min_value: Set(self.min_value.map(|v| CharacteristicValue::format(format, v).value)),
+            max_value: Set(self.max_value.map(|v| CharacteristicValue::format(format, v).value)),
             tag: Default::default(),
             max_len: Set(self.max_len),
             unit_convertor: Set(self.unit_convertor),
@@ -178,9 +182,7 @@ impl CharacteristicParam {
 
 
 #[derive(serde::Deserialize, Debug)]
-pub struct HapBridgeListParam {
-
-}
+pub struct HapBridgeListParam {}
 
 #[derive(serde::Deserialize, Debug)]
 pub struct DisableParam {

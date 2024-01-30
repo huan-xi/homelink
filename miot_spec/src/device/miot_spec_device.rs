@@ -1,6 +1,7 @@
 use std::cmp::min;
 use std::collections::HashSet;
 use std::sync::Arc;
+use anyhow::anyhow;
 use futures_util::future::BoxFuture;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, Mutex, RwLock};
@@ -24,6 +25,7 @@ pub struct DeviceInfo {
     pub localip: Option<String>,
     pub extra: Option<Extra>,
 }
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, )]
 pub struct Extra {
     pub fw_version: Option<String>,
@@ -119,13 +121,13 @@ pub trait MiotSpecDevice {
 
     async fn get_proto(&self) -> Result<MiotSpecProtocolPointer, ExitError>;
 
-    /// 设置设备属性
-    async fn set_property(&self, siid: i32, piid: i32, value: Value) -> anyhow::Result<()> {
+    /// 设置设备属性 siid: i32, piid: i32
+    async fn set_property(&self, spec_id: MiotSpecId, value: Value) -> anyhow::Result<()> {
         let did = self.get_info().did.clone();
         let proto = self.get_proto()
             .await
             .map_err(Into::<anyhow::Error>::into)?;
-        proto.set_property(MiotSpecDTO { did, siid, piid, value: Some(value) }).await?;
+        proto.set_property(MiotSpecDTO { did, siid: spec_id.siid, piid: spec_id.piid, value: Some(value) }).await?;
         Ok(())
     }
     /// 读取设备属性
@@ -142,10 +144,14 @@ pub trait MiotSpecDevice {
     async fn read_properties(&self, props: Vec<MiotSpecId>) -> anyhow::Result<Vec<MiotSpecDTO>> {
         let did = self.get_info().did.clone();
         let props: Vec<MiotSpecDTO> = props.into_iter().map(|id| MiotSpecDTO { did: did.clone(), siid: id.siid, piid: id.piid, value: None }).collect();
+        let len = props.len();
         let proto = self.get_proto()
             .await
             .map_err(Into::<anyhow::Error>::into)?;
         let value = proto.get_properties(props, None).await?;
+        if value.len() != len {
+            return Err(anyhow!("读取属性失败,返回值数量不匹配"));
+        }
         self.get_base().retry_info.reset().await;
         Ok(value)
     }

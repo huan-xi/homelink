@@ -115,7 +115,7 @@ pub async fn list(state: State<AppState>, Query(param): Query<HapBridgeListParam
             i.setup_id.clone());
         let running = config.is_some();
         let is_paired = if let Some(config) = config {
-            config.lock().await.status_flag == BonjourStatusFlag::NotPaired
+            config.lock().await.status_flag != BonjourStatusFlag::NotPaired
         } else { false };
         let accessory_count = HapAccessoryEntity::find()
             .filter(HapAccessoryColumn::BridgeId.eq(i.bridge_id))

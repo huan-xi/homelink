@@ -48,9 +48,7 @@ impl MiotSpecDevice for BleDevice {
     async fn get_proto(&self) -> Result<MiotSpecProtocolPointer, ExitError> {
         return Err(ExitError::BltConnectErr);
     }
-    async fn set_property(&self, siid: i32, piid: i32, value: Value) -> anyhow::Result<()> {
-        Ok(())
-    }
+
 
     // read_property
     async fn read_property(&self, siid: i32, piid: i32) -> anyhow::Result<Option<Value>> {

@@ -212,7 +212,7 @@ pub(crate) async fn add_service(ctx: InitServiceContext, service_chs: (HapServic
     };
 
     if success {
-        ctx.accessory.lock().await.push_service(service.tag, Box::new(hap_service));
+        ctx.accessory.write().await.push_service(service.tag, Box::new(hap_service));
     } else {
         error!("服务:{:?}没有可用的特征", service);
     }

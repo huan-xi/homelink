@@ -21,7 +21,7 @@ use crypto::digest::Digest;
 use crypto::sha1::Sha1;
 use crypto::sha2::Sha256;
 use hex::ToHex;
-use log::{error, info};
+use log::{debug, error, info};
 use rand::distributions::Alphanumeric;
 use rand::Rng;
 use reqwest::{header, StatusCode, Url};
@@ -426,7 +426,7 @@ impl MiCloud {
         }
 
         //url编码
-        info!("params:{:?}", params);
+        debug!("params:{:?}", params);
 
         let resp = self.client
             .post(api_url)

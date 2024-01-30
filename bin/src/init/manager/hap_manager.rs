@@ -75,7 +75,7 @@ impl HapManageInner {
 
     pub(crate) fn update_char_value_by_accessory(&self, accessory: HapAccessoryPointer, sid: u64, cid: u64, value: Value) {
         tokio::spawn(async move {
-            match accessory.lock()
+            match accessory.write()
                 .await
                 .get_mut_service_by_id(sid)
                 .and_then(|s| s.get_mut_characteristic_by_id(cid)) {
@@ -98,7 +98,7 @@ impl HapManageInner {
             .ok_or(anyhow!("设备:{}不存在",aid))?
             .accessory.clone();
         tokio::spawn(async move {
-            match accessory.lock()
+            match accessory.write()
                 .await
                 .get_mut_service_by_id(sid) {
                 None => {
@@ -133,7 +133,7 @@ impl HapManageInner {
 
         // let services = &accessory.service_tag_map;
         // let mut char_ids = HashMap::new();
-        let mut lock = accessory.accessory.lock().await;
+        let mut lock = accessory.accessory.write().await;
 
         let services = lock.get_mut_services_by_tag(service_tag.as_str());
         for svc in services {

@@ -1,15 +1,11 @@
 use anyhow::anyhow;
-use log::info;
+use log::{debug, info};
 use sea_orm::JsonValue;
 use hap::characteristic::{CharReadParam, CharUpdateParam, ReadCharValue, UpdateCharValue};
 use hap::HapType;
 use miot_spec::proto::miio_proto::MiotSpecId;
 use crate::hap::models::{AccessoryModelExt, ContextPointer, ReadValueResult, UpdateValueResult};
 
-///"arming-mode": {
-//         siid: 3,
-//         piid: 1
-//     }
 pub struct ModelExt {
     arming_mode: MiotSpecId,
 }
@@ -28,7 +24,7 @@ impl AccessoryModelExt for ModelExt {
     // CharReadParam { sid: 13, stag: None, cid: 14, ctag: SecuritySystemCurrentState }]
     async fn read_chars_value(&self, ctx: ContextPointer, params: Vec<CharReadParam>) -> ReadValueResult {
         //读取设备属性值
-        info!("read values:{:?}", params);
+        debug!("read values:{:?}", params);
         let value = ctx.dev.read_property(self.arming_mode.siid, self.arming_mode.piid).await?;
         let value = value
             .and_then(|v| v.as_i64())
@@ -52,7 +48,7 @@ impl AccessoryModelExt for ModelExt {
     }
 
     async fn update_chars_value(&self, ctx: ContextPointer, params: Vec<CharUpdateParam>) -> UpdateValueResult {
-        info!("update values:{:?}", params);
+        debug!("update values:{:?}", params);
         let mut results = vec![];
         for param in params.into_iter() {
             let value = param.new_value
@@ -64,7 +60,7 @@ impl AccessoryModelExt for ModelExt {
             } else {
                 value + 1
             };
-            ctx.dev.set_property(self.arming_mode.siid, self.arming_mode.piid, serde_json::json!(value)).await?;
+            ctx.dev.set_property(self.arming_mode, serde_json::json!(value)).await?;
             results.push(UpdateCharValue {
                 cid: param.cid,
                 success: true,

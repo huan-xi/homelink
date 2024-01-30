@@ -2,7 +2,7 @@ use std::sync::Arc;
 use anyhow::anyhow;
 use log::info;
 use sea_orm::*;
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, RwLock};
 use hap::accessory::{AccessoryInformation, HapAccessory};
 use hap::service::HapService;
 use crate::db::entity::prelude::{HapAccessoryModel, HapCharacteristicEntity, HapServiceColumn, HapServiceEntity};
@@ -79,7 +79,7 @@ pub(crate) async fn init_hap_accessory<'a, C: ConnectionTrait>(conn: &C, hap_man
         None
     };
 
-    let accessory = Arc::new(Mutex::new(Box::new(IotHapAccessory::new(aid, hss, model)) as Box<dyn HapAccessory>));
+    let accessory = Arc::new(RwLock::new(Box::new(IotHapAccessory::new(aid, hss, model)) as Box<dyn HapAccessory>));
     let ch_id = SNOWFLAKE.next_id();
     // 注册到manage 上
     hap_manage.put_accessory_ch(aid, ch_id, false).await;
@@ -114,9 +114,9 @@ pub(crate) async fn init_hap_accessory<'a, C: ConnectionTrait>(conn: &C, hap_man
     Ok(accessory.clone())
 }
 
-async fn check_ids(name_c: String, accessory: &Arc<Mutex<Box<dyn HapAccessory>>>) -> anyhow::Result<()> {
+async fn check_ids(name_c: String, accessory: &Arc<RwLock<Box<dyn HapAccessory>>>) -> anyhow::Result<()> {
     let mut ids = vec![];
-    for ch in accessory.lock().await.get_services() {
+    for ch in accessory.read().await.get_services() {
         for ch in ch.get_characteristics() {
             let id = ch.get_id();
             if ids.contains(&id) {

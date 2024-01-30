@@ -91,7 +91,7 @@ pub trait MiotSpecProtocol {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, New)]
+#[derive(Debug,Copy, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, New)]
 pub struct MiotSpecId {
     pub siid: i32,
     pub piid: i32,

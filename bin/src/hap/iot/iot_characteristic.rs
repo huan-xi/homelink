@@ -1,4 +1,5 @@
 use axum::async_trait;
+use log::error;
 use hap::characteristic::{AsyncCharacteristicCallbacks, Characteristic, CharacteristicCallbacks, Format, HapCharacteristic, HapCharacteristicSetup, OnReadFn, OnReadFuture, OnUpdateFn, OnUpdateFuture, Perm, Unit};
 use hap::{HapType, pointer};
 use hap::characteristic::brightness::BrightnessCharacteristic;
@@ -36,6 +37,49 @@ pub struct CharacteristicValue {
 impl CharacteristicValue {
     pub fn new(value: serde_json::Value) -> Self {
         Self { value }
+    }
+    /// string
+    pub fn format(format: Format, value: serde_json::Value) -> Self {
+        Self::format0(format, value).unwrap_or_else(|e| {
+            error!("format error:{:?}", e);
+            Self::new(json!(""))
+        })
+    }
+    pub fn format0(format: Format, value: serde_json::Value) -> anyhow::Result<Self> {
+        let value = if value.is_string() {
+            match format {
+                Format::Bool => {
+                    let v = value.as_str().unwrap().parse::<bool>()?;
+                    json!(v)
+                }
+                Format::Int32 => {
+                    let v = value.as_str().unwrap().parse::<i32>()?;
+                    json!(v)
+                }
+                Format::UInt8 => {
+                    let v = value.as_str().unwrap().parse::<u8>()?;
+                    json!(v)
+                }
+                Format::UInt16 => {
+                    let v = value.as_str().unwrap().parse::<u16>()?;
+                    json!(v)
+                }
+                Format::UInt32 => {
+                    let v = value.as_str().unwrap().parse::<u32>()?;
+                    json!(v)
+                }
+
+                Format::Float => {
+                    let v = value.as_str().unwrap().parse::<f32>()?;
+                    json!(v)
+                }
+                _ => { value }
+            }
+        } else { value };
+
+        Ok(Self {
+            value
+        })
     }
 }
 
@@ -101,43 +145,43 @@ impl IotCharacteristic {
             MappingHapType::TemperatureDisplayUnits => {
                 Some(Box::new(TemperatureDisplayUnitsCharacteristic::new(0, 0)))
             }
-            MappingHapType::TargetHeaterCoolerState=>{
+            MappingHapType::TargetHeaterCoolerState => {
                 Some(Box::new(TargetHeaterCoolerStateCharacteristic::new(0, 0)))
             }
-            MappingHapType::CurrentHeaterCoolerState=>{
+            MappingHapType::CurrentHeaterCoolerState => {
                 Some(Box::new(CurrentHeaterCoolerStateCharacteristic::new(0, 0)))
             }
-            MappingHapType::TargetTemperature=>{
+            MappingHapType::TargetTemperature => {
                 Some(Box::new(TargetTemperatureCharacteristic::new(0, 0)))
             }
-            MappingHapType::TargetHeatingCoolingState=>{
+            MappingHapType::TargetHeatingCoolingState => {
                 Some(Box::new(TargetHeatingCoolingStateCharacteristic::new(0, 0)))
             }
-            MappingHapType::CurrentHeatingCoolingState=>{
+            MappingHapType::CurrentHeatingCoolingState => {
                 Some(Box::new(CurrentHeatingCoolingStateCharacteristic::new(0, 0)))
             }
-            MappingHapType::CoolingThresholdTemperature=>{
+            MappingHapType::CoolingThresholdTemperature => {
                 Some(Box::new(CoolingThresholdTemperatureCharacteristic::new(0, 0)))
             }
-            MappingHapType::HeatingThresholdTemperature=>{
+            MappingHapType::HeatingThresholdTemperature => {
                 Some(Box::new(HeatingThresholdTemperatureCharacteristic::new(0, 0)))
             }
-            MappingHapType::RotationSpeed=>{
+            MappingHapType::RotationSpeed => {
                 Some(Box::new(RotationSpeedCharacteristic::new(0, 0)))
             }
-            MappingHapType::SwingMode=>{
+            MappingHapType::SwingMode => {
                 Some(Box::new(SwingModeCharacteristic::new(0, 0)))
             }
-            MappingHapType::LockPhysicalControls=>{
+            MappingHapType::LockPhysicalControls => {
                 Some(Box::new(LockPhysicalControlsCharacteristic::new(0, 0)))
             }
-            MappingHapType::TargetFanState=>{
+            MappingHapType::TargetFanState => {
                 Some(Box::new(TargetFanStateCharacteristic::new(0, 0)))
             }
-            MappingHapType::CurrentFanState=>{
+            MappingHapType::CurrentFanState => {
                 Some(Box::new(CurrentFanStateCharacteristic::new(0, 0)))
             }
-            MappingHapType::Active=>{
+            MappingHapType::Active => {
                 Some(Box::new(ActiveCharacteristic::new(0, 0)))
             }
             _ => None

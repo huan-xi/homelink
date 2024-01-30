@@ -107,6 +107,10 @@ impl HapService for IotHapService {
         None
     }
 
+    fn get_characteristic_by_id(&self, id: u64) -> Option<&dyn HapCharacteristic> {
+        self.characteristic_map.get(&id).map(|i| i.as_ref() as &dyn HapCharacteristic)
+    }
+
     fn get_mut_characteristic_by_id(&mut self, id: u64) -> Option<&mut dyn HapCharacteristic> {
         self.characteristic_map.get_mut(&id).map(|i| i.as_mut() as &mut dyn HapCharacteristic)
     }

@@ -8,6 +8,7 @@ use crate::api::state::AppState;
 use crate::db::entity::prelude::{IotDeviceEntity, IotDeviceActiveModel, IotDeviceColumn, IotDeviceModel, MiotDeviceEntity, MiotDeviceModel};
 use sea_orm::QueryFilter;
 use sea_orm::ColumnTrait;
+use miot_spec::proto::miio_proto::MiotSpecId;
 use crate::api::params::{AddServiceParam, DisableParam, QueryIotDeviceParam, TestPropParam};
 use crate::api::results::{IotDeviceResult, MiotDeviceResult};
 use crate::api_err;
@@ -71,7 +72,7 @@ pub async fn set_property(state: State<AppState>, Path(id): Path<i64>, Json(para
         .ok_or(api_err!("设备不存在"))?;
     let val = params.value
         .ok_or(api_err!("请设置value"))?;
-    dev.set_property(params.siid, params.piid, val)
+    dev.set_property(MiotSpecId::new(params.siid, params.piid), val)
         .await?;
 
     ok_data(())

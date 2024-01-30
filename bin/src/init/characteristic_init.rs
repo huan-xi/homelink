@@ -12,6 +12,7 @@ use hap::characteristic::{AsyncCharacteristicCallbacks, Characteristic, Characte
 use hap::HapType;
 use miot_spec::device::common::emitter::{DataListener, EventType};
 use miot_spec::device::common::emitter::EventType::UpdateProperty;
+use miot_spec::proto::miio_proto::MiotSpecId;
 
 use crate::config::context::get_app_context;
 use crate::db::entity::common::Property;
@@ -61,8 +62,8 @@ pub async fn to_characteristic(ctx: InitServiceContext,
         // hap_type: HapType::PowerState,
         format,
         unit,
-        max_value: ch.max_value.clone().map(|i| CharacteristicValue::new(i)),
-        min_value: ch.min_value.clone().map(|i| CharacteristicValue::new(i)),
+        max_value: ch.max_value.clone().map(|i| CharacteristicValue::format(format,i)),
+        min_value: ch.min_value.clone().map(|i| CharacteristicValue::format(format,i)),
         perms: vec![
             Perm::Events,
             Perm::PairedRead,
@@ -204,7 +205,7 @@ impl ToChUtils {
                             // info!("listen property:{},{},{:?}", res.siid, res.piid, value);
                             // 蓝牙数据设置到特征上
                             tokio::spawn(async move {
-                                match accessory.lock()
+                                match accessory.write()
                                     .await
                                     .get_mut_service_by_id(ctx.sid)
                                     .and_then(|s| s.get_mut_characteristic_by_id(cid)) {
@@ -291,7 +292,7 @@ impl ToChUtils {
                     return Ok(());
                 };
 
-                let res = dev.set_property(property_id.siid, property_id.piid, value.clone())
+                let res = dev.set_property(MiotSpecId::new(property_id.siid, property_id.piid,), value.clone())
                     .await
                     .tap_err(|e| {
                         error!("设置属性失败:{}", e);
@@ -304,7 +305,7 @@ impl ToChUtils {
                         let sid = ctx.sid;
                         let value = new.value.clone();
                         tokio::spawn(async move {
-                            if let Some(svc) = accessory.lock().await.get_mut_service_by_id(sid) {
+                            if let Some(svc) = accessory.write().await.get_mut_service_by_id(sid) {
                                 if let Some(curr) = svc.get_mut_characteristic(curr) {
                                     if let Err(e) = curr.set_value(value).await {
                                         warn!("设置curr特征失败:{:?}", e);
