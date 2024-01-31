@@ -2,7 +2,6 @@ use futures_util::future::ok;
 use log::info;
 use sea_orm::JsonValue;
 use hap::characteristic::{CharReadParam, CharUpdateParam, ReadCharValue};
-use hap::characteristic::target_heating_cooling_state::TargetHeatingCoolingStateCharacteristic;
 use hap::HapType;
 use miot_spec::proto::miio_proto::{MiotSpecDTO, MiotSpecId};
 use crate::hap::models::{AccessoryModelExt, ContextPointer, ReadValueResult, UpdateValueResult};

@@ -57,6 +57,7 @@ pub fn api() -> Router<AppState> {
                   .route("/", post(controller::hap_accessory::add))
                   .route("/:id", get(controller::hap_accessory::detail))
                   .route("/disable/:id", put(controller::hap_accessory::disable))
+                  .route("/:id", delete(controller::hap_accessory::disable))
                   .route("/:id", put(controller::hap_accessory::update))
               ,
         )

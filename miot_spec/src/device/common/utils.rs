@@ -5,7 +5,7 @@ use log::error;
 use tokio::time;
 use crate::device::common::emitter::EventType;
 use crate::device::miot_spec_device::{BaseMiotSpecDevice, MiotSpecDevice};
-use crate::proto::miio_proto::MiotSpecDTO;
+use crate::proto::miio_proto::{MiotSpecDTO, MiotSpecId};
 
 /// 轮询注册的属性,发送UpdateProperty 事件
 pub fn get_poll_func<'a, T: MiotSpecDevice + Sync + Send>(dev: &'a T, did: &'a str, interval: Duration) -> BoxFuture<'a, ()> {
@@ -30,7 +30,7 @@ pub fn get_poll_func<'a, T: MiotSpecDevice + Sync + Send>(dev: &'a T, did: &'a s
             };
 
             let params = base
-                .registered_property
+                .pool_properties
                 .read()
                 .await.iter()
                 .map(|id| MiotSpecDTO {
@@ -42,9 +42,29 @@ pub fn get_poll_func<'a, T: MiotSpecDevice + Sync + Send>(dev: &'a T, did: &'a s
             if params.is_empty() {
                 continue;
             }
+
             if let Ok(results) = proto.get_properties(params, None).await {
+                let mut updates = vec![];
                 for result in results {
-                    base.emitter.write().await.emit(EventType::UpdateProperty(result)).await;
+                    //新旧值比较
+                    let id = MiotSpecId::new(result.siid, result.piid);
+
+                    if let Some(old_val) = base.value_map.read().await.get(&id) {
+                        if let Some(val) = &result.value {
+                            if val == old_val {
+                                continue;
+                            } else {
+                                base.value_map.write().await.insert(id, val.clone());
+                                //发布单次更新事件
+                                base.emitter.write().await.emit(EventType::UpdateProperty(result.clone())).await;
+                                updates.push(result);
+                            }
+                        }
+                    }
+                }
+                //发布批量更新事件
+                if !updates.is_empty() {
+                    base.emitter.write().await.emit(EventType::UpdatePropertyBatch(updates)).await;
                 }
             }
         }

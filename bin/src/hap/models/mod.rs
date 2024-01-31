@@ -1,15 +1,14 @@
 use std::sync::Arc;
 use anyhow::anyhow;
 use dashmap::DashMap;
-use log::info;
 use once_cell::sync::OnceCell;
-use hap::characteristic::leak_detected::Value;
 use hap::characteristic::{CharReadParam, ReadCharValue, OnReadsFn, OnUpdatesFn, CharUpdateParam, UpdateCharValue};
 use miot_spec::device::MiotDevicePointer;
-use crate::init::DevicePointer;
 use crate::init::manager::hap_manager::HapManage;
 
 pub mod lumi;
+mod deerma;
+mod init;
 
 pub static MODEL_EXT_DATABASE: OnceCell<AccessoryModelExtDatabase> = OnceCell::new();
 
@@ -24,17 +23,6 @@ impl AccessoryModelExtDatabase {
     }
     pub fn insert(&self, name: &str, ext: AccessoryModelExtPointer) {
         self.model_map.insert(name.to_string(), ext);
-    }
-}
-
-impl Default for AccessoryModelExtDatabase {
-    fn default() -> Self {
-        let model_map: DashMap<String, AccessoryModelExtPointer> = DashMap::new();
-        model_map.insert("lumi.acpartner.vmcn02".to_string(), Arc::new(lumi::lumi_acpartner_mcn02::ModelExt::default()));
-        model_map.insert("lumi.gateway.mgl03".to_string(), Arc::new(lumi::lumi_gateway_mgl03::ModelExt::default()));
-        Self {
-            model_map,
-        }
     }
 }
 

@@ -21,6 +21,8 @@ pub struct DeviceEvent {
 pub enum EventType {
     /// 属性更新事件
     UpdateProperty(MiotSpecDTO),
+    /// 属性更新事件
+    UpdatePropertyBatch(Vec<MiotSpecDTO>),
     /// 属性设置事件
     SetProperty(MiotSpecDTO),
     /// 网关消息
@@ -51,7 +53,7 @@ impl<T> DataEmitter<T>
         let _ = timeout(Duration::from_secs(1), async {
             join_all(self.listeners.iter().map(|listener| listener(event.clone()))).await;
         }).await.tap_err(|_| {
-            log::error!("设备事件响应超时" );
+            log::error!("设备事件提交超时" );
         });
     }
 }

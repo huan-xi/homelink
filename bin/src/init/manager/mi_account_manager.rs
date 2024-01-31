@@ -19,7 +19,7 @@ use crate::db::entity::mi_account::MiAccountStatus;
 use crate::db::entity::prelude::{MiAccountActiveModel, MiAccountEntity};
 
 /// 米家账号管理器
-
+/// todo 启动任务自动登入
 pub struct MiAccountManagerInner {
     pub mi_cloud_map: DashMap<String, Arc<RwLock<MiCloud>>>,
     proto_map: DashMap<String, Arc<CloudMiioProto>>,
@@ -64,6 +64,7 @@ impl MiAccountManagerInner {
         let account = MiAccountActiveModel {
             account: Set(account.to_string()),
             status: Set(MiAccountStatus::Normal),
+            last_login_at: Set(chrono::Utc::now()),
             ..Default::default()
         };
         MiAccountEntity::update(account)
@@ -105,9 +106,7 @@ impl MiCloudExt for MiCloudDeviceExt {
         self.manager.get_proto(self.account_id.as_str()).await
     }
 
-    async fn register_property(&self, siid: i32, piid: i32) {
-
-    }
+    async fn register_property(&self, siid: i32, piid: i32) {}
 }
 
 

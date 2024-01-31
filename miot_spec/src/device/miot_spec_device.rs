@@ -1,5 +1,5 @@
 use std::cmp::min;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use anyhow::anyhow;
 use futures_util::future::BoxFuture;
@@ -87,8 +87,9 @@ impl Default for RetryInfo {
 pub struct BaseMiotSpecDevice {
     pub status: RwLock<DeviceStatus>,
     /// 注册轮询的属性
-    pub registered_property: Arc<RwLock<HashSet<MiotSpecId>>>,
-
+    pub pool_properties: Arc<RwLock<HashSet<MiotSpecId>>>,
+    /// 存储属性数据
+    pub value_map: Arc<RwLock<HashMap<MiotSpecId, serde_json::Value>>>,
     pub(crate) emitter: Arc<RwLock<DataEmitter<EventType>>>,
     pub tx: broadcast::Sender<EventType>,
     pub retry_info: RetryInfo,
@@ -99,7 +100,8 @@ impl Default for BaseMiotSpecDevice {
         let (tx, _) = broadcast::channel(10);
         Self {
             status: RwLock::new(DeviceStatus::Run),
-            registered_property: Arc::new(RwLock::new(HashSet::new())),
+            pool_properties: Arc::new(RwLock::new(HashSet::new())),
+            value_map: Arc::new(Default::default()),
             emitter: Arc::new(RwLock::new(DataEmitter::new())),
             tx,
             retry_info: Default::default(),
@@ -143,7 +145,8 @@ pub trait MiotSpecDevice {
 
     async fn read_properties(&self, props: Vec<MiotSpecId>) -> anyhow::Result<Vec<MiotSpecDTO>> {
         let did = self.get_info().did.clone();
-        let props: Vec<MiotSpecDTO> = props.into_iter().map(|id| MiotSpecDTO { did: did.clone(), siid: id.siid, piid: id.piid, value: None }).collect();
+        let props: Vec<MiotSpecDTO> = props.into_iter()
+            .map(|id| MiotSpecDTO { did: did.clone(), siid: id.siid, piid: id.piid, value: None }).collect();
         let len = props.len();
         let proto = self.get_proto()
             .await
@@ -167,7 +170,7 @@ pub trait MiotSpecDevice {
 
     /// 注册属性事件
     async fn register_property(&self, siid: i32, piid: i32) {
-        let mut write = self.get_base().registered_property.write().await;
+        let mut write = self.get_base().pool_properties.write().await;
         write.insert(MiotSpecId { siid, piid });
     }
 

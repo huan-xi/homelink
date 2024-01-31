@@ -31,6 +31,7 @@ pub struct Model {
     pub password: String,
     pub status: MiAccountStatus,
     pub update_at: DateTimeUtc,
+    pub last_login_at: DateTimeUtc,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveColumn)]
@@ -39,6 +40,7 @@ pub enum Column {
     Password,
     Status,
     UpdateAt,
+    LastLoginAt,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DerivePrimaryKey)]
@@ -63,6 +65,7 @@ impl ColumnTrait for Column {
             Self::Account => ColumnType::String(None).def(),
             Self::Password => ColumnType::String(None).def(),
             Self::UpdateAt => ColumnType::Timestamp.def(),
+            Self::LastLoginAt => ColumnType::Timestamp.def(),
             Self::Status => ColumnType::Integer.def(),
         }
     }
@@ -81,6 +84,7 @@ impl ActiveModelBehavior for ActiveModel {
             password: Default::default(),
             status: Default::default(),
             update_at: Set(chrono::Utc::now()),
+            last_login_at: Default::default(),
         }
     }
 }
