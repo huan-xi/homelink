@@ -2,4 +2,4 @@
 
 pub mod prelude;
 
-pub mod mi_account;
+pub mod device_mapping;

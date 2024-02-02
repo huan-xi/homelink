@@ -15,10 +15,11 @@ use bin::config::cfgs::Configs;
 use bin::config::context::{APP_CONTEXT, ApplicationContext, get_app_context};
 use bin::db::init::db_conn;
 use bin::init;
-use bin::init::device_init::init_iot_devices;
+use bin::init::device_init::init_iot_device_manager;
 use bin::init::manager::device_manager::IotDeviceManager;
 use bin::init::manager::hap_manager::HapManage;
 use bin::init::manager::mi_account_manager::MiAccountManager;
+use bin::init::manager::template_manager::TemplateManager;
 use bin::init::Managers;
 use bin::js_engine::context::EnvContext;
 use bin::js_engine::init_js_engine::init_js_engine;
@@ -46,11 +47,17 @@ async fn main() -> anyhow::Result<()> {
     // 初始化hap 服务器
     let iot_device_manager = IotDeviceManager::new();
     let hap_manager = HapManage::new();
+    let template_manager = TemplateManager::new();
+
+
     let mi_account_manager = MiAccountManager::new(conn.clone());
 
-    let app_state = AppState::new(conn.clone(), hap_metadata.clone(),
+    let app_state = AppState::new(conn.clone(),
+                                  hap_metadata.clone(),
                                   iot_device_manager.clone(),
-                                  hap_manager.clone(), mi_account_manager.clone());
+                                  hap_manager.clone(),
+                                  mi_account_manager.clone(),
+                                  template_manager.clone());
 
     let app = Router::new()
         .nest_service("/", ServeDir::new("dist/"))
@@ -102,10 +109,11 @@ async fn main() -> anyhow::Result<()> {
         iot_device_manager: iot_device_manager.clone(),
         mi_account_manager: mi_account_manager.clone(),
     };
-
+    // 初始化模板
+    template_manager.init().await?;
     // 初始化iot设备
-    init_iot_devices(&conn, iot_device_manager.clone(), mi_account_manager.clone()).await?;
-
+    init_iot_device_manager(&conn, iot_device_manager.clone(), mi_account_manager.clone()).await?;
+    // 初始化hap 设备
     init::hap_init::init_hap_list(&conn, hap_manager.clone(), iot_device_manager.clone()).await?;
 
     // 等待引擎退出

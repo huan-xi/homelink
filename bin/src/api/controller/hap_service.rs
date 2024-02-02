@@ -14,7 +14,7 @@ use crate::{api_err, err_msg};
 
 
 /// 返回 配件服务列表
-pub async fn list(state: State<AppState>, axum::extract::Path(id): axum::extract::Path<i64>) -> ApiResult<Vec<HapServiceModel>> {
+pub async fn list(state: State<AppState>, Path(id): Path<i64>) -> ApiResult<Vec<HapServiceModel>> {
     let list = HapServiceEntity::find()
         .filter(HapServiceColumn::AccessoryId.eq(id))
         .all(state.conn()).await?;
@@ -59,11 +59,12 @@ pub async fn add_service(state: State<AppState>, Json(param): Json<AddServicePar
     let model = HapServiceActiveModel {
         id: Set(service_id),
         accessory_id: Set(param.accessory_id),
-        name: Set(param.name),
+        configured_name: Set(param.configured_name),
         tag: Default::default(),
         memo: Set(param.memo),
         service_type: Set(param.service_type),
         disabled: Set(false),
+        primary: Set(false),
     };
     let txn = state.conn().begin().await?;
     HapServiceEntity::insert(model).exec(&txn).await?;

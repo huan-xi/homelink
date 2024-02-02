@@ -1,94 +1,126 @@
+use std::any::Any;
+use std::ops::Deref;
 use std::sync::Arc;
 use anyhow::anyhow;
 use dashmap::DashMap;
+use log::info;
 use once_cell::sync::OnceCell;
+use sea_orm::JsonValue;
+use serde_json::Value;
 use hap::characteristic::{CharReadParam, ReadCharValue, OnReadsFn, OnUpdatesFn, CharUpdateParam, UpdateCharValue};
+use miot_spec::device::common::emitter::EventType;
 use miot_spec::device::MiotDevicePointer;
+use crate::hap::models::model_ext_database::{AccessoryModelExtDatabase, MODEL_EXT_DATABASE};
 use crate::init::manager::hap_manager::HapManage;
 
 pub mod lumi;
 mod deerma;
-mod init;
-
-pub static MODEL_EXT_DATABASE: OnceCell<AccessoryModelExtDatabase> = OnceCell::new();
-
-
-pub struct AccessoryModelExtDatabase {
-    pub(crate) model_map: DashMap<String, AccessoryModelExtPointer>,
-}
-
-impl AccessoryModelExtDatabase {
-    pub fn get(&self, name: &str) -> Option<AccessoryModelExtPointer> {
-        self.model_map.get(name).map(|v| v.value().clone())
-    }
-    pub fn insert(&self, name: &str, ext: AccessoryModelExtPointer) {
-        self.model_map.insert(name.to_string(), ext);
-    }
-}
+mod model_ext_database;
+mod common;
 
 
 pub struct AccessoryModelContext {
     pub aid: u64,
     pub(crate) dev: MiotDevicePointer,
     pub(crate) hap_manager: HapManage,
+    /// 资源表,存储局部变量
+    pub resource_table: DashMap<String, Box<dyn Any + 'static + Send + Sync>>,
 }
 
 pub type AccessoryModelExtPointer = Arc<dyn AccessoryModelExt + Send + Sync + 'static>;
+
 pub type ContextPointer = Arc<AccessoryModelContext>;
+pub type AccessoryModelPointer = Arc<AccessoryModel>;
 
 /// 配件模型
+#[derive(Clone)]
 pub struct AccessoryModel {
-    context: Arc<AccessoryModelContext>,
-    model_ext: AccessoryModelExtPointer,
+    pub model_ext: AccessoryModelExtPointer,
 }
 
 impl AccessoryModel {
-    pub fn new(ctx: AccessoryModelContext, name: &str) -> anyhow::Result<Self> {
-        let ext = MODEL_EXT_DATABASE.get_or_init(|| AccessoryModelExtDatabase::default())
-            .get(name);
+    pub async fn new(ctx: AccessoryModelContext, name: &str, option: Option<Value>) -> anyhow::Result<Self> {
+        let ctx = Arc::new(ctx);
+        let ext = MODEL_EXT_DATABASE.get_or_init(|| AccessoryModelExtDatabase::default()).get(name);
+        let model_ext_new_func = ext
+            .ok_or(anyhow!("AccessoryModelExt {} not found",name))?;
+        let dev = ctx.dev.clone();
+        let model_ext = model_ext_new_func(ctx, option)?;
+        //订阅设备事件
+        if model_ext.is_subscribe_event() {
+            let model_ext_c = model_ext.clone();
+            dev.add_listener(Box::new(move |data: EventType| {
+                let model_ext = model_ext_c.clone();
+                Box::pin(async move {
+                    //let result = model_ext.update_chars_value(ctx, data.params).await?;
+                    info!("update_chars_value:{:?}", data);
+                    Ok(())
+                })
+            })
+            ).await;
+        }
+
         Ok(Self {
-            context: Arc::new(ctx),
-            model_ext: ext.ok_or(anyhow!("AccessoryModelExt {} not found",name))?,
+            model_ext,
         })
     }
 
+
     pub fn get_on_reads_fn(&self) -> Option<OnReadsFn> {
         let ext = self.model_ext.clone();
-        let ctx = self.context.clone();
         Some(Box::new(move |ids| {
             let ext = ext.clone();
-            let ctx = ctx.clone();
             Box::pin(async move {
-                let result = ext.read_chars_value(ctx, ids).await?;
+                let result = ext.read_chars_value(ids).await?;
                 //读取函数
                 Ok(result)
             })
         }))
     }
 
+
     pub fn get_on_updates_fn(&self) -> Option<OnUpdatesFn> {
         let ext = self.model_ext.clone();
-        let ctx = self.context.clone();
         Some(Box::new(move |params| {
             let ext = ext.clone();
-            let ctx = ctx.clone();
             Box::pin(async move {
-                let result = ext.update_chars_value(ctx, params).await?;
+                let result = ext.update_chars_value(params).await?;
                 Ok(result)
             })
         }))
     }
 }
 
+impl Deref for AccessoryModel {
+    type Target = AccessoryModelExtPointer;
+    fn deref(&self) -> &Self::Target {
+        &self.model_ext
+    }
+}
+
 pub(crate) type ReadValueResult = anyhow::Result<Vec<ReadCharValue>>;
 pub(crate) type UpdateValueResult = anyhow::Result<Vec<UpdateCharValue>>;
 
+pub(crate) const PARAM_KEY: &str = "PARAM";
+
+
+pub trait AccessoryModelExtConstructor {
+    /// 创建配件模型扩展
+    fn new(ctx: ContextPointer, params: Option<JsonValue>) -> anyhow::Result<AccessoryModelExtPointer>;
+}
 
 /// 配件模型扩展
 #[async_trait::async_trait]
 pub trait AccessoryModelExt {
+    /// 初始化
+    async fn init(&self) -> anyhow::Result<()> {
+        Ok(())
+    }
     /// 批量读取特征值
-    async fn read_chars_value(&self, ctx: ContextPointer, params: Vec<CharReadParam>) -> ReadValueResult;
-    async fn update_chars_value(&self, ctx: ContextPointer, params: Vec<CharUpdateParam>) -> UpdateValueResult;
-}
+    async fn read_chars_value(&self, params: Vec<CharReadParam>) -> ReadValueResult;
+    async fn update_chars_value(&self, params: Vec<CharUpdateParam>) -> UpdateValueResult;
+    async fn on_event(&self, event_type: EventType) {}
 
+    /// 是否订阅设备的事件
+    fn is_subscribe_event(&self) -> bool { true }
+}

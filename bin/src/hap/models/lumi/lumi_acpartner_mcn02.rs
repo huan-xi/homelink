@@ -1,29 +1,33 @@
+use std::sync::Arc;
 use futures_util::future::ok;
 use log::info;
 use sea_orm::JsonValue;
 use hap::characteristic::{CharReadParam, CharUpdateParam, ReadCharValue};
 use hap::HapType;
 use miot_spec::proto::miio_proto::{MiotSpecDTO, MiotSpecId};
-use crate::hap::models::{AccessoryModelExt, ContextPointer, ReadValueResult, UpdateValueResult};
+use crate::hap::models::{AccessoryModelExt, AccessoryModelExtConstructor,AccessoryModelExtPointer, ContextPointer, ReadValueResult, UpdateValueResult};
 
 
 pub struct ModelExt {
+    ctx: ContextPointer,
     on: MiotSpecId,
     model: MiotSpecId,
     ///Target Temperature 设置的温度
     target_temperature: MiotSpecId,
 }
 
-impl Default for ModelExt {
-    fn default() -> Self {
-        Self {
+impl AccessoryModelExtConstructor for ModelExt {
+    fn new(ctx: ContextPointer, params: Option<JsonValue>) -> anyhow::Result<AccessoryModelExtPointer> {
+        Ok(Arc::new(Self {
+            ctx,
             on: MiotSpecId::new(2, 1),
             model: MiotSpecId::new(2, 2),
             target_temperature: MiotSpecId::new(2, 3),
-
-        }
+        }))
     }
 }
+
+
 
 /// 温度传感器?
 ///https://home.miot-spec.com/s/lumi.acpartner.mcn02
@@ -35,14 +39,14 @@ impl AccessoryModelExt for ModelExt {
     /// CharReadParam { sid: 13, stag: None, cid: 14, ctag: CurrentHeatingCoolingState },
     /// CharReadParam { sid: 13, stag: None, cid: 18, ctag: TemperatureDisplayUnits },
     /// CharReadParam { sid: 13, stag: None, cid: 15, ctag: TargetHeatingCoolingState }]
-    async fn read_chars_value(&self, ctx: ContextPointer, params: Vec<CharReadParam>) -> ReadValueResult {
+    async fn read_chars_value(&self, params: Vec<CharReadParam>) -> ReadValueResult {
         let types: Vec<HapType> = params.iter()
             .map(|i| i.ctag.clone())
             .collect();
         info!("read_chars_value:{:?}", types);
 
         let mut result = vec![];
-        let values = ctx.dev.read_properties(vec![self.on, self.model, self.target_temperature]).await?;
+        let values = self.ctx.dev.read_properties(vec![self.on, self.model, self.target_temperature]).await?;
         let on = values.get(0);
         let model = values.get(1);
         let target_temperature = values.get(2);
@@ -77,7 +81,7 @@ impl AccessoryModelExt for ModelExt {
         Ok(result)
     }
 
-    async fn update_chars_value(&self, ctx: ContextPointer, params: Vec<CharUpdateParam>) -> UpdateValueResult {
+    async fn update_chars_value(&self, params: Vec<CharUpdateParam>) -> UpdateValueResult {
         let types: Vec<(HapType, JsonValue, JsonValue)> = params.iter()
             .map(|i| (i.ctag.clone(), i.old_value.clone(), i.new_value.clone()))
             .collect();
@@ -88,19 +92,19 @@ impl AccessoryModelExt for ModelExt {
                 HapType::TargetHeatingCoolingState => {
                     if param.new_value == 0 {
                         //调用设备关闭
-                        ctx.dev.set_property(self.on, serde_json::json!(false)).await?;
+                        self.ctx.dev.set_property(self.on, serde_json::json!(false)).await?;
                     } else {
                         //获取对应的模式
                         let model = Self::get_model_from_hap(param.new_value);
                         if let Some(model) = model {
-                            ctx.dev.set_property(self.model, serde_json::json!(model)).await?;
-                            ctx.dev.set_property(self.on, serde_json::json!(true)).await?;
+                            self.ctx.dev.set_property(self.model, serde_json::json!(model)).await?;
+                            self.ctx.dev.set_property(self.on, serde_json::json!(true)).await?;
                         }
                     }
                 }
                 HapType::TargetTemperature => {
-                    ctx.dev.set_property(self.target_temperature, param.new_value.clone()).await?;
-                    ctx.hap_manager.update_char_value_by_id(ctx.aid, param.sid, HapType::CurrentTemperature, param.new_value).await?;
+                    self. ctx.dev.set_property(self.target_temperature, param.new_value.clone()).await?;
+                    self.ctx.hap_manager.update_char_value_by_id(self.ctx.aid, param.sid, HapType::CurrentTemperature, param.new_value).await?;
                 }
                 _ => {}
             };

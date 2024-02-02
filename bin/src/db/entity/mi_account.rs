@@ -31,7 +31,8 @@ pub struct Model {
     pub password: String,
     pub status: MiAccountStatus,
     pub update_at: DateTimeUtc,
-    pub last_login_at: DateTimeUtc,
+    /// 最后登入时间
+    pub last_login_at: Option<DateTimeUtc>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveColumn)]
@@ -65,7 +66,7 @@ impl ColumnTrait for Column {
             Self::Account => ColumnType::String(None).def(),
             Self::Password => ColumnType::String(None).def(),
             Self::UpdateAt => ColumnType::Timestamp.def(),
-            Self::LastLoginAt => ColumnType::Timestamp.def(),
+            Self::LastLoginAt => ColumnType::Timestamp.def().null(),
             Self::Status => ColumnType::Integer.def(),
         }
     }

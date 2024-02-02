@@ -13,6 +13,7 @@ use hap::HapType;
 use miot_spec::device::common::emitter::{DataListener, EventType};
 use miot_spec::device::common::emitter::EventType::UpdateProperty;
 use miot_spec::proto::miio_proto::MiotSpecId;
+use miot_spec::proto::transport::udp_iot_spec_proto::Utils;
 
 use crate::config::context::get_app_context;
 use crate::db::entity::common::Property;
@@ -44,16 +45,10 @@ lazy_static! {
 pub async fn to_characteristic(ctx: InitServiceContext,
                                index: usize, ch: HapCharacteristicModel, ) -> anyhow::Result<IotCharacteristic> {
     let sid = ctx.sid;
-    let format: Format = serde_json::from_str(format!("\"{}\"", ch.format).as_str())
-        .map_err(|e| anyhow!("格式转换错误:{:?}", e))?;
-    let unit: Option<Unit> = match ch.unit.as_ref() {
-        None => { None }
-        Some(i) => {
-            Some(serde_json::from_str(format!("\"{}\"", i).as_str())
-                .map_err(|e| anyhow!("格式转换错误:{:?}", e))?)
-        }
-    };
+    let format: Format = ch.info.format;
+    let unit: Option<Unit> = ch.info.unit;
 
+    let unit_conv = UnitConv(ch.unit_convertor.clone(), ch.convertor_param.clone());
 
     let mut cts = IotCharacteristic(Characteristic::<CharacteristicValue> {
         id: sid + index as u64 + 1,
@@ -62,13 +57,12 @@ pub async fn to_characteristic(ctx: InitServiceContext,
         // hap_type: HapType::PowerState,
         format,
         unit,
-        max_value: ch.max_value.clone().map(|i| CharacteristicValue::format(format,i)),
-        min_value: ch.min_value.clone().map(|i| CharacteristicValue::format(format,i)),
-        perms: vec![
-            Perm::Events,
-            Perm::PairedRead,
-            Perm::PairedWrite,
-        ],
+        max_value: ch.info.max_value
+            .clone()
+            .map(|i| CharacteristicValue::format(format, ToChUtils::conv_from_value(unit_conv.clone(), i))),
+        min_value: ch.info.min_value.clone()
+            .map(|i| CharacteristicValue::format(format, ToChUtils::conv_from_value(unit_conv.clone(), i))),
+        perms: ch.info.perms.clone(),
         ..Default::default()
     });
     // 设置默认值
@@ -121,17 +115,17 @@ async fn set_read_update_method(ctx: InitServiceContext, cts: &mut IotCharacteri
         }
         MappingMethod::PropMapping => {
             // 设置读写映射
-            if let Some(MappingParam::MIotSpec(param)) = ch.mapping_param.clone() {
-                let ps = param.property;
-                let read = ToChUtils::get_read_func(ctx.device.clone(), ps.clone(), unit_conv.clone());
+            if let Some(MappingParam::PropMapping(param)) = ch.mapping_param.clone() {
+                let ps: MiotSpecId = param.into();
+                let read = ToChUtils::get_read_func(ctx.device.clone(), ps, unit_conv.clone());
                 cts.on_read_async(Some(read));
                 // ch.characteristic_type
-                let set = ToChUtils::get_set_func(ctx.clone(), ps.clone(), unit_conv.clone(), ch.clone());
+                let set = ToChUtils::get_set_func(ctx.clone(), ps, unit_conv.clone(), ch.clone());
                 cts.on_update_async(Some(set));
 
                 //注册属性事件
                 ctx.device.register_property(ps.siid, ps.piid).await;
-                let listener = ToChUtils::get_miot_listener(ctx.clone(), cid, ps.clone(), unit_conv.clone());
+                let listener = ToChUtils::get_miot_listener(ctx.clone(), cid, ps, unit_conv.clone());
                 ctx.device.add_listener(listener).await;
             } else {
                 return Err(anyhow!("映射参数不能为空"));
@@ -184,13 +178,13 @@ fn set_default_for_cts(cts: &mut IotCharacteristic, ch: HapCharacteristicModel) 
 }
 
 
-pub struct ToChUtils {}
+pub struct ToChUtils;
 
 
 impl ToChUtils {
     pub fn get_miot_listener(ctx: InitServiceContext,
                              cid: u64,
-                             property: Property,
+                             property: MiotSpecId,
                              unit_conv: UnitConv) -> DataListener<EventType> {
         Box::new(move |data: EventType| {
             let unit_conv = unit_conv.clone();
@@ -246,7 +240,7 @@ impl ToChUtils {
         }
     }
 
-    //转换成目标值
+    //hap 转换成目标值
     pub fn conv_to_value(conv: UnitConv, value: JsonValue) -> JsonValue {
         match conv.0 {
             None => {
@@ -265,14 +259,14 @@ impl ToChUtils {
         }
     }
 
-    pub async fn read_property(dev: DevicePointer, property: Property) -> anyhow::Result<Option<Value>> {
+    pub async fn read_property(dev: DevicePointer, property: MiotSpecId) -> anyhow::Result<Option<Value>> {
         dev.read_property(property.siid, property.piid).await
     }
 
     /// hap 配件更新到设备
     /// 存在target 属性
     pub fn get_set_func(ctx: InitServiceContext,
-                        property_id: Property,
+                        property_id: MiotSpecId,
                         conv: UnitConv,
                         ch_model: HapCharacteristicModel) -> impl OnUpdateFuture<CharacteristicValue>
     {
@@ -292,29 +286,28 @@ impl ToChUtils {
                     return Ok(());
                 };
 
-                let res = dev.set_property(MiotSpecId::new(property_id.siid, property_id.piid,), value.clone())
+                dev.set_property(property_id, value.clone())
                     .await
                     .tap_err(|e| {
                         error!("设置属性失败:{}", e);
-                    });
-                if let Ok(_) = res {
-                    //设置成功,判断是否存在curr特征
-                    if let Some(curr_type) = TARGET_CHAR_MAP.get_by_left(&ch_model.characteristic_type) {
-                        let curr: HapType = curr_type.clone().into();
-                        //开一个task更新,否则会重入死锁
-                        let sid = ctx.sid;
-                        let value = new.value.clone();
-                        tokio::spawn(async move {
-                            if let Some(svc) = accessory.write().await.get_mut_service_by_id(sid) {
-                                if let Some(curr) = svc.get_mut_characteristic(curr) {
-                                    if let Err(e) = curr.set_value(value).await {
-                                        warn!("设置curr特征失败:{:?}", e);
-                                    };
-                                }
+                    })?;
+
+                //设置成功,判断是否存在curr特征
+                if let Some(curr_type) = TARGET_CHAR_MAP.get_by_left(&ch_model.characteristic_type) {
+                    let curr: HapType = curr_type.clone().into();
+                    //开一个task更新,否则会重入死锁
+                    let sid = ctx.sid;
+                    let value = new.value.clone();
+                    tokio::spawn(async move {
+                        if let Some(svc) = accessory.write().await.get_mut_service_by_id(sid) {
+                            if let Some(curr) = svc.get_mut_characteristic(curr) {
+                                if let Err(e) = curr.set_value(value).await {
+                                    warn!("设置curr特征失败:{:?}", e);
+                                };
                             }
-                        });
-                    }
-                };
+                        }
+                    });
+                }
 
 
                 Ok(())
@@ -325,7 +318,7 @@ impl ToChUtils {
 
     /// 获取 属性映射读取函数
     pub fn get_read_func(device: DevicePointer,
-                         property: Property,
+                         property: MiotSpecId,
                          conv: UnitConv,
     ) -> impl OnReadFuture<CharacteristicValue> {
         let conv = conv.clone();
@@ -334,7 +327,9 @@ impl ToChUtils {
             let conv = conv.clone();
             async move {
                 //读取状态
-                let value = Self::read_property(dev.clone(), property.clone()).await
+
+                let value = dev.read_property(property.siid, property.piid)
+                    .await
                     .tap_err(|e| {
                         error!("属性读取失败:{}", e);
                     })?;

@@ -46,7 +46,7 @@ impl CharacteristicValue {
         })
     }
     pub fn format0(format: Format, value: serde_json::Value) -> anyhow::Result<Self> {
-        let value = if value.is_string() {
+        let value = if value.is_string() && format != Format::String {
             match format {
                 Format::Bool => {
                     let v = value.as_str().unwrap().parse::<bool>()?;
@@ -75,6 +75,9 @@ impl CharacteristicValue {
                 }
                 _ => { value }
             }
+        } else if format == Format::Bool && value.is_number() {
+            let val = value.as_u64() == Some(1);
+            json!(val)
         } else { value };
 
         Ok(Self {

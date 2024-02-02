@@ -1,30 +1,32 @@
+use std::sync::Arc;
 use hap::characteristic::{CharReadParam, CharUpdateParam, Format, ReadCharValue, UpdateCharValue};
 use hap::HapType;
 use log::info;
 use sea_orm::JsonValue;
 use serde_json::json;
-use hap::characteristic::active::ActiveCharacteristic;
-use hap::characteristic::active_identifier::ActiveIdentifierCharacteristic;
-use hap::characteristic::current_humidifier_dehumidifier_state::CurrentHumidifierDehumidifierStateCharacteristic;
 use miot_spec::proto::miio_proto::MiotSpecId;
 use crate::hap::iot::iot_characteristic::CharacteristicValue;
-use crate::hap::models::{AccessoryModelExt, ContextPointer, ReadValueResult, UpdateValueResult};
+use crate::hap::models::{AccessoryModelExt, AccessoryModelExtConstructor,  AccessoryModelExtPointer, ContextPointer, ReadValueResult, UpdateValueResult};
 
 ///加湿器
 pub struct ModelExt {
+    ctx: ContextPointer,
     on: MiotSpecId,
     target_humidity: MiotSpecId,
 }
 
-impl Default for ModelExt {
-    fn default() -> Self {
-        Self {
-            on: MiotSpecId::new(2, 1),
-            target_humidity: MiotSpecId::new(2, 6),
-
-        }
+impl AccessoryModelExtConstructor for ModelExt {
+    fn new(ctx: ContextPointer, params: Option<JsonValue>) -> anyhow::Result<AccessoryModelExtPointer> {
+        Ok(Arc::new(
+            Self {
+                ctx,
+                on: MiotSpecId::new(2, 1),
+                target_humidity: MiotSpecId::new(2, 6),
+            }
+        ))
     }
 }
+
 
 /// homekit 有除湿模式,设备没有
 /// 配件有档位, 映射成homekit 的开关
@@ -33,12 +35,12 @@ impl AccessoryModelExt for ModelExt {
     ///[CurrentRelativeHumidity
     /// , TargetHumidifierDehumidifierState,
     /// CurrentHumidifierDehumidifierState, Active]
-    async fn read_chars_value(&self, ctx: ContextPointer, params: Vec<CharReadParam>) -> ReadValueResult {
+    async fn read_chars_value(&self, params: Vec<CharReadParam>) -> ReadValueResult {
         let types: Vec<HapType> = params.iter()
             .map(|i| i.ctag.clone())
             .collect();
         //读取值
-        let values = ctx.dev.read_properties(vec![self.on, self.target_humidity]).await?;
+        let values = self.ctx.dev.read_properties(vec![self.on, self.target_humidity]).await?;
         let on = values.get(0);
         let target_humidity = values.get(1);
         info!("read_chars_value:{:?}", types);
@@ -77,7 +79,8 @@ impl AccessoryModelExt for ModelExt {
         Ok(result)
     }
 
-    async fn update_chars_value(&self, ctx: ContextPointer, params: Vec<CharUpdateParam>) -> UpdateValueResult {
+    async fn update_chars_value(&self, params: Vec<CharUpdateParam>) -> UpdateValueResult {
+        let ctx = &self.ctx;
         let types: Vec<(HapType, JsonValue, JsonValue)> = params.iter()
             .map(|i| (i.ctag.clone(), i.old_value.clone(), i.new_value.clone()))
             .collect();

@@ -71,6 +71,13 @@ const eventHandlers = {
         await moduleMap.get(event.chId).onCharUpdate(event.serviceTag, event.charTag, event.oldValue, event.newValue);
         await mainChannel.send_response(msgId, {type: "CharUpdateResp"})
     },
+    async ping(mainChannel, msgId, event) {
+        let value = event.value;
+        let time = BigInt(value);
+        let diff = BigInt(Date.now()) - time;
+        await Deno[Deno.internal].core.ops.op_mock_err();
+        await mainChannel.send_response(msgId, {type: "Pong", value: String(diff)})
+    },
     /**
      * 设备事件,分发到对应的模块中去
      * @param mainChannel
@@ -103,37 +110,39 @@ function firstLetterToLower(str) {
     return str.charAt(0).toLowerCase() + str.slice(1);
 }
 
+async function handleEvent(ch, msg) {
+    let [msgId, event] = msg;
+    console.log(`msgId:${msgId}:event:`, event);
+    try {
+        let handler = eventHandlers[firstLetterToLower(event.type)];
+        if (handler) {
+            await handler(ch, msgId, event);
+            return;
+        }
+        console.error("event handler_bac not found")
+    } catch (e) {
+        console.error("handle event error", e)
+        //   send error event
+        try {
+            await ch.send_response(msgId, {type: "ErrorResp", error: e.message});
+            console.error("send err success")
+        } catch (e) {
+            console.error("send error event error", e)
+        }
+    }
+}
+
 async function main() {
     let ch = await env.open_main_listener();
-
     while (true) {
         let msg = await ch.accept_event();
         if (!msg) {
-            break;
+            continue;
         }
-        let [msgId, event] = msg;
-        console.log(`msgId:${msgId}:event:`, event);
-        try {
-            let handler = eventHandlers[firstLetterToLower(event.type)];
-            if (handler) {
-                handler(ch, msgId, event).then(() => {
-                    //handle success
-                }).catch(e => {
-                    console.error("event hande error", e)
-                    ch.send_response(msgId, {type: "ErrorResp", error: e.message});
-                });
-                continue;
-            }
-            console.error("event handler_bac not found")
-        } catch (e) {
-            console.error("handle event error", e)
-            //   send error event
-            try {
-                await ch.send_response(msgId, {type: "ErrorResp", error: e.message});
-            } catch (e) {
-                console.error("send error event error", e)
-            }
-        }
+        //异步执行
+        handleEvent(ch, msg).then(r => {
+
+        });
     }
 }
 
@@ -141,5 +150,5 @@ try {
     await main();
     console.log("main exit");
 } catch (e) {
-    console.error("e", e)
+    console.error("error exit", e)
 }

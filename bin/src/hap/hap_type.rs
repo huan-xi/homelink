@@ -2,7 +2,6 @@ use std::str::FromStr;
 use hap::{Error, HapType};
 use sea_orm::{DeriveActiveEnum, EnumIter};
 use serde::{Deserialize, Serialize};
-use strum_macros::EnumString;
 
 
 /// HAP service and characteristic type representation.

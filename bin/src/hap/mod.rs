@@ -3,9 +3,11 @@
 // pub  mod config;
 pub mod hap_type;
 pub mod unit_convertor;
-mod db_bridges_storage;
+pub(crate) mod db_bridge_storage;
 pub mod rand_utils;
 
 /// 模型的特殊处理
 pub mod models;
 pub mod iot;
+/// 米家转换模板
+pub mod template;

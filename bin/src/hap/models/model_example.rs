@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use hap::characteristic::{CharReadParam, CharUpdateParam};
 use hap::HapType;
 use log::info;
@@ -17,6 +18,13 @@ impl Default for ModelExt {
         }
     }
 }
+impl AccessoryModelExtConstructor for ModelExt {
+    fn new(ctx: ContextPointer, params: Option<JsonValue>) -> anyhow::Result<AccessoryModelExtPointer> {
+        Ok(Arc::new(Self {}))
+    }
+}
+
+
 
 #[async_trait::async_trait]
 impl AccessoryModelExt for ModelExt {

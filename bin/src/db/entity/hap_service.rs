@@ -17,33 +17,17 @@ impl EntityName for Entity {
 }
 
 
-#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
-#[deprecated]
-pub struct MappingCharacteristic {
-    /// 映射特征值类型
-    pub characteristic_type: MappingHapType,
-    /// 固定值
-    pub fixed_value: Option<serde_json::Value>,
-}
-
-#[test]
-fn test_type() {
-    let str = serde_json::to_string(&MappingHapType::Switch).unwrap();
-    let hap_type: HapType = serde_json::from_str(&str).unwrap();
-    println!("{:?}", hap_type);
-}
-
-
 #[derive(Clone, Debug, PartialEq, DeriveModel, DeriveActiveModel, Eq, Serialize, Deserialize)]
 pub struct Model {
     pub id: i64,
+    pub tag: Option<String>,
     /// 配件id
     pub accessory_id: i64,
-    pub name: Option<String>,
-    pub tag: Option<String>,
+    pub configured_name: Option<String>,
     pub memo: Option<String>,
     pub service_type: MappingHapType,
     pub disabled: bool,
+    pub primary: bool,
 
 }
 
@@ -53,9 +37,10 @@ pub enum Column {
     AccessoryId,
     ServiceType,
     Memo,
-    Name,
+    ConfiguredName,
     Tag,
     Disabled,
+    Primary
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DerivePrimaryKey)]
@@ -83,8 +68,9 @@ impl ColumnTrait for Column {
             Self::AccessoryId => ColumnType::BigInteger.def(),
             Self::ServiceType => ColumnType::Integer.def(),
             Self::Disabled => ColumnType::Boolean.def(),
+            Self::Primary => ColumnType::Boolean.def(),
             Self::Memo => ColumnType::String(None).def().null(),
-            Self::Name => ColumnType::String(None).def().null(),
+            Self::ConfiguredName => ColumnType::String(Some(64)).def().null(),
             Self::Tag => ColumnType::String(None).def().null(),
         }
     }

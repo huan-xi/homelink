@@ -1,36 +1,24 @@
-use std::str::FromStr;
-use std::sync::Arc;
-
 use anyhow::anyhow;
 use axum::body::HttpBody;
-use futures_util::FutureExt;
-use log::{error, info};
-use rand::Rng;
-use sea_orm::{ColIdx, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, JsonValue, QueryFilter};
-use tokio::sync::Mutex;
+use log::error;
+use sea_orm::{ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, JsonValue, QueryFilter};
 
-use hap::{Config, MacAddress};
-use hap::accessory::{AccessoryCategory, AccessoryInformation, HapAccessory};
+use hap::accessory::{AccessoryInformation, HapAccessory};
 use hap::accessory::bridge::BridgeAccessory;
 use hap::characteristic::configured_name::ConfiguredNameCharacteristic;
 use hap::characteristic::HapCharacteristic;
 use hap::server::{IpServer, Server};
 use hap::service::HapService;
-use hap::storage::{FileStorage, Storage};
-use miot_spec::device::miot_spec_device::MiotSpecDevice;
+use hap::storage::Storage;
 
 use crate::config::context::get_app_context;
-use crate::db::entity::prelude::{HapAccessoryColumn, HapAccessoryEntity, HapAccessoryModel, HapBridgeColumn, HapBridgeEntity, HapBridgeModel, HapCharacteristicEntity, HapCharacteristicModel, HapServiceColumn, HapServiceEntity, HapServiceModel};
-use crate::db::SNOWFLAKE;
-use crate::hap::iot::iot_hap_accessory::IotHapAccessory;
+use crate::db::entity::prelude::{HapAccessoryColumn, HapAccessoryEntity, HapBridgeColumn, HapBridgeEntity, HapBridgeModel, HapCharacteristicModel, HapServiceModel};
+use crate::hap::db_bridge_storage::DbBridgesStorage;
 use crate::hap::iot::iot_hap_service::IotHapService;
-use crate::hap::models::{AccessoryModel, AccessoryModelContext};
-use crate::hap::rand_utils::{compute_setup_hash, pin_code_from_str};
 use crate::init::{DevicePointer, HapAccessoryPointer};
+use crate::init::characteristic_init::to_characteristic;
 use crate::init::manager::device_manager::IotDeviceManager;
 use crate::init::manager::hap_manager::HapManage;
-use crate::init::characteristic_init::to_characteristic;
-
 
 pub async fn init_hap_list(conn: &DatabaseConnection, manage: HapManage, iot_device_map: IotDeviceManager) -> anyhow::Result<()> {
     let bridges = HapBridgeEntity::find()
@@ -39,7 +27,9 @@ pub async fn init_hap_list(conn: &DatabaseConnection, manage: HapManage, iot_dev
         .await?;
     // let mut servers = Vec::new();
     for bridge in bridges.into_iter() {
-        add_hap_bridge(conn, bridge, manage.clone(), iot_device_map.clone()).await?;
+        if let Err(e) = add_hap_bridge(conn, bridge, manage.clone(), iot_device_map.clone()).await {
+            error!("初始化桥接器失败:{}",e);
+        }
     }
     Ok(())
 }
@@ -52,59 +42,57 @@ pub fn print_dir() {
 }
 
 /// 添加单个bridge 到管理器中
-pub async fn add_hap_bridge<C>(conn: &C, bridge: HapBridgeModel, manage: HapManage, iot_device_map: IotDeviceManager) -> anyhow::Result<()>
-    where C: ConnectionTrait, {
+pub async fn add_hap_bridge(conn: &DatabaseConnection, bridge: HapBridgeModel, manage: HapManage, iot_device_map: IotDeviceManager) -> anyhow::Result<()> {
     let config = &get_app_context().config;
 
-    let str = format!("{}/{}_{}", config.server.data_dir, "hap", bridge.pin_code);
-    let mut storage = FileStorage::new(str.as_str()).await?;
+    // let str = format!("{}/{}_{}", config.server.data_dir, "hap", bridge.pin_code);
+    // let mut storage = FileStorage::new(str.as_str()).await?;
     let bid = bridge.bridge_id;
+    let bridge_model = HapBridgeEntity::find_by_id(bid)
+        .one(conn)
+        .await?
+        .ok_or(anyhow!("未找到桥接器:{:?}", bid))?;
+    let is_single_accessory = bridge_model.single_accessory;
 
+    let mut storage = DbBridgesStorage::new(bid, conn.clone());
     //config
-    let hap_config = match storage.load_config().await {
-        Ok(mut config) => {
-            config.redetermine_local_ip();
-            config.port = bridge.port as u16;
-            storage.save_config(&config).await?;
-            config
-        }
-        Err(_) => {
-            let pin = pin_code_from_str(bridge.pin_code.to_string().as_str());
-            let name = bridge.name.clone();
-            let setup_hash = compute_setup_hash(bridge.setup_id.as_str(), bridge.mac.as_str());
-            // let setup_hash=
-            let config = Config {
-                pin,
-                name,
-                //mac 地址配置
-                device_id: MacAddress::from_str(bridge.mac.as_str())?,
-                port: bridge.port as u16,
-                category: AccessoryCategory::Bridge,
-                setup_id: bridge.setup_id.clone(),
-                setup_hash,
-                ..Default::default()
-            };
-            storage.save_config(&config).await?;
-            config
-        }
-    };
-
-    let serial_number = {
-        let mut rng = rand::thread_rng();
-        let random_bytes: [u8; 16] = rng.gen();
-        hex::encode(random_bytes)
-    };
+    let mut hap_config = storage.load_config().await?;
+    hap_config.redetermine_local_ip();
+    storage.save_config(&hap_config).await?;
 
 
     let server = IpServer::new(hap_config, storage).await?;
-    // 初始化bridge 设备
-    let bridge = BridgeAccessory::new(1, AccessoryInformation {
-        name: bridge.name.clone(),
-        serial_number,
-        software_revision: Some(config.server.version.clone()),
-        ..Default::default()
-    })?;
-    server.add_accessory(bridge).await?;
+    if is_single_accessory {
+        //取设备上的属性覆盖
+        let accessories = HapAccessoryEntity::find()
+            .filter(HapAccessoryColumn::BridgeId.eq(bridge_model.bridge_id))
+            .all(conn)
+            .await?;
+        if accessories.len() == 0 {
+            return Err(anyhow!("单配件桥接器没有配件"));
+        }
+        if accessories.len() > 1 {
+            return Err(anyhow!("单配件桥接器配件大于0"));
+        }
+    } else {
+        // 初始化bridge 设备
+        let bridge = BridgeAccessory::new(1, AccessoryInformation {
+            name: bridge_model.name.clone(),
+            serial_number: bridge_model.info.serial_number,
+            software_revision: bridge_model.info.software_revision,
+            manufacturer: bridge_model.info.manufacturer,
+            model: bridge_model.info.model,
+            ..Default::default()
+        })?;
+        server.add_accessory(bridge).await?;
+    }
+
+    /*let serial_number = {
+        let mut rng = rand::thread_rng();
+        let random_bytes: [u8; 16] = rng.gen();
+        hex::encode(random_bytes)
+    };*/
+
 
     // 初始化其他配件
     let accessories = init_hap_accessories(conn,
@@ -125,7 +113,7 @@ pub struct AccessoryRelation {
     pub accessory: HapAccessoryPointer,
 }
 
-/// 配件是基于设备的
+/// 基于设备初始化配件列表
 async fn init_hap_accessories<C: ConnectionTrait>(conn: &C,
                                                   hap_manage: HapManage,
                                                   bridge_id: i64, iot_device_map: IotDeviceManager) -> anyhow::Result<Vec<AccessoryRelation>> {
@@ -163,7 +151,6 @@ async fn init_hap_accessories<C: ConnectionTrait>(conn: &C,
 }
 
 
-
 #[derive(Clone)]
 pub struct InitServiceContext {
     pub aid: u64,
@@ -182,6 +169,7 @@ pub(crate) async fn add_service(ctx: InitServiceContext, service_chs: (HapServic
     let service = service_chs.0;
     let chs = service_chs.1;
     let mut hap_service = IotHapService::new(ctx.sid, ctx.aid, service.service_type.into());
+    hap_service.set_primary(service.primary);
     let stag = service.tag.clone();
     let mut success = false;
     for (index, ch) in chs.into_iter()
@@ -198,11 +186,11 @@ pub(crate) async fn add_service(ctx: InitServiceContext, service_chs: (HapServic
             }
         };
     }
-
+    // hap_service.set_primary(true);
     // for (index, ch) in chs.into_iter().enumerate() {}
     let len = hap_service.get_characteristics().len();
     // 设置名称
-    if let Some(n) = service.name.clone() {
+    if let Some(n) = service.configured_name.clone() {
         if !n.is_empty() {
             let id = ctx.sid + len as u64 + 1;
             let mut name = ConfiguredNameCharacteristic::new(id, ctx.aid);

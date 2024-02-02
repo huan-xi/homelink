@@ -5,7 +5,9 @@ use sea_orm::{FromJsonQueryResult, JsonValue};
 use serde::{Deserialize, Serialize};
 use crate::hap::hap_type::MappingHapType;
 use serde_aux::prelude::deserialize_number_from_string;
+use hap::characteristic::{Format, Perm, Unit};
 use miot_spec::device::ble::value_types::{BleValueType};
+use miot_spec::proto::miio_proto::MiotSpecId;
 use crate::db::entity::common::Property;
 use crate::hap::unit_convertor::{ConvertorParamType, UnitConvertor};
 
@@ -42,7 +44,7 @@ pub enum MappingMethod {
 #[serde(tag = "type")]
 pub enum MappingParam {
     /// miot spec 设备转控制器
-    MIotSpec(MiotSpecParam),
+    PropMapping(PropMappingParam),
     JsScript(JsScriptParam),
     /// 低功耗蓝牙设备转传感器
     BleToSensor(BleToSensorParam),
@@ -79,11 +81,36 @@ pub struct BleToSensorParam {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
-pub struct MiotSpecParam {
+pub struct PropMappingParam {
     /// 属性
-    pub property: Property,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    pub siid: i32,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    pub piid: i32,
 }
 
+impl Into<MiotSpecId> for PropMappingParam {
+    fn into(self) -> MiotSpecId {
+        MiotSpecId::new(self.siid, self.piid)
+    }
+}
+
+/// hap 的一些属性
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize, FromJsonQueryResult)]
+pub struct HapCharInfo {
+    pub format: Format,
+    pub unit: Option<Unit>,
+    pub min_value: Option<JsonValue>,
+    pub max_value: Option<JsonValue>,
+    pub step_value: Option<JsonValue>,
+    pub max_len: Option<u16>,
+    pub max_data_len: Option<u32>,
+    pub valid_values: Option<Vec<JsonValue>>,
+    pub valid_values_range: Option<Vec<JsonValue>>,
+    pub ttl: Option<u64>,
+    pub perms: Vec<Perm>,
+    pub pid: Option<u64>,
+}
 
 #[derive(Clone, Debug, PartialEq, DeriveModel, DeriveActiveModel, Eq, Serialize, Deserialize)]
 pub struct Model {
@@ -95,17 +122,11 @@ pub struct Model {
     /// 服务的映射类型
     pub mapping_method: MappingMethod,
     pub mapping_param: Option<MappingParam>,
-    // pub mapping_property: Option<Property>,
-    pub fixed_value: Option<String>,
-    pub format: String,
-    pub unit: Option<String>,
-    pub min_value: Option<JsonValue>,
-    pub max_value: Option<JsonValue>,
-    pub tag: Option<String>,
-    pub max_len: Option<JsonValue>,
+
     /// 单位转换器
     pub unit_convertor: Option<UnitConvertor>,
     pub convertor_param: Option<ConvertorParamType>,
+    pub info: HapCharInfo,
 
 }
 
@@ -115,18 +136,13 @@ pub enum Column {
     ServiceId,
     MappingParam,
     Name,
-    Tag,
+    // Tag,
     Disabled,
     CharacteristicType,
     MappingMethod,
-    FixedValue,
-    Format,
-    Unit,
-    MinValue,
-    MaxValue,
-    MaxLen,
     UnitConvertor,
     ConvertorParam,
+    Info,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DerivePrimaryKey)]
@@ -151,21 +167,15 @@ impl ColumnTrait for Column {
     fn def(&self) -> ColumnDef {
         match self {
             Self::Cid => ColumnType::BigInteger.def(),
-            Self::ServiceId => ColumnType::BigInteger.def(),
+            Self::ServiceId => ColumnType::BigInteger.def().indexed(),
             Self::Disabled => ColumnType::Boolean.def(),
             Self::MappingParam => ColumnType::String(None).def().null(),
-            Self::FixedValue => ColumnType::String(None).def().null(),
             Self::Name => ColumnType::String(Some(64)).def().null(),
-            Self::Tag => ColumnType::String(Some(64)).def().null(),
-            Self::Format => ColumnType::String(None).def().null(),
-            Self::Unit => ColumnType::String(None).def().null(),
-            Self::MinValue => ColumnType::String(None).def().null(),
-            Self::MaxValue => ColumnType::String(None).def().null(),
-            Self::MaxLen => ColumnType::String(None).def().null(),
             Self::MappingMethod => ColumnType::Integer.def(),
             Self::CharacteristicType => ColumnType::Integer.def(),
-            Self::UnitConvertor => ColumnType::Integer.def().null(),
+            Self::UnitConvertor => ColumnType::String(Some(32)).def().null(),
             Self::ConvertorParam => ColumnType::String(None).def().null(),
+            Self::Info => ColumnType::String(None).def().null(),
         }
     }
 }

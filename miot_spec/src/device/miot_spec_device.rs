@@ -87,7 +87,7 @@ impl Default for RetryInfo {
 pub struct BaseMiotSpecDevice {
     pub status: RwLock<DeviceStatus>,
     /// 注册轮询的属性
-    pub pool_properties: Arc<RwLock<HashSet<MiotSpecId>>>,
+    pub poll_properties: Arc<RwLock<HashSet<MiotSpecId>>>,
     /// 存储属性数据
     pub value_map: Arc<RwLock<HashMap<MiotSpecId, serde_json::Value>>>,
     pub(crate) emitter: Arc<RwLock<DataEmitter<EventType>>>,
@@ -100,7 +100,7 @@ impl Default for BaseMiotSpecDevice {
         let (tx, _) = broadcast::channel(10);
         Self {
             status: RwLock::new(DeviceStatus::Run),
-            pool_properties: Arc::new(RwLock::new(HashSet::new())),
+            poll_properties: Arc::new(RwLock::new(HashSet::new())),
             value_map: Arc::new(Default::default()),
             emitter: Arc::new(RwLock::new(DataEmitter::new())),
             tx,
@@ -170,7 +170,7 @@ pub trait MiotSpecDevice {
 
     /// 注册属性事件
     async fn register_property(&self, siid: i32, piid: i32) {
-        let mut write = self.get_base().pool_properties.write().await;
+        let mut write = self.get_base().poll_properties.write().await;
         write.insert(MiotSpecId { siid, piid });
     }
 

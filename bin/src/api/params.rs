@@ -4,7 +4,7 @@ use sea_orm::ActiveValue::Set;
 use sea_orm::{ActiveValue, JsonValue, NotSet};
 use crate::hap::hap_type::MappingHapType;
 use serde_aux::prelude::deserialize_number_from_string;
-use crate::db::entity::hap_characteristic::{BleToSensorParam, DbBleValueType, MappingMethod, MappingParam, MiotSpecParam};
+use crate::db::entity::hap_characteristic::{BleToSensorParam, DbBleValueType, MappingMethod, MappingParam, PropMappingParam};
 use serde_aux::prelude::deserialize_option_number_from_string;
 use hap::characteristic::Format;
 use hap::HapType;
@@ -14,6 +14,7 @@ use crate::db::entity::iot_device::IotDeviceType;
 use crate::db::entity::prelude::{HapAccessoryActiveModel, HapCharacteristicActiveModel};
 use crate::hap::iot::iot_characteristic::CharacteristicValue;
 use crate::hap::unit_convertor::{ConvertorParamType, UnitConvertor};
+use crate::init::manager::template_manager::BridgeMode;
 
 #[derive(serde::Deserialize, Debug)]
 pub struct LoginParam {
@@ -26,7 +27,6 @@ pub struct LoginParam {
 pub struct AddHapBridgeParam {
     /// pin码
     pub pin_code: Option<String>,
-
     pub category: BridgeCategory,
     pub name: String,
 
@@ -45,9 +45,25 @@ pub struct DidParam {
     pub did: String,
 }
 
+
+#[derive(serde::Deserialize, Debug)]
+pub struct MiConvertByTemplateParam {
+    /// 使用的模板id
+    pub id: String,
+    pub did: String,
+    /// 设备列表
+    // pub devices: Vec<String>,
+    pub bridge_mode: BridgeMode,
+    #[serde(default, deserialize_with = "deserialize_option_number_from_string")]
+    pub bridge_id: Option<i64>,
+    #[serde(default, deserialize_with = "deserialize_option_number_from_string")]
+    pub gateway_id: Option<i64>,
+}
+
 #[derive(serde::Deserialize, Debug)]
 pub struct MiConvertToIotParam {
     /// did
+    pub id: String,
     pub did: String,
     pub device_type: IotDeviceType,
     pub name: String,
@@ -75,7 +91,7 @@ pub struct AddServiceParam {
     pub memo: Option<String>,
     #[serde(deserialize_with = "deserialize_number_from_string")]
     pub accessory_id: i64,
-    pub name: Option<String>,
+    pub configured_name: Option<String>,
     /// 服务类型
     pub service_type: MappingHapType,
     pub characteristics: Vec<CharacteristicParam>,
@@ -87,28 +103,25 @@ pub struct AddHapAccessoryParam {
     device_id: i64,
     #[serde(deserialize_with = "deserialize_number_from_string")]
     bridge_id: i64,
-    name: Option<String>,
+    name: String,
     memo: Option<String>,
     script: Option<String>,
     disabled: Option<bool>,
-    hap_type: Option<MappingHapType>,
+    category: BridgeCategory,
     listening_props: PropertyVec,
 }
 
 impl AddHapAccessoryParam {
     pub fn into_model(self) -> anyhow::Result<HapAccessoryActiveModel> {
         Ok(HapAccessoryActiveModel {
-            aid: Default::default(),
             device_id: Set(self.device_id),
             bridge_id: Set(self.bridge_id),
             name: Set(self.name),
             memo: Set(self.memo),
             disabled: Set(self.disabled.unwrap_or(false)),
-            hap_type: Set(self.hap_type),
-            info: Default::default(),
+            category: Set(self.category),
             script: Set(self.script),
-            listening_props: Set(self.listening_props),
-            model: Default::default(),
+            ..Default::default()
         })
     }
 }
@@ -120,7 +133,7 @@ pub struct CharacteristicParam {
     pub cid: Option<i64>,
     pub characteristic_type: MappingHapType,
     pub mapping_method: MappingMethod,
-    pub mapping_property: Option<Property>,
+    pub mapping_property: Option<PropMappingParam>,
     pub name: Option<String>,
     pub ble_value_type: Option<DbBleValueType>,
     pub format: String,
@@ -130,7 +143,6 @@ pub struct CharacteristicParam {
     pub max_len: Option<JsonValue>,
     pub unit_convertor: Option<UnitConvertor>,
     pub convertor_param: Option<ConvertorParamType>,
-    pub fixed_value: Option<String>,
 }
 
 impl CharacteristicParam {
@@ -142,9 +154,7 @@ impl CharacteristicParam {
                         return Err(anyhow!("mapping_property 不能为空"));
                     }
                     Some(s) => {
-                        MappingParam::MIotSpec(MiotSpecParam {
-                            property: s,
-                        })
+                        MappingParam::PropMapping(s)
                     }
                 })
             }
@@ -158,12 +168,11 @@ impl CharacteristicParam {
             mapping_method: Set(self.mapping_method),
             mapping_param: Set(mapping_param),
             name: Set(self.name),
-            format: Set(self.format),
-            unit: Set(self.unit),
-            min_value: Set(self.min_value.map(|v| CharacteristicValue::format(format, v).value)),
-            max_value: Set(self.max_value.map(|v| CharacteristicValue::format(format, v).value)),
-            tag: Default::default(),
-            max_len: Set(self.max_len),
+            // format: Set(self.format),
+            // unit: Set(self.unit),
+            // min_value: Set(self.min_value.map(|v| CharacteristicValue::format(format, v).value)),
+            // max_value: Set(self.max_value.map(|v| CharacteristicValue::format(format, v).value)),
+            // max_len: Set(self.max_len),
             unit_convertor: Set(self.unit_convertor),
             service_id: Set(service_id),
             disabled: Set(false),
@@ -172,7 +181,7 @@ impl CharacteristicParam {
                 None => NotSet,
                 Some(s) => Set(Some(s))
             },
-            fixed_value: Set(self.fixed_value),
+            ..Default::default()
         };
 
 
@@ -191,13 +200,13 @@ pub struct DisableParam {
 
 #[derive(serde::Deserialize, Debug)]
 pub struct UpdateHapAccessoryParam {
-    pub name: Option<String>,
+    pub name: String,
     pub memo: Option<String>,
     #[serde(deserialize_with = "deserialize_number_from_string")]
     pub bridge_id: i64,
     #[serde(deserialize_with = "deserialize_number_from_string")]
     pub device_id: i64,
-    pub hap_type: Option<MappingHapType>,
+    pub category: BridgeCategory,
     // pub script: Option<String>,
     // pub register_props: PropertyVec,
 }
@@ -208,11 +217,9 @@ impl UpdateHapAccessoryParam {
             aid: Set(id),
             name: Set(self.name),
             memo: Set(self.memo),
-            hap_type: Set(self.hap_type),
+            category: Set(self.category),
             bridge_id: Set(self.bridge_id),
             device_id: Set(self.device_id),
-            // script: Set(self.script),
-            // register_props: Set(self.register_props),
             ..Default::default()
         })
     }

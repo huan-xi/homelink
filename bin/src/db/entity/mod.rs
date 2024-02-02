@@ -3,7 +3,6 @@
 pub mod iot_device;
 pub mod prelude;
 pub mod hap_bridge;
-pub mod device_mapping;
 pub mod hap_accessory;
 pub mod hap_service;
 pub mod hap_characteristic;

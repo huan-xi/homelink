@@ -7,6 +7,7 @@ use miot_spec::cloud::MiCloud;
 use crate::init::manager::device_manager::IotDeviceManager;
 use crate::init::manager::hap_manager::HapManage;
 use crate::init::manager::mi_account_manager::MiAccountManager;
+use crate::init::manager::template_manager::TemplateManager;
 
 
 pub struct AppStateInner {
@@ -16,6 +17,7 @@ pub struct AppStateInner {
     pub device_manager: IotDeviceManager,
     pub hap_manager: HapManage,
     pub mi_account_manager: MiAccountManager,
+    pub template_manager: TemplateManager,
     //
 }
 
@@ -25,6 +27,7 @@ impl AppStateInner {
                device_manager: IotDeviceManager,
                hap_manager: HapManage,
                mi_account_manager: MiAccountManager,
+               template_manager: TemplateManager,
     ) -> Self {
         let conn_c = conn.clone();
         Self {
@@ -33,6 +36,7 @@ impl AppStateInner {
             device_manager,
             hap_manager,
             mi_account_manager,
+            template_manager
         }
     }
 
@@ -48,11 +52,16 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub fn new(conn: DatabaseConnection, hap_metadata: Arc<HapMetadata>,
+    pub fn new(conn: DatabaseConnection,
+               hap_metadata: Arc<HapMetadata>,
                device_manager: IotDeviceManager,
-               hap_manager: HapManage,mi_account_manager: MiAccountManager, ) -> Self {
+               hap_manager: HapManage,
+               mi_account_manager: MiAccountManager,
+               template_manager: TemplateManager,
+    ) -> Self {
         Self {
-            inner: Arc::new(AppStateInner::new(conn, hap_metadata, device_manager, hap_manager,mi_account_manager)),
+            inner: Arc::new(AppStateInner::new(conn, hap_metadata, device_manager, hap_manager, mi_account_manager
+            ,template_manager)),
         }
     }
 }

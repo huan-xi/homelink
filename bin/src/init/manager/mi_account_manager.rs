@@ -64,7 +64,7 @@ impl MiAccountManagerInner {
         let account = MiAccountActiveModel {
             account: Set(account.to_string()),
             status: Set(MiAccountStatus::Normal),
-            last_login_at: Set(chrono::Utc::now()),
+            last_login_at: Set(Some(chrono::Utc::now())),
             ..Default::default()
         };
         MiAccountEntity::update(account)

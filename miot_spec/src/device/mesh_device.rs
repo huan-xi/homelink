@@ -67,10 +67,6 @@ impl MiotSpecDevice for MeshDevice {
                 }
             }
         }
-        /*
-         loop {
-             tokio::time::sleep(Duration::from_secs(100)).await;
-         }*/
         Ok(())
     }
 }

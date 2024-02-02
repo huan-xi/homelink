@@ -21,7 +21,7 @@ use crate::init::manager::device_manager::IotDeviceManager;
 use crate::init::manager::mi_account_manager::{MiAccountManager, MiCloudDeviceExt};
 
 /// 初始化hap 设备 init_iot_device
-pub async fn init_iot_devices(conn: &DatabaseConnection, manage: IotDeviceManager, mi_account_manager: MiAccountManager) -> anyhow::Result<()> {
+pub async fn init_iot_device_manager(conn: &DatabaseConnection, manage: IotDeviceManager, mi_account_manager: MiAccountManager) -> anyhow::Result<()> {
     // let mut map: DeviceMap = dashmap::DashMap::new();
     // let mut list = vec![];
     //读取设备
@@ -87,16 +87,15 @@ async fn init_children_device0(conn: &DatabaseConnection, dev: IotDeviceModel, g
                 let ble_dev = BleDevice::new(param.info, gw.clone(), mapping);
                 return Ok(DevicePointer::new(Arc::new(ble_dev)));
             }
-            Err(anyhow!("初始化设备失败，参数类型错误"))
+            Err(anyhow!("初始化设备失败，MiBleDevice 参数类型错误"))
         }
         IotDeviceType::MiMeshDevice => {
             if let Some(DeviceParam::MeshParam) = dev.params {
                 let ble_dev = MeshDevice::new(dev_info, gw.clone());
                 return Ok(DevicePointer::new(Arc::new(ble_dev)));
             }
-            Err(anyhow!("初始化设备失败，参数类型错误"))
+            Err(anyhow!("初始化设备失败，MiMeshDevice参数类型错误"))
         }
-
         _ => {
             Err(anyhow!("初始化设备失败，设备类型错误"))
         }
@@ -119,18 +118,12 @@ async fn init_mi_device0(conn: &DatabaseConnection, dev: IotDeviceModel, mi_acco
     let (account_id, param) = get_device_info(conn, source_id.as_str()).await?;
     return match dev.device_type {
         IotDeviceType::MiWifiDevice => {
-            if let Some(DeviceParam::WifiDeviceParam) = dev.params {
-                return Ok(DevicePointer::new(Arc::new(WifiDevice::new(param).await?)));
-            }
-            Err(anyhow!("初始化设备失败，参数类型错误"))
+            return Ok(DevicePointer::new(Arc::new(WifiDevice::new(param).await?)));
         }
         IotDeviceType::MiGatewayDevice => {
-            if let Some(DeviceParam::MiGatewayParam) = dev.params {
-                let dev = OpenMiioGatewayDevice::new(param).await?;
-                let dev = Arc::new(dev);
-                return Ok(DevicePointer::new(dev.clone()));
-            }
-            Err(anyhow!("初始化设备失败，参数类型错误"))
+            let dev = OpenMiioGatewayDevice::new(param).await?;
+            let dev = Arc::new(dev);
+            return Ok(DevicePointer::new(dev.clone()));
         }
         IotDeviceType::MiCloudDevice => {
             // mi_account_manager.get_proto(account_id.as_str()).await?;

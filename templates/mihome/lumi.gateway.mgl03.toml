@@ -1,0 +1,61 @@
+# https://home.miot-spec.com/s/lumi.gateway.mgl03
+# https://home.miot-spec.com/spec?type=urn:miot-spec-v2:device:gateway:0000A019:lumi-mgl03:1
+id = "lumi.gateway.mgl03"
+version = "1.0.0"
+model = "lumi.gateway.mgl03"
+model_name = "小米智能多模网关"
+model_icon = ""
+[[devices]]
+device_type = "MiGatewayDevice"
+timeout = 200
+desc = "网关"
+[[devices]]
+# 设备接入方式
+device_type = "MiWifiDevice"
+#轮询间隔
+interval = 60_000
+#轮询属性
+poll_properties = [
+    # on
+    { siid = 3, piid = 1 },
+    # alarm
+    { siid = 3, piid = 22 },
+]
+#调用超时时间
+timeout = 200
+desc = "安防系统"
+# 配件
+[[devices.accessories]]
+#插座类型
+category = "SecuritySystem"
+# 接管模型
+model = "lumi.gateway.mgl03"
+# 配件下的服务
+[[devices.accessories.services]]
+# 插座服务
+service_type = "SecuritySystem"
+# 配件下的服务的特征
+[[devices.accessories.services.characteristics]]
+mapping_method = "AccessoryModel"
+name = "security-system-state.current"
+description = "安防系统当前状态"
+hap_type = "SecuritySystemCurrentState"
+format = "uint8"
+# 读写权限
+perms = ["ev", "pr"]
+min_value = 0
+max_value = 4
+step_value = 4
+valid_values = [0, 1, 2, 3, 4]
+[[devices.accessories.services.characteristics]]
+mapping_method = "AccessoryModel"
+name = "security-system-state.target"
+description = "安防系统target状态"
+hap_type = "SecuritySystemCurrentState"
+format = "uint8"
+# 读写权限
+perms = ["ev", "pr", "pw"]
+min_value = 0
+max_value = 4
+step_value = 4
+valid_values = [0, 1, 2, 3, 4]

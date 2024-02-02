@@ -2,7 +2,7 @@ use std::net::SocketAddr;
 use serde::Serialize;
 use serde_json::Value;
 use hap_metadata::metadata::HapCharacteristic;
-use crate::db::entity::prelude::{HapAccessoryModel, HapBridgeEntity, HapBridgeModel, IotDeviceModel};
+use crate::db::entity::prelude::{HapAccessoryModel, HapBridgeEntity, HapBridgeModel, IotDeviceModel, MiotDeviceModel};
 use crate::hap::models::AccessoryModel;
 
 #[derive(Debug, serde::Serialize)]
@@ -78,6 +78,14 @@ impl CharacteristicMetaResult {
     }
 }
 
+
+#[derive(serde::Deserialize, Debug, Serialize)]
+pub struct MiotDeviceModelResult {
+    #[serde(flatten)]
+    pub model: MiotDeviceModel,
+    /// 是否有模板
+    pub has_template: bool,
+}
 
 #[derive(serde::Deserialize, Debug, Serialize)]
 pub struct MiotDeviceResult {

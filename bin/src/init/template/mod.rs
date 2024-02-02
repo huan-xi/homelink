@@ -1,1 +1,0 @@
-mod miot_template;

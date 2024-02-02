@@ -27,7 +27,7 @@ pub(crate) async fn init_hap_accessory<'a, C: ConnectionTrait>(conn: &C, hap_man
     // 初始化配件服务
 
     let dev_info = device.get_info().clone();
-    let name = hap_accessory.name.unwrap_or(dev_info.name.clone());
+    let name = hap_accessory.name;
     let name_c = name.clone();
     let software_revision = dev_info
         .extra
@@ -73,8 +73,22 @@ pub(crate) async fn init_hap_accessory<'a, C: ConnectionTrait>(conn: &C, hap_man
             aid,
             dev: device.device.clone(),
             hap_manager: hap_manage.clone(),
+            resource_table: Default::default(),
         };
-        Some(AccessoryModel::new(ctx, model.as_str())?)
+        // 事件订阅
+        let model = AccessoryModel::new(ctx, model.as_str(), hap_accessory.model_params).await?;
+        model.init().await?;
+        if model.model_ext.is_subscribe_event() {
+            let model_c = model.clone();
+            device.add_listener(Box::new(move |data| {
+                let model_c = model_c.clone();
+                Box::pin(async move {
+                    model_c.on_event(data).await;
+                    Ok(())
+                })
+            })).await;
+        };
+        Some(model)
     } else {
         None
     };

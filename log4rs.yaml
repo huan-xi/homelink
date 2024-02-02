@@ -21,6 +21,8 @@ loggers:
     level: info
   "hap::transport::http::handler::pair_verify":
     level: info
+  "miot_spec::cloud":
+    level: info
   miot_spec:
     level: debug
   libmdns:

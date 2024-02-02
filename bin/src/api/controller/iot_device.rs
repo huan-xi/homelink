@@ -12,10 +12,8 @@ use miot_spec::proto::miio_proto::MiotSpecId;
 use crate::api::params::{AddServiceParam, DisableParam, QueryIotDeviceParam, TestPropParam};
 use crate::api::results::{IotDeviceResult, MiotDeviceResult};
 use crate::api_err;
-use crate::db::entity::iot_device::SourceType;
-use crate::hap::hap_type::MappingHapType::Saturation;
-use crate::init::device_init::{init_children_device, init_iot_devices, init_mi_device};
-use crate::init::DevicePointer;
+use crate::db::entity::iot_device::SourcePlatform;
+use crate::init::device_init::{init_children_device, init_iot_device_manager, init_mi_device};
 
 pub async fn list(state: State<AppState>, Query(param): Query<QueryIotDeviceParam>) -> ApiResult<Vec<IotDeviceResult>> {
     let mut query = IotDeviceEntity::find();
@@ -33,7 +31,7 @@ pub async fn list(state: State<AppState>, Query(param): Query<QueryIotDevicePara
         //查询对应的来源设
         let source = if let (Some(st), Some(id)) = (i.source_type, i.source_id.clone()) {
             match st {
-                SourceType::MiHome => {
+                SourcePlatform::MiHome => {
                     //查询对应的设备
                     MiotDeviceEntity::find_by_id(id).one(state.conn()).await?
                 }
@@ -88,12 +86,12 @@ pub async fn restart(state: State<AppState>, Path(id): Path<i64>) -> ApiResult<(
         true => {
             init_children_device(state.conn(), iot_device, state.device_manager.clone())
                 .await
-                .map_err(|e| api_err!("停止成功,启动失败{e}"))?
+                .map_err(|e| api_err!("启动失败{e}"))?
         }
         false => {
             init_mi_device(state.conn(), iot_device, state.device_manager.clone(), state.mi_account_manager.clone())
                 .await
-                .map_err(|e| api_err!("停止成功,启动失败{e}"))?
+                .map_err(|e| api_err!("启动失败{e}"))?
         }
     };
 

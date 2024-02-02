@@ -1,17 +1,22 @@
 use std::collections::HashMap;
 use std::sync::Arc;
-use hap::accessory::HapAccessory;
-use hap::HapType;
-use hap::service::HapService;
+
 use serde::{Serialize, Serializer};
 use serde::ser::SerializeStruct;
 use tokio::sync::Mutex;
+
+use hap::accessory::HapAccessory;
 use hap::characteristic::{OnReadsFn, OnUpdatesFn};
+use hap::HapType;
+use hap::service::HapService;
 use miot_spec::device::miot_spec_device::MiotSpecDevice;
-use crate::hap::models::{AccessoryModel, AccessoryModelExt, AccessoryModelExtPointer};
+
+use crate::hap::models::{AccessoryModel, };
 
 /// 一个设备可能存在多个配件
 /// 一个配件多个服务，一个服务多个特征值
+
+#[deprecated]
 pub struct IotDeviceAccessory {
     pub device: Arc<dyn MiotSpecDevice + Send + Sync>,
     pub accessories: Vec<Arc<Mutex<Box<dyn HapAccessory>>>>,

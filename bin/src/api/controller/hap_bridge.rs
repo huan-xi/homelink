@@ -17,52 +17,14 @@ use crate::db::SNOWFLAKE;
 use crate::hap::rand_utils::{gen_homekit_setup_uri_default, rand_mac_addr, rand_pin_code, rand_setup_id};
 use crate::init::hap_init::add_hap_bridge;
 use sea_orm::QueryFilter;
+use crate::db::entity::hap_bridge::{BonjourStatusFlagWrapper, BridgeInfo, PairingsWrapper};
+use crate::db::service::hap_bridge_service::create_hap_bridge;
+
 /// 添加桥接器
 pub async fn add(state: State<AppState>, Json(param): Json<AddHapBridgeParam>) -> ApiResult<()> {
-    let pin_code = match param.pin_code.filter(|x| !x.is_empty()) {
-        None => {
-            rand_pin_code() as i64
-        }
-        Some(s) => {
-            if s.len() != 8 {
-                return err_msg!("pin_code length must be 8");
-            }
-            s.parse::<i64>().map_err(|e| api_err!("pin code 格式错误"))?
-        }
-    };
-    let mac = rand_mac_addr();
-    let conn = state.conn();
-    let builder = conn.get_database_backend();
-    let st = SeaQuery::select().from(HapBridgeEntity)
-        .expr(Expr::col(HapBridgeColumn::Port).max())
-        .to_owned();
-    let stmt = builder.build(&st);
-    let result = conn.query_one(stmt).await?;
-    let default = 30000;
-
-    let port = match result {
-        None => default,
-        Some(r) => {
-            match r.try_get_by_index::<Option<i64>>(0)? {
-                None => default,
-                Some(s) => s + 1
-            }
-        }
-    };
-    let bid = SNOWFLAKE.next_id();
-    let hap_bridge = HapBridgeModel {
-        bridge_id: bid,
-        pin_code,
-        port,
-        category: param.category,
-        name: param.name,
-        mac: mac.to_string(),
-        setup_id: rand_setup_id(),
-        disabled: false,
-    };
-
-    let model = hap_bridge.clone().into_active_model();
-    HapBridgeEntity::insert(model).exec(state.conn()).await?;
+    //查询名字是否存在
+    let hap_bridge = create_hap_bridge(state.conn(), param.pin_code,
+                                       param.category, param.name, false).await?;
     add_hap_bridge(state.conn(), hap_bridge, state.hap_manager.clone(), state.device_manager.clone())
         .await
         .map_err(|e| api_err!("添加成功,启动失败{e}")).unwrap();
@@ -81,6 +43,19 @@ pub async fn delete(state: State<AppState>, Path(id): Path<i64>) -> ApiResult<()
     }
     state.hap_manager.stop_server(id).await?;
     HapBridgeEntity::delete_by_id(id).exec(state.conn()).await?;
+    ok_data(())
+}
+
+///重置
+pub async fn reset(state: State<AppState>, Path(id): Path<i64>) -> ApiResult<()> {
+    let model = HapBridgeActiveModel {
+        bridge_id: Set(id),
+        pairings: Set(PairingsWrapper::default()),
+        status_flag: Set(BonjourStatusFlagWrapper(BonjourStatusFlag::NotPaired)),
+        ..Default::default()
+    };
+    HapBridgeEntity::update(model).exec(state.conn()).await?;
+    restart(state, Path(id)).await?;
     ok_data(())
 }
 
@@ -107,16 +82,14 @@ pub async fn list(state: State<AppState>, Query(param): Query<HapBridgeListParam
         let peers = match peers {
             None => vec![],
             Some(s) => {
-                s.read().await.keys().map(|i| i.clone()).collect()
+                s.read().await.iter().map(|i| i.clone()).collect()
             }
         };
         let setup_uri = gen_homekit_setup_uri_default(
             i.pin_code as u64, i.category.to_value() as u64,
             i.setup_id.clone());
         let running = config.is_some();
-        let is_paired = if let Some(config) = config {
-            config.lock().await.status_flag != BonjourStatusFlag::NotPaired
-        } else { false };
+        let is_paired = i.status_flag.0 != BonjourStatusFlag::NotPaired;
         let accessory_count = HapAccessoryEntity::find()
             .filter(HapAccessoryColumn::BridgeId.eq(i.bridge_id))
             .count(state.conn())

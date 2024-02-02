@@ -50,10 +50,20 @@ impl<T> DataEmitter<T>
     }
 
     pub async fn emit(&self, event: T) {
-        let _ = timeout(Duration::from_secs(1), async {
-            join_all(self.listeners.iter().map(|listener| listener(event.clone()))).await;
-        }).await.tap_err(|_| {
-            log::error!("设备事件提交超时" );
-        });
+        let result = timeout(Duration::from_secs(1), async {
+            join_all(self.listeners.iter().map(|listener| listener(event.clone()))).await
+        }).await;
+        match result {
+            Ok(results) => {
+                for e in results {
+                    if let Err(e) = e {
+                        log::error!("设备事件提交,处理失败:{:?}", e);
+                    }
+                }
+            }
+            Err(_) => {
+                log::error!("设备事件提交,处理超时");
+            }
+        }
     }
 }

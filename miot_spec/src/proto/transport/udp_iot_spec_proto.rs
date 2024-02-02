@@ -167,7 +167,8 @@ impl MiotSpecProtocol for UdpMiotSpecProtocol {
 }
 
 
-pub struct Utils {}
+pub struct Utils;
+
 
 impl Utils {
     pub fn key_iv(token: &[u8; 16]) -> (Vec<u8>, Vec<u8>) {

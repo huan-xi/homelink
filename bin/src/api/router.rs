@@ -47,6 +47,7 @@ pub fn api() -> Router<AppState> {
                   .route("/list", get(controller::hap_bridge::list))
                   .route("/disable/:id", put(controller::hap_bridge::disable))
                   .route("/restart/:id", put(controller::hap_bridge::restart))
+                  .route("/reset/:id", put(controller::hap_bridge::reset))
                   .route("/:id", delete(controller::hap_bridge::delete))
                   .route("/", post(controller::hap_bridge::add))
               ,
@@ -68,10 +69,15 @@ pub fn api() -> Router<AppState> {
               Router::new()
 
                   .route("/list", get(controller::miot_device::list))
+                  .route("/templates/:model", get(controller::miot_device::templates))
                   .route("/convert", post(controller::miot_device::convert_to_iot_device))
+                  .route("/convert_by_template", post(controller::miot_device::convert_by_template))
                   .route("/handshake", post(controller::miot_device::handshake))
                   .route("/accounts", get(controller::miot_device::accounts))
                   .route("/account", post(controller::miot_device::add_account))
+                  .route("/account", delete(controller::miot_device::delete_account))
+                  //修改密码
+                  .route("/account/password", put(controller::miot_device::change_password))
                   .route("/account/login", post(controller::miot_device::login))
                   .route("/account", put(controller::miot_device::update_account))
                   .route("/account/sync_mi_devices", get(controller::miot_device::sync_mi_devices))

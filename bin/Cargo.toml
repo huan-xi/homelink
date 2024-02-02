@@ -62,6 +62,7 @@ sea-orm-migration = "0.12.12"
 thiserror = "1.0.56"
 tower-http.workspace = true
 url = "2.4.1"
+async-recursion = "1.0.5"
 #url = "2.1"
 [dev-dependencies]
 
