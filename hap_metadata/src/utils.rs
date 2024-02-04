@@ -1,3 +1,6 @@
+use std::io::Write;
+
+/// hap desc 字符串转 name
 pub fn pascal_case(param: &str) -> String {
     // let param = h.param(0).unwrap().value().as_str().unwrap().to_owned();
     let param = param.replace("-", " ");
@@ -12,4 +15,20 @@ pub fn pascal_case(param: &str) -> String {
         })
         .collect::<String>();
     name.replace(" ", "").replace(".", "_")
+}
+
+
+fn snake_case(param: &str) -> String {
+    param
+        .replace(" ", "_")
+        .replace(".", "_")
+        .replace("-", "_")
+        .to_lowercase()
+}
+
+#[test]
+pub fn test() {
+    let a = "current-temperature";
+    let c = snake_case(a);
+    println!("{}", c);
 }

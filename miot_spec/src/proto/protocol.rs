@@ -1,7 +1,7 @@
 use anyhow::Error;
 use block_modes::BlockMode;
 use impl_new::New;
-use log::{debug, info};
+use log::{debug, };
 use packed_struct::derive::PackedStruct;
 use packed_struct::PackedStruct;
 use serde::Serialize;

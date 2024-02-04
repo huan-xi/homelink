@@ -2,7 +2,7 @@
 /target/expend
 /target/release/build
 /target/release/deps
-/bin/examples
+/lib/examples
 #/target
 /.idea
 /data

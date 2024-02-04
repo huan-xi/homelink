@@ -2,13 +2,11 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use futures_util::future::join;
-use hex::FromHex;
 use impl_new::New;
-use log::info;
+use log::{debug, info};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tokio::sync::broadcast;
-
 use crate::proto::protocol::JsonMessage;
 
 // pub type MiotSpecProtocolPointer = Arc<Box<dyn MiotSpecProtocol + Send + Sync + 'static>>;
@@ -61,7 +59,7 @@ pub trait MiotSpecProtocol {
             "params":params
         }];
         let str = param.to_string();
-        info!("call_rpc:{}", str);
+        debug!("call_rpc:{}", str);
         let sender = self.send(str.as_str());
         let recv = self.await_result(id, timeout);
         let (r1, r2) = join(recv, sender).await;
@@ -86,7 +84,7 @@ pub trait MiotSpecProtocol {
             .ok_or(anyhow::anyhow!("properties 无result"))?;
         let miot_specs: Vec<MiotSpecDTO> = serde_json::from_value(value)?;
         //value 转成 MiotSpecDTO
-        info!("get_properties result:{:?}", miot_specs);
+        debug!("get_properties result:{:?}", miot_specs);
         Ok(miot_specs)
     }
 }

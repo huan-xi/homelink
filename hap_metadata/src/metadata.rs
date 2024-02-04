@@ -130,13 +130,13 @@ pub struct AssistantCharacteristic {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HapMetadata {
     pub categories: HashMap<String, HomeKitCategory>,
-    pub sorted_categories: Vec<HomeKitCategory>,
+    // pub sorted_categories: Vec<HomeKitCategory>,
     pub characteristics: HashMap<String, HapCharacteristic>,
-    pub sorted_characteristics: Vec<HapCharacteristic>,
+    // pub sorted_characteristics: Vec<HapCharacteristic>,
     pub services: HashMap<String, HapService>,
-    pub sorted_services: Vec<HapService>,
+    // pub sorted_services: Vec<HapService>,
     pub properties: HashMap<String, HapProperty>,
-    pub assistant_characteristics: HashMap<String, AssistantCharacteristic>,
+    // pub assistant_characteristics: HashMap<String, AssistantCharacteristic>,
     pub characteristic_in_values: HashMap<String, HashMap<String, Value>>,
     pub characteristic_out_values: HashMap<String, HashMap<String, Value>>,
 }
@@ -203,13 +203,13 @@ impl From<SystemMetadata> for HapMetadata {
 
         Self {
             categories: m.homekit.categories,
-            sorted_categories,
+            // sorted_categories,
             characteristics:m.hap.characteristics,
-            sorted_characteristics,
+            // sorted_characteristics,
             services,
-            sorted_services,
+            // sorted_services,
             properties: m.hap.properties,
-            assistant_characteristics: m.assistant.characteristics,
+            // assistant_characteristics: m.assistant.characteristics,
             characteristic_in_values,
             characteristic_out_values,
         }

@@ -1,11 +1,11 @@
 target
 data
-bin/examples
+lib/examples
 log
 .idea
 hap-rs/.idea
 Cargo.lock
 test.json
 test1.json
-bin/src/test
+lib/src/test
 dist

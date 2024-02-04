@@ -1,32 +1,29 @@
 #![allow(unused_variables)]
 
 use std::sync::Arc;
-
 use axum::Router;
 use log::{error, info};
-use sea_orm_migration::MigratorTrait;
 use tokio::select;
 use tokio::sync::oneshot;
 use tower_http::services::ServeDir;
 
-use bin::api::router;
-use bin::api::state::AppState;
-use bin::config::cfgs::Configs;
-use bin::config::context::{APP_CONTEXT, ApplicationContext, get_app_context};
-use bin::db::init::db_conn;
-use bin::init;
-use bin::init::device_init::init_iot_device_manager;
-use bin::init::manager::device_manager::IotDeviceManager;
-use bin::init::manager::hap_manager::HapManage;
-use bin::init::manager::mi_account_manager::MiAccountManager;
-use bin::init::manager::template_manager::TemplateManager;
-use bin::init::Managers;
-use bin::js_engine::context::EnvContext;
-use bin::js_engine::init_js_engine::init_js_engine;
-use bin::migration::Migrator;
+use lib::api::router;
+use lib::api::state::AppState;
+use lib::config::cfgs::Configs;
+use lib::config::context::{APP_CONTEXT, ApplicationContext, get_app_context};
+use lib::db::init::{db_conn, migrator_up};
+use lib::init;
+use lib::init::device_init::init_iot_device_manager;
+use lib::init::manager::device_manager::IotDeviceManager;
+use lib::init::manager::hap_manager::HapManage;
+use lib::init::manager::mi_account_manager::MiAccountManager;
+use lib::init::manager::template_manager::TemplateManager;
+use lib::init::{logger_init, Managers};
+use lib::js_engine::context::EnvContext;
+use lib::js_engine::init_js_engine::init_js_engine;
+use lib::migration::Migrator;
 use hap_metadata::hap_metadata;
 
-pub fn init_context() {}
 
 /// 先创建http服务
 /// 创建homekit 服务
@@ -34,19 +31,22 @@ pub fn init_context() {}
 /// 映射米家设备到homekit设备
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    log4rs::init_file("log4rs.yaml", Default::default()).unwrap();
+    if let Err(e) = log4rs::init_file("log4rs1.yaml", Default::default()) {
+        // 初始化默认日志
+        logger_init::init_logger();
+    }
     //读取配置
     let config = Configs::init();
     let addr = config.server.address.parse().expect("监听地址解析失败");
     // let addr = SocketAddr::new([0, 0, 0, 0].into(), 5514);
     let conn = db_conn(&config.server).await;
     //数据库版本迁移
-    Migrator::up(&conn, None).await.unwrap();
+    migrator_up(&conn).await;
 
     let hap_metadata = Arc::new(hap_metadata()?);
     // 初始化hap 服务器
     let iot_device_manager = IotDeviceManager::new();
-    let hap_manager = HapManage::new();
+    let hap_manager = HapManage::new(hap_metadata.clone());
     let template_manager = TemplateManager::new();
 
 
