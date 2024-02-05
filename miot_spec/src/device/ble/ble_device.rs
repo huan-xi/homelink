@@ -1,24 +1,24 @@
-use std::collections::HashMap;
-use std::mem;
+
+
 use std::sync::{Arc};
-use std::time::Duration;
+
 use anyhow::anyhow;
-use futures_util::future::{BoxFuture, join_all, ok};
+
 use crate::device::miot_spec_device::{BaseMiotSpecDevice, DeviceInfo, MiotDeviceType, MiotSpecDevice};
-use futures_util::FutureExt;
+
 use hex::FromHex;
-use log::{debug, error, info, warn};
-use num_enum::TryFromPrimitiveError;
-use packed_struct::{PackedStruct, PackingError};
+use log::{debug, error};
+
+use packed_struct::{PackedStruct};
 use serde_json::Value;
 use tokio::sync::RwLock;
-use crate::device::ble::value_types::{BleValue, BleValueType, ValueLsbI16};
-use crate::device::gateway::gateway::OpenMiioGatewayDevice;
-use crate::device::common::emitter::{DataListener, DataEmitter, EventType,};
+use crate::device::ble::value_types::{BleValue, BleValueType};
+
+use crate::device::common::emitter::{EventType,};
 use crate::device::MiotDevicePointer;
 use crate::proto::miio_proto::{MiotSpecDTO, MiotSpecId, MiotSpecProtocolPointer};
 use crate::proto::protocol::{ExitError, RecvMessage};
-use crate::proto::transport::ble_mapping_proto::BleMappingProto;
+
 
 /// https://tasmota.github.io/docs/Bluetooth/
 /// 低功耗蓝牙设备
@@ -54,7 +54,7 @@ impl MiotSpecDevice for BleDevice {
     async fn read_property(&self, siid: i32, piid: i32) -> anyhow::Result<Option<Value>> {
         if let Some(val) = self.spec_map.get_by_left(&MiotSpecId::new(siid, piid)) {
             let read = self.values.read().await;
-            if let Some(val) = read.get_value(val.clone()) {
+            if let Some(val) = read.get_value(*val) {
                 return Ok(Some(val));
             }
         };

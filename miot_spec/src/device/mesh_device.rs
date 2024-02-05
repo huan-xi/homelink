@@ -1,10 +1,10 @@
-use std::time::Duration;
+
 use crate::device::common::emitter::EventType;
 
 use crate::device::miot_spec_device::{BaseMiotSpecDevice, DeviceInfo, MiotSpecDevice};
 use crate::device::MiotDevicePointer;
 use crate::proto::miio_proto::{MiotSpecDTO, MiotSpecId, MiotSpecProtocolPointer};
-use crate::proto::protocol::{ExitError, RecvMessage};
+use crate::proto::protocol::{ExitError};
 
 /// 网关上监听了米家协议
 ///能监听到  miio/report properties_changed

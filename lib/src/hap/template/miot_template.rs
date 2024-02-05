@@ -1,4 +1,5 @@
 use std::str::FromStr;
+use sea_orm::{FromJsonQueryResult, JsonValue};
 use serde::{Deserialize, Serialize};
 use hap::characteristic::{Format, Perm, Unit};
 use miot_spec::proto::miio_proto::MiotSpecId;
@@ -77,6 +78,8 @@ pub struct AccessoryTemplate {
     #[serde(default)]
     pub model: Option<String>,
     #[serde(default)]
+    pub model_params: Option<JsonValue>,
+    #[serde(default)]
     pub desc: Option<String>,
     /// 配件的名称,默认取上一级
     #[serde(default)]
@@ -114,24 +117,29 @@ pub struct CharacteristicTemplate {
     #[serde(default)]
     pub name: Option<String>,
     #[serde(default)]
-
     pub unit_convertor: Option<UnitConvertor>,
     #[serde(default)]
     pub convertor_param: Option<ConvertorParamType>,
-
-    pub info: HapCharInfo,
-
-
-    // pub description: Option<String>,
-    // pub event_notifications: Option<bool>,
-    // pub valid_values: Option<Vec<String>>,
-    // pub min_value: Option<String>,
-    // pub max_value: Option<String>,
-    // pub step_value: Option<String>,
-
-    // pub max_len: Option<u64>,
-    // pub max_data_len: Option<u64>,
+    pub info: HapCharInfoTemp,
 }
+
+
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+pub struct HapCharInfoTemp {
+    pub format: Option<Format>,
+    pub unit: Option<Unit>,
+    pub min_value: Option<JsonValue>,
+    pub max_value: Option<JsonValue>,
+    pub step_value: Option<JsonValue>,
+    pub max_len: Option<u16>,
+    pub max_data_len: Option<u32>,
+    pub valid_values: Option<Vec<JsonValue>>,
+    pub valid_values_range: Option<Vec<JsonValue>>,
+    pub ttl: Option<u64>,
+    pub perms: Option<Vec<Perm>>,
+    pub pid: Option<u64>,
+}
+
 
 pub mod test {
     use tokio::fs::File;

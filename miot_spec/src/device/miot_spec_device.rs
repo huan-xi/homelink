@@ -1,15 +1,14 @@
-use std::cmp::min;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use anyhow::anyhow;
-use futures_util::future::BoxFuture;
+
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, Mutex, RwLock};
 use crate::device::ble::ble_device::BleDevice;
 use crate::device::common::emitter::{DataEmitter, DataListener, EventType};
 use crate::proto::miio_proto::{MiotSpecDTO, MiotSpecId, MiotSpecProtocolPointer};
 use serde_json::Value;
-use crate::proto::protocol::{ExitError, JsonMessage};
+use crate::proto::protocol::{ExitError};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, )]
 pub struct DeviceInfo {
@@ -50,7 +49,7 @@ impl RetryInfo {
     pub async fn incr(&self) -> u32 {
         let mut write = self.retry_count.lock().await;
         *write += 1;
-        return *write;
+        *write
     }
     pub async fn reset(&self) {
         let mut write = self.retry_count.lock().await;
@@ -131,6 +130,14 @@ pub trait MiotSpecDevice {
             .map_err(Into::<anyhow::Error>::into)?;
         proto.set_property(MiotSpecDTO { did, siid: spec_id.siid, piid: spec_id.piid, value: Some(value) }).await?;
         Ok(())
+    }
+    async fn set_properties(&self, params: Vec<(MiotSpecId, Value)>) ->anyhow::Result<Vec<MiotSpecDTO>>  {
+        let did = self.get_info().did.clone();
+        let proto = self.get_proto()
+            .await
+            .map_err(Into::<anyhow::Error>::into)?;
+        let params = params.into_iter().map(|id| MiotSpecDTO { did: did.clone(), siid: id.0.siid, piid: id.0.piid, value: Some(id.1) }).collect();
+        proto.set_properties(params, None).await
     }
     /// 读取设备属性
     async fn read_property(&self, siid: i32, piid: i32) -> anyhow::Result<Option<Value>> {

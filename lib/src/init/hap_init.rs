@@ -6,7 +6,8 @@ use sea_orm::{ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, Jso
 use hap::accessory::{AccessoryInformation, HapAccessory};
 use hap::accessory::bridge::BridgeAccessory;
 use hap::characteristic::configured_name::ConfiguredNameCharacteristic;
-use hap::characteristic::HapCharacteristic;
+use hap::characteristic::{AsyncCharacteristicCallbacks, CharacteristicCallbacks, HapCharacteristic};
+use hap::characteristic::name::NameCharacteristic;
 use hap::server::{IpServer, Server};
 use hap::service::HapService;
 use hap::storage::Storage;
@@ -19,7 +20,7 @@ use crate::init::{DevicePointer, HapAccessoryPointer};
 use crate::init::characteristic_init::to_characteristic;
 use crate::init::manager::device_manager::IotDeviceManager;
 use crate::init::manager::hap_manager::HapManage;
-
+use futures_util::FutureExt;
 pub async fn init_hap_list(conn: &DatabaseConnection, manage: HapManage, iot_device_map: IotDeviceManager) -> anyhow::Result<()> {
     let bridges = HapBridgeEntity::find()
         .filter(HapBridgeColumn::Disabled.eq(false))
@@ -168,7 +169,7 @@ pub struct InitServiceContext {
 pub(crate) async fn add_service(ctx: InitServiceContext, service_chs: (HapServiceModel, Vec<HapCharacteristicModel>)) -> anyhow::Result<usize> {
     let service = service_chs.0;
     let chs = service_chs.1;
-    let mut hap_service = IotHapService::new(ctx.sid, ctx.aid, service.service_type.into());
+    let mut hap_service = IotHapService::new(ctx.sid, ctx.aid, service.service_type.into(), service.tag.clone());
     hap_service.set_primary(service.primary);
     let stag = service.tag.clone();
     let mut success = false;
@@ -188,13 +189,20 @@ pub(crate) async fn add_service(ctx: InitServiceContext, service_chs: (HapServic
     }
     // hap_service.set_primary(true);
     // for (index, ch) in chs.into_iter().enumerate() {}
-    let len = hap_service.get_characteristics().len();
+    let mut len = hap_service.get_characteristics().len();
     // 设置名称
     if let Some(n) = service.configured_name.clone() {
         if !n.is_empty() {
             let id = ctx.sid + len as u64 + 1;
+            len += 1;
             let mut name = ConfiguredNameCharacteristic::new(id, ctx.aid);
-            name.set_value(JsonValue::String(n)).await?;
+            name.set_value(JsonValue::String(n.clone())).await?;
+            name.on_read(Some(move || {
+                let name = n.clone();
+                {
+                    Ok(Some(name))
+                }
+            }));
             hap_service.push_characteristic(Some("configured-name".to_string()), Box::new(name));
         }
     };

@@ -134,8 +134,8 @@ pub enum ExitError {
     Lock,
 }
 
-impl Into<anyhow::Error> for ExitError {
-    fn into(self) -> Error {
-        anyhow::anyhow!("{:?}",self)
+impl From<ExitError> for anyhow::Error {
+    fn from(val: ExitError) -> Self {
+        anyhow::anyhow!("{:?}",val)
     }
 }

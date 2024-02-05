@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use futures_util::future::BoxFuture;
+
 use crate::device::gateway::gateway::OpenMiioGatewayDevice;
 use crate::device::miot_spec_device::{BaseMiotSpecDevice, DeviceInfo, MiotSpecDevice};
 use crate::proto::miio_proto::MiotSpecProtocolPointer;

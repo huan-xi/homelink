@@ -38,7 +38,7 @@ pub struct UdpMiotSpecProtocol {
 impl UdpMiotSpecProtocol {
     pub async fn new(ip: &str, port: u32, token: [u8; 16],timeout: Duration) -> anyhow::Result<Self> {
         let addr: std::net::SocketAddr = format!("{}:{}", ip, port).parse().unwrap();
-        let mut socket = UdpSocket::bind("0.0.0.0:0").await?;
+        let socket = UdpSocket::bind("0.0.0.0:0").await?;
         socket.connect(addr).await?;
         let socket = std::sync::Arc::new(socket);
         let (msg_sender, _) = tokio::sync::broadcast::channel(1024);
@@ -74,7 +74,7 @@ impl UdpMiotSpecProtocol {
             device_id: self.device_id,
             stamp,
             //先用token 作为checksum
-            checksum: self.token.clone(),
+            checksum: self.token,
             ..Default::default()
         }, data);
 
@@ -92,8 +92,8 @@ impl UdpMiotSpecProtocol {
         let mut buf = [0u8; 1024];
         let result = tokio::time::timeout(timeout, socket.recv_from(&mut buf))
             .await
-            .tap_err(|f| error!("hello 包响应超时"))??;
-        let (size, block_modes) = result;
+            .tap_err(|_f| error!("hello 包响应超时"))??;
+        let (size, _block_modes) = result;
         let msg = Message::parse(&buf[..size]).unwrap();
         Ok(msg)
     }
@@ -123,12 +123,12 @@ impl MiotSpecProtocol for UdpMiotSpecProtocol {
             loop {
                 let msg = self.msg_sender.subscribe().recv().await?;
                 if let Some(val) = msg.data.get("id") {
-                    if val.as_u64() == Some(id as u64) {
+                    if val.as_u64() == Some(id) {
                         return Ok(msg);
                     }
                 };
             }
-        }).await.map_err(|f| anyhow!("调用接口响应超时,id:{}",id))?;
+        }).await.map_err(|_f| anyhow!("调用接口响应超时,id:{}",id))?;
         if let Err(e) = &res {
             error!("await_result error:{}", e);
             //将状态改成断开

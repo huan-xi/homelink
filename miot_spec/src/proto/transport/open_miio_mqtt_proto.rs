@@ -2,7 +2,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
 use anyhow::anyhow;
-use futures_util::StreamExt;
+
 use log::{debug, error};
 // use paho_mqtt::{AsyncClient, Message};
 // use paho_mqtt as mqtt;
@@ -34,7 +34,7 @@ impl OpenMiIOMqttSpecProtocol {
             .set_keep_alive(Duration::from_secs(5))
             .set_manual_acks(false);
 
-        let (mut client, mut event_loop) = AsyncClient::new(mqttoptions, 10);
+        let (client, event_loop) = AsyncClient::new(mqttoptions, 10);
         client.subscribe("#", QoS::AtMostOnce).await?;
 
 
@@ -77,13 +77,13 @@ impl MiotSpecProtocol for OpenMiIOMqttSpecProtocol {
             loop {
                 let msg = recv.recv().await?;
                 if let Some(val) = msg.data.get("id") {
-                    if val.as_u64() == Some(id as u64) {
+                    if val.as_u64() == Some(id) {
                         debug!("await_result:{:?}", msg.data);
                         return Ok(msg);
                     }
                 };
             }
-        }).await.map_err(|e| anyhow!("执行命令超时"))?
+        }).await.map_err(|_e| anyhow!("执行命令超时"))?
     }
 
     async fn start_listen(&self) {
@@ -126,7 +126,7 @@ impl MiotSpecProtocol for OpenMiIOMqttSpecProtocol {
 
                 }
             }
-            Err(e) => {
+            Err(_e) => {
                 error!("获取event_loop 失败");
             }
         }

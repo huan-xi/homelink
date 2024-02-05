@@ -16,6 +16,7 @@ use crate::db::service::hap_bridge_service::create_hap_bridge;
 use crate::db::SNOWFLAKE;
 use crate::hap::template::miot_template::MiotTemplate;
 use crate::init::helper::template_helper::{AccessoryCtx, DeviceModelCtx, to_accessory_model, to_char_model, to_device_model, to_service_model};
+use crate::init::manager::hap_manager::HapManage;
 
 /// 模板管理器
 ///
@@ -40,10 +41,11 @@ pub enum BridgeMode {
     Singer,
 }
 
-#[derive(Debug, Clone)]
+#[derive( Clone)]
 pub struct ApplyTemplateOptions {
     pub(crate) platform: SourcePlatformModel,
     pub(crate) id: String,
+    pub hap_manager: HapManage,
     //米家模型
     pub bridge_mode: BridgeMode,
     pub bridge_id: Option<i64>,
@@ -183,7 +185,9 @@ impl TemplateManagerInner {
                     // 保存服务
                     to_service_model(aid, sid, service)?.insert(&txn).await?;
                     for char in service.characteristics.iter() {
-                        let char_model = to_char_model(sid, char)?;
+                        let default = option.hap_manager.get_hap_default_info(char.char_type.into())
+                            .ok_or(anyhow!("未找到hap默认信息"))?;
+                        let char_model = to_char_model(sid, char, default)?;
                         char_model.insert(&txn).await?;
                     }
                 }

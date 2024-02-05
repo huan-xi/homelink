@@ -54,13 +54,13 @@ impl CookieState {
         //如果文件不存在则创建
 
 
-        let mut file = fs::OpenOptions::new()
+        let file = fs::OpenOptions::new()
             .write(true)
             .create(true)
             .truncate(true)
             .open(&self.cookie_store_path);
-        let mut file = if let Err(e) = file {
-            create_dir_all(&self.cookie_store_path.parent()
+        let mut file = if let Err(_e) = file {
+            create_dir_all(self.cookie_store_path.parent()
                 .ok_or(anyhow::anyhow!("路径错误"))?)?;
             match File::create(&self.cookie_store_path) {
                 Ok(f) => f,

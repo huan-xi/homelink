@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use futures_util::future::{BoxFuture, join_all};
 use serde::Serialize;
-use tap::TapFallible;
+
 use tokio::time::timeout;
 
 use crate::proto::miio_proto::MiotSpecDTO;

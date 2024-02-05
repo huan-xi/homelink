@@ -22,12 +22,12 @@ pub struct IotHapService {
     // pub power_state: PowerStateCharacteristic,
     // pub name: Option<NameCharacteristic>,
     characteristic_map: HashMap<u64, Box<dyn HapCharacteristic>>,
-
+    tag: Option<String>,
     tag_id_map: HashMap<String, Vec<u64>>,
 }
 
 impl IotHapService {
-    pub fn new(id: u64, accessory_id: u64, hap_type: HapType) -> Self {
+    pub fn new(id: u64, accessory_id: u64, hap_type: HapType, tag: Option<String>,) -> Self {
         let mut characteristic_map = HashMap::new();
         Self {
             id,
@@ -36,6 +36,7 @@ impl IotHapService {
             primary: false,
             linked_services: vec![],
             characteristic_map,
+            tag,
             tag_id_map: Default::default(),
         }
     }
@@ -51,6 +52,9 @@ impl IotHapService {
 impl HapService for IotHapService {
     fn get_id(&self) -> u64 {
         self.id
+    }
+    fn get_tag(&self) -> Option<String> {
+        self.tag.clone()
     }
 
     fn set_id(&mut self, id: u64) {

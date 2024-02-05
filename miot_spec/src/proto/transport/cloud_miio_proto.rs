@@ -20,7 +20,7 @@ impl MiotSpecProtocol for CloudMiioProto {
         todo!()
     }
 
-    async fn send<'a>(&'a self, cmd: &'a str) -> anyhow::Result<()> {
+    async fn send<'a>(&'a self, _cmd: &'a str) -> anyhow::Result<()> {
         Ok(())
     }
 
@@ -28,7 +28,7 @@ impl MiotSpecProtocol for CloudMiioProto {
         todo!("can not recv")
     }
 
-    async fn await_result<'a>(&'a self, id: u64, timeout_val: Option<Duration>) -> anyhow::Result<JsonMessage> {
+    async fn await_result<'a>(&'a self, _id: u64, _timeout_val: Option<Duration>) -> anyhow::Result<JsonMessage> {
         todo!("can not await_result")
     }
 
@@ -36,7 +36,7 @@ impl MiotSpecProtocol for CloudMiioProto {
         todo!("can not start_listen")
     }
 
-    async fn call_rpc(&self, method: &str, params: Vec<MiotSpecDTO>, timeout: Option<Duration>) -> anyhow::Result<JsonMessage> {
+    async fn call_rpc(&self, method: &str, params: Vec<MiotSpecDTO>, _timeout: Option<Duration>) -> anyhow::Result<JsonMessage> {
         let url = match method {
             METHOD_GET_PROPERTIES => "/miotspec/prop/get",
             METHOD_SET_PROPERTIES => "/miotspec/prop/set",

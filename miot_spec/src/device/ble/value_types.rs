@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 use packed_struct::derive::PackedStruct;
 use serde_json::Value;
-use tap::Tap;
+
 use num_enum::TryFromPrimitive;
-use std::convert::TryFrom;
+
 use anyhow::anyhow;
 use futures_util::TryStreamExt;
-use log::error;
+
 use packed_struct::PackedStruct;
 use serde::{Deserialize, Serialize};
 
@@ -55,7 +55,7 @@ impl BleValue {
 
 impl BleValue {
     pub fn get_value(&self, value_type: BleValueType) -> Option<Value> {
-        self.value_map.get(&value_type).map(|i| i.clone())
+        self.value_map.get(&value_type).cloned()
     }
 }
 
@@ -67,8 +67,8 @@ pub struct ValueLsbI16 {
     pub value: i16,
 }
 
-impl Into<serde_json::Value> for ValueLsbI16 {
-    fn into(self) -> Value {
-        Value::from(self.value)
+impl From<ValueLsbI16> for serde_json::Value {
+    fn from(val: ValueLsbI16) -> Self {
+        Value::from(val.value)
     }
 }

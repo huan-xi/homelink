@@ -195,7 +195,6 @@ impl ToChUtils {
                 if let UpdateProperty(res) = data {
                     if let Some(value) = res.value {
                         if res.did.as_str() == did.as_str() && res.piid == property.piid && res.siid == property.siid {
-                            // todo 只有值变化时才更新
                             // info!("listen property:{},{},{:?}", res.siid, res.piid, value);
                             // 蓝牙数据设置到特征上
                             tokio::spawn(async move {

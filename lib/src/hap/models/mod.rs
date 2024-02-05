@@ -3,10 +3,11 @@ use std::ops::Deref;
 use std::sync::Arc;
 use anyhow::anyhow;
 use dashmap::DashMap;
-use log::info;
+use log::{error, info};
 use once_cell::sync::OnceCell;
 use sea_orm::JsonValue;
 use serde_json::Value;
+use tap::TapFallible;
 use hap::characteristic::{CharReadParam, ReadCharValue, OnReadsFn, OnUpdatesFn, CharUpdateParam, UpdateCharValue};
 use miot_spec::device::common::emitter::EventType;
 use miot_spec::device::MiotDevicePointer;
@@ -45,15 +46,15 @@ impl AccessoryModel {
         let model_ext_new_func = ext
             .ok_or(anyhow!("AccessoryModelExt {} not found",name))?;
         let dev = ctx.dev.clone();
-        let model_ext = model_ext_new_func(ctx, option)?;
+        let model_ext = model_ext_new_func(ctx, option)
+            .tap_err(|e| error!("创建模型扩展失败{:?}",e))?;
         //订阅设备事件
         if model_ext.is_subscribe_event() {
             let model_ext_c = model_ext.clone();
             dev.add_listener(Box::new(move |data: EventType| {
                 let model_ext = model_ext_c.clone();
                 Box::pin(async move {
-                    //let result = model_ext.update_chars_value(ctx, data.params).await?;
-                    info!("update_chars_value:{:?}", data);
+                    model_ext.on_event(data).await;
                     Ok(())
                 })
             })

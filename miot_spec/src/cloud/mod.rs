@@ -6,7 +6,7 @@ mod mi_cloud_device_group;
 use crypto::symmetriccipher::SynchronousStreamCipher;
 use crypto::rc4::Rc4;
 use base64;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap};
 use std::fs::File;
 use std::i64;
 use std::io::Write;
@@ -15,7 +15,7 @@ use std::path::PathBuf;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use anyhow::anyhow;
 use base64::Engine;
-use base64::engine::general_purpose;
+
 use base64::engine::general_purpose::{STANDARD};
 use crypto::digest::Digest;
 use crypto::sha1::Sha1;
@@ -25,25 +25,25 @@ use log::{debug, error, info};
 use rand::distributions::Alphanumeric;
 use rand::Rng;
 use reqwest::{header, StatusCode, Url};
-use reqwest::cookie::{Cookie, CookieStore};
+
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value};
 use tokio::io::AsyncReadExt;
 use crate::cloud::state::CookieState;
 use anyhow::Result;
-use base64::prelude::BASE64_STANDARD_NO_PAD;
+
 use reqwest::header::HeaderMap;
 use tap::TapFallible;
 
 pub struct Utils {}
 
 mod test {
-    use std::collections::{BTreeMap, HashMap};
-    use base64::Engine;
-    use base64::engine::general_purpose::STANDARD;
-    use base64::prelude::BASE64_STANDARD_NO_PAD;
-    use log::info;
-    use crate::cloud::Utils;
+    
+    
+    
+    
+    
+    
 
     #[test]
     pub fn test_nonce() {
@@ -170,12 +170,12 @@ impl Utils {
         Ok(encrypted_payload)
     }
     fn generate_enc_params(url: &str, method: &str, signed_nonce: &str, nonce: &str, params: &mut BTreeMap<String, String>, ssecurity: &str) -> Result<()> {
-        let sign = Self::gen_enc_signature(url, method, signed_nonce, &params)?;
+        let sign = Self::gen_enc_signature(url, method, signed_nonce, params)?;
         params.insert("rc4_hash__".to_string(), sign);
         for (_, v) in params.iter_mut() {
             *v = Self::encrypt_rc4(signed_nonce, v.as_str())?;
         }
-        let sign = Self::gen_enc_signature(url, method, signed_nonce, &params)?;
+        let sign = Self::gen_enc_signature(url, method, signed_nonce, params)?;
         params.insert("signature".to_string(), sign);
         params.insert("ssecurity".to_string(), ssecurity.to_string());
         params.insert("_nonce".to_string(), nonce.to_string());
@@ -199,7 +199,7 @@ impl Utils {
         let mut buf: Vec<u8> = repeat(0).take((hasher.output_bits() + 7) / 8).collect();
         hasher.result(&mut buf);
         // hasher.result(hashed_signature.as_mut_slice());
-        let encoded_signature = STANDARD.encode(buf.to_vec());
+        let encoded_signature = STANDARD.encode(&buf);
         Ok(encoded_signature)
     }
     fn signed_nonce(ssecret: &str, nonce: &str) -> Result<String> {
@@ -218,7 +218,7 @@ impl Utils {
     fn gen_nonce() -> anyhow::Result<String> {
         let millis = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .map_err(|e| anyhow!("Time went backwards"))?
+            .map_err(|_e| anyhow!("Time went backwards"))?
             .as_millis() as i64;
 
         let mut rng = rand::thread_rng();
@@ -227,7 +227,7 @@ impl Utils {
 
         let part2 = millis as u64 / 60000;
         let mut nonce_bytes = random_int.to_be_bytes().to_vec();
-        let mut part2_bytes = part2.to_be_bytes().to_vec();
+        let part2_bytes = part2.to_be_bytes().to_vec();
         nonce_bytes.extend_from_slice(&part2_bytes[4..8]);
         Ok(STANDARD.encode(&nonce_bytes))
     }
@@ -251,7 +251,7 @@ impl Utils {
 }
 
 
-const JSON_START: &'static str = "&&&START&&&";
+const JSON_START: &str = "&&&START&&&";
 
 #[derive(Clone, Serialize, Default, Deserialize)]
 pub struct Info {
@@ -363,7 +363,7 @@ impl MiCloud {
     pub fn get_info(&self) -> anyhow::Result<Info> {
         match self.info.clone() {
             None => {
-                return Err(anyhow!("未登录"));
+                Err(anyhow!("未登录"))
             }
             Some(i) => Ok(i)
         }
@@ -452,7 +452,7 @@ impl MiCloud {
         let val: serde_json::Value = serde_json::from_str(text.as_str())?;
 
 
-        return Ok(val);
+        Ok(val)
     }
     fn _get_api_url(&self, path: &str) -> String {
         let country_lower = self.country.as_str().trim().to_lowercase();
@@ -545,7 +545,7 @@ impl MiCloud {
         let text = text.replace(JSON_START, "");
         //转成json
         let mut json_map: serde_json::map::Map<String, Value> = serde_json::from_str(text.as_str())
-            .map_err(|e| anyhow!("json解析失败"))?;
+            .map_err(|_e| anyhow!("json解析失败"))?;
 
         let code = json_map.remove("code")
             .and_then(|i| i.as_u64());
@@ -561,7 +561,7 @@ impl MiCloud {
                 let ssecurity = json_map.remove("ssecurity")
                     .and_then(|v| v.as_str().map(|s| s.to_string()))
                     .ok_or(anyhow!("获取ssecurity 失败"))
-                    .tap_err(|e| {
+                    .tap_err(|_e| {
                         //{"qs":"%3Fsid%3Dxiaomiio%26_json%3Dtrue","code":70016,"description"
                         error!("登录第二步失败,text:{}",text.as_str())
                     })?;

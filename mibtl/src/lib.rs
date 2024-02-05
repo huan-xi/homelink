@@ -5,15 +5,15 @@ pub fn add(left: usize, right: usize) -> usize {
 #[cfg(test)]
 mod tests {
     use std::env;
-    use btleplug::api::{bleuuid::BleUuid, Central, CentralEvent, Manager as _, Peripheral, ScanFilter};
+    use btleplug::api::{Central, Manager as _, Peripheral, ScanFilter};
     use btleplug::platform::{Adapter, Manager};
-    use futures_util::stream::StreamExt;
+    
     use std::error::Error;
-    use log::{error, info};
+    use log::{info};
 
     async fn get_central(manager: &Manager) -> Adapter {
         let adapters = manager.adapters().await.unwrap();
-        adapters.into_iter().nth(0).unwrap()
+        adapters.into_iter().next().unwrap()
     }
 
     #[tokio::test]
@@ -27,7 +27,7 @@ mod tests {
         // Each adapter has an event stream, we fetch via events(),
         // simplifying the type, this will return what is essentially a
         // Future<Result<Stream<Item=CentralEvent>>>.
-        let mut events = central.events().await?;
+        let _events = central.events().await?;
 
         // start scanning for devices
         central.start_scan(ScanFilter::default()).await?;

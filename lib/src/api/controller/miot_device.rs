@@ -203,6 +203,7 @@ pub async fn convert_by_template(state: State<AppState>, Json(param): Json<MiCon
     state.template_manager.apply_template(state.conn(), &ApplyTemplateOptions {
         platform: SourcePlatformModel::MiHome(mi_dev),
         id: param.id,
+        hap_manager: state.hap_manager.clone(),
         bridge_mode: param.bridge_mode,
         bridge_id: param.bridge_id,
         gateway_id: param.gateway_id,

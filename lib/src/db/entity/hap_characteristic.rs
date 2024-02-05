@@ -173,7 +173,7 @@ impl ColumnTrait for Column {
             Self::Name => ColumnType::String(Some(64)).def().null(),
             Self::MappingMethod => ColumnType::Integer.def(),
             Self::CharacteristicType => ColumnType::Integer.def(),
-            Self::UnitConvertor => ColumnType::String(Some(32)).def().null(),
+            Self::UnitConvertor => ColumnType::Integer.def().null(),
             Self::ConvertorParam => ColumnType::String(None).def().null(),
             Self::Info => ColumnType::String(None).def().null(),
         }

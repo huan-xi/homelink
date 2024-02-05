@@ -1,5 +1,6 @@
 use sea_orm::ActiveValue::Set;
 use crate::db::entity::common::{Property, PropertyVec};
+use crate::db::entity::hap_characteristic::HapCharInfo;
 use crate::db::entity::iot_device::SourcePlatform;
 use crate::db::entity::prelude::{HapAccessoryActiveModel, HapCharacteristicActiveModel, HapServiceActiveModel, IotDeviceActiveModel, IotDeviceModel, MiotDeviceModel};
 use crate::db::SNOWFLAKE;
@@ -25,7 +26,23 @@ pub fn to_service_model(aid: i64, sid: i64, svc: &ServiceTemplate) -> anyhow::Re
     })
 }
 
-pub fn to_char_model(sid: i64, char: &CharacteristicTemplate) -> anyhow::Result<HapCharacteristicActiveModel> {
+pub fn to_char_model(sid: i64, char: &CharacteristicTemplate, default: HapCharInfo) -> anyhow::Result<HapCharacteristicActiveModel> {
+    let info_temp = char.info.clone();
+    let info = HapCharInfo {
+        format: info_temp.format.unwrap_or(default.format),
+        unit: info_temp.unit.or(default.unit),
+        min_value: info_temp.min_value.or(default.min_value),
+        max_value: info_temp.max_value.or(default.max_value),
+        step_value: info_temp.step_value.or(default.step_value),
+        max_len: info_temp.max_len.or(default.max_len),
+        max_data_len: info_temp.max_data_len.or(default.max_data_len),
+        valid_values: info_temp.valid_values.or(default.valid_values),
+        valid_values_range: info_temp.valid_values_range.or(default.valid_values_range),
+        ttl: info_temp.ttl.or(default.ttl),
+        perms: info_temp.perms.unwrap_or(default.perms),
+        pid: info_temp.pid.or(default.pid),
+    };
+
     Ok(HapCharacteristicActiveModel {
         cid: Set(SNOWFLAKE.next_id()),
         service_id: Set(sid),
@@ -36,7 +53,7 @@ pub fn to_char_model(sid: i64, char: &CharacteristicTemplate) -> anyhow::Result<
         mapping_param: Set(char.mapping_param.clone()),
         unit_convertor: Set(char.unit_convertor.clone()),
         convertor_param: Set(char.convertor_param.clone()),
-        info: Set(char.info.clone()),
+        info: Set(info),
     })
 }
 
@@ -52,7 +69,7 @@ pub fn to_accessory_model(ctx: AccessoryCtx, accessory: &AccessoryTemplate) -> a
         script: Default::default(),
         script_params: Default::default(),
         model: Set(accessory.model.clone()),
-        model_params: Default::default(),
+        model_params: Set(accessory.model_params.clone()),
         memo: Set(accessory.desc.clone()),
         info: Default::default(),
         temp_id: Set(Some(ctx.dev_ctx.id.clone())),

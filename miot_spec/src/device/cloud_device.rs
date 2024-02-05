@@ -1,11 +1,11 @@
-use std::sync::Arc;
+
 use std::time::Duration;
 use futures_util::future::BoxFuture;
 
 use crate::device::miot_spec_device::{BaseMiotSpecDevice, DeviceInfo, MiotSpecDevice};
 use crate::proto::miio_proto::MiotSpecProtocolPointer;
 use crate::proto::protocol::ExitError;
-use crate::proto::transport::cloud_miio_proto::CloudMiioProto;
+
 
 /// 通过云端接入的设备
 pub struct MiCloudDevice<T: MiCloudExt> {

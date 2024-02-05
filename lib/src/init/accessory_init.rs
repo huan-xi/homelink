@@ -129,6 +129,11 @@ pub(crate) async fn init_hap_accessory<'a, C: ConnectionTrait>(conn: &C, hap_man
 async fn check_ids(name_c: String, accessory: &Arc<RwLock<Box<dyn HapAccessory>>>) -> anyhow::Result<()> {
     let mut ids = vec![];
     for ch in accessory.read().await.get_services() {
+        let sid = ch.get_id();
+        if ids.contains(&sid) {
+            return Err(anyhow!("配件:{},服务id:{}重复",name_c,sid));
+        }
+        ids.push(sid);
         for ch in ch.get_characteristics() {
             let id = ch.get_id();
             if ids.contains(&id) {

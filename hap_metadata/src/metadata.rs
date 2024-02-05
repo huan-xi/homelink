@@ -153,13 +153,13 @@ impl From<SystemMetadata> for HapMetadata {
         let  smart_speaker_service = m.hap.services.get_mut("smart-speaker").unwrap();
         smart_speaker_service.name = "Smart Speaker".to_string();
 
-        let mut sorted_categories = m.homekit.categories.iter().map(|(_, v)| v.clone()).collect::<Vec<_>>();
+        let mut sorted_categories = m.homekit.categories.values().cloned().collect::<Vec<_>>();
         sorted_categories.sort_by(|a, b| a.number.partial_cmp(&b.number).unwrap());
 
-        let mut sorted_characteristics = m.hap.characteristics.iter().map(|(_, v)| v.clone()).collect::<Vec<_>>();
+        let mut sorted_characteristics = m.hap.characteristics.values().cloned().collect::<Vec<_>>();
         sorted_characteristics.sort_by(|a, b| a.name.cmp(&b.name));
 
-        let mut sorted_services = m.hap.services.iter().map(|(_, v)| v.clone()).collect::<Vec<_>>();
+        let mut sorted_services = m.hap.services.values().cloned().collect::<Vec<_>>();
         sorted_services.sort_by(|a, b| a.name.cmp(&b.name));
 
         let mut characteristic_in_values = HashMap::new();

@@ -32,7 +32,7 @@ pub trait MiotSpecProtocol {
 
     async fn get_property_timeout(&self, param: MiotSpecDTO, timeout_val: Option<Duration>) -> anyhow::Result<Option<Value>> {
         let mut values = self.get_properties(vec![param], timeout_val).await?;
-        if values.len() == 0 {
+        if values.is_empty() {
             return Ok(None);
         };
         Ok(values.remove(0).value)
@@ -46,7 +46,7 @@ pub trait MiotSpecProtocol {
     }
     async fn set_property_timeout(&self, param: MiotSpecDTO, timeout_val: Option<Duration>) -> anyhow::Result<()> {
         let mut values = self.set_properties(vec![param], timeout_val).await?;
-        values.remove(0).value;
+        values.remove(0);
         Ok(())
     }
 

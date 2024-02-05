@@ -31,7 +31,7 @@ use hap_metadata::hap_metadata;
 /// 映射米家设备到homekit设备
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    if let Err(e) = log4rs::init_file("log4rs1.yaml", Default::default()) {
+    if let Err(e) = log4rs::init_file("log4rs.yaml", Default::default()) {
         // 初始化默认日志
         logger_init::init_logger();
     }
