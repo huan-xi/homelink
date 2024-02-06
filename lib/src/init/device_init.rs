@@ -10,7 +10,7 @@ use miot_spec::device::ble::ble_device::BleDevice;
 use miot_spec::device::cloud_device::MiCloudDevice;
 use miot_spec::device::gateway::gateway::OpenMiioGatewayDevice;
 use miot_spec::device::mesh_device::MeshDevice;
-use miot_spec::device::miot_spec_device::DeviceInfo;
+use miot_spec::device::miot_spec_device::{AsMiotSpecDevice, DeviceInfo};
 use miot_spec::device::MiotDevicePointer;
 use miot_spec::device::wifi_device::WifiDevice;
 
@@ -69,13 +69,13 @@ pub async fn init_children_device(conn: &DatabaseConnection, dev: IotDeviceModel
         }
         Some(gw) => gw
     };
-    let dev = init_children_device0(conn, dev, gw.device).await?;
-    manager.push_device(dev_id, dev);
+    // let dev = init_children_device0(conn, dev, gw).await?;
+    // manager.push_device(dev_id, dev);
     Ok(())
 }
 
 
-async fn init_children_device0(conn: &DatabaseConnection, dev: IotDeviceModel, gw: MiotDevicePointer) -> anyhow::Result<DevicePointer> {
+async fn init_children_device0<T: AsMiotSpecDevice +  Send + Sync>(conn: &DatabaseConnection, dev: IotDeviceModel, gw: Arc<T>) -> anyhow::Result<DevicePointer> {
     //查米家设备
     let source_id = dev.source_id.ok_or(anyhow!("设备来源id不存在"))?;
     let (_, dev_info) = get_device_info(conn, source_id.as_str()).await?;
@@ -85,14 +85,16 @@ async fn init_children_device0(conn: &DatabaseConnection, dev: IotDeviceModel, g
                 // param.mapping
                 let mapping = param.get_mapping();
                 let ble_dev = BleDevice::new(param.info, gw.clone(), mapping);
-                return Ok(DevicePointer::new(Arc::new(ble_dev)));
+                // return Ok(Arc::new(ble_dev));
+                todo!();
             }
             Err(anyhow!("初始化设备失败，MiBleDevice 参数类型错误"))
         }
         IotDeviceType::MiMeshDevice => {
             if let Some(DeviceParam::MeshParam) = dev.params {
-                let ble_dev = MeshDevice::new(dev_info, gw.clone());
-                return Ok(DevicePointer::new(Arc::new(ble_dev)));
+                todo!();
+                // let ble_dev = MeshDevice::new(dev_info, gw.clone());
+                // return Ok(Arc::new(ble_dev));
             }
             Err(anyhow!("初始化设备失败，MiMeshDevice参数类型错误"))
         }
@@ -118,18 +120,18 @@ async fn init_mi_device0(conn: &DatabaseConnection, dev: IotDeviceModel, mi_acco
     let (account_id, param) = get_device_info(conn, source_id.as_str()).await?;
     return match dev.device_type {
         IotDeviceType::MiWifiDevice => {
-            return Ok(DevicePointer::new(Arc::new(WifiDevice::new(param).await?)));
+            return Ok(Arc::new(WifiDevice::new(param).await?));
         }
         IotDeviceType::MiGatewayDevice => {
             let dev = OpenMiioGatewayDevice::new(param).await?;
             let dev = Arc::new(dev);
-            return Ok(DevicePointer::new(dev.clone()));
+            return Ok(dev.clone());
         }
         IotDeviceType::MiCloudDevice => {
             // mi_account_manager.get_proto(account_id.as_str()).await?;
             //todo 判断米家账号状态
             let ext = MiCloudDeviceExt::new(account_id, mi_account_manager.clone());
-            Ok(DevicePointer::new(Arc::new(MiCloudDevice::new(param, ext))))
+            Ok(Arc::new(MiCloudDevice::new(param, ext)))
         }
         _ => {
             Err(anyhow!("初始化设备失败，设备类型错误"))

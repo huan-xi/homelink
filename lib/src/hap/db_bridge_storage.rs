@@ -3,7 +3,7 @@ use impl_new::New;
 use sea_orm::ActiveValue::Set;
 use sea_orm::{ActiveModelTrait, DatabaseConnection, EntityTrait, NotSet};
 use tap::TapFallible;
-use hap::{BonjourFeatureFlag, BonjourStatusFlag, Config, Ed25519Keypair};
+use hap::{Config, Ed25519Keypair};
 use hap::Error::Unknown;
 use hap::pairing::Pairing;
 use hap::storage::Storage;
@@ -153,7 +153,7 @@ mod test {
 
     #[tokio::test]
     pub async fn test() {
-        let conn = open_db("sqlite:///Users/huanxi/project/home-link/data/data.db".to_string()).await;
+        let conn = open_db("sqlite:///Users/huanxi/project/homelink/data/data.db".to_string()).await;
         let mut storage = crate::hap::db_bridge_storage::DbBridgesStorage::new(1202261535225806848i64, conn);
         let config = storage.load_config().await.unwrap();
         let pairing = Pairing {

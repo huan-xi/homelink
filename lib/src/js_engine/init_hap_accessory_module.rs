@@ -10,7 +10,7 @@ use crate::config::context::{get_app_context, get_data_dir};
 use crate::init::manager::hap_manager::HapManage;
 // use crate::js_engine::channel::params::ExecuteSideModuleParam;
 
-/// hap 设备作为一个module 运行
+/// hap_platform 设备作为一个module 运行
 #[cfg(feature = "deno")]
 pub async fn init_hap_accessory_module(manage: HapManage, ch_id: i64, aid: u64, script: &str) -> anyhow::Result<()> {
     // let (sender, recv, exit_ch) = hap_channel::channel();
@@ -52,7 +52,7 @@ fn init_js_files(aid: u64, script: &str) -> anyhow::Result<Url> {
     let md5_hdx = hex::encode(md5.0);
     // let context = get_app_context();
     let dir = get_data_dir();
-    let js_file_str = format!("{}/js_scripts/hap/{}_{}/handle.js", dir, aid, md5_hdx);
+    let js_file_str = format!("{}/js_scripts/hap_platform/{}_{}/handle.js", dir, aid, md5_hdx);
     let js_file = PathBuf::from(js_file_str.as_str());
     fs::create_dir_all(js_file.parent().unwrap())?;
     fs::write(js_file.as_path(), script)?;

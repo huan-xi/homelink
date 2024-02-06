@@ -1,51 +1,40 @@
 use std::collections::HashMap;
 use std::sync::Arc;
+use impl_new::New;
+use log::info;
 
 use serde::{Serialize, Serializer};
 use serde::ser::SerializeStruct;
 use tokio::sync::Mutex;
 
 use hap::accessory::HapAccessory;
-use hap::characteristic::{OnReadsFn, OnUpdatesFn};
+use hap::characteristic::{Cid, OnReadsFn, OnRwFn, OnUpdateFn, OnUpdatesFn};
 use hap::HapType;
 use hap::service::HapService;
 use miot_spec::device::miot_spec_device::MiotSpecDevice;
 
-use crate::hap::models::{AccessoryModel, };
+use crate::hap::models::{AccessoryModel};
 
 /// 一个设备可能存在多个配件
 /// 一个配件多个服务，一个服务多个特征值
 
-#[deprecated]
-pub struct IotDeviceAccessory {
-    pub device: Arc<dyn MiotSpecDevice + Send + Sync>,
-    pub accessories: Vec<Arc<Mutex<Box<dyn HapAccessory>>>>,
-}
-
-impl IotDeviceAccessory {
-    pub fn new(device: Arc<dyn MiotSpecDevice + Send + Sync>) -> Self {
-        Self {
-            device,
-            accessories: vec![],
-        }
-    }
-}
 
 pub struct TagsIdMap {
     map: HashMap<String, Vec<u64>>,
 }
 
-/*impl TagsIdMap {
-    pub fn new() -> Self {
-        Self {
-            map: Default::default(),
-        }
-    }
-    pub fn push(&mut self, tag: String, id: u64) {
-        let ids = self.map.entry(tag).or_insert(vec![]);
-        ids.push(id);
-    }
-}*/
+#[derive(Debug, Clone, Hash, Eq, PartialEq, New)]
+pub struct CharId {
+    aid: u64,
+    iid: u64,
+}
+
+/// 特征值处理器
+pub struct CharsHandler {
+    /// 一个函数可以处理多个特征值
+    reads_map: HashMap<Vec<u64>, Arc<OnReadsFn>>,
+    updates_map: HashMap<Vec<u64>, Arc<OnUpdatesFn>>,
+}
 
 pub struct IotHapAccessory {
     /// ID of the Switch accessory.
@@ -56,7 +45,10 @@ pub struct IotHapAccessory {
     /// Switch service.
     pub services: HashMap<u64, Box<dyn HapService>>,
     pub tag_ids_map: HashMap<String, Vec<u64>>,
+
     pub model_ext: Option<AccessoryModel>,
+    reads_map: HashMap<Vec<u64>, Arc<OnReadsFn>>,
+    updates_map: HashMap<Vec<u64>, Arc<OnUpdatesFn>>,
 }
 
 impl IotHapAccessory {
@@ -71,6 +63,8 @@ impl IotHapAccessory {
             services,
             tag_ids_map: Default::default(),
             model_ext,
+            reads_map: Default::default(),
+            updates_map: Default::default(),
         }
     }
     pub fn on_read() {}
@@ -121,16 +115,120 @@ impl HapAccessory for IotHapAccessory {
     fn get_mut_service_by_id(&mut self, id: u64) -> Option<&mut dyn HapService> {
         self.services.get_mut(&id).map(|i| i.as_mut() as &mut dyn HapService)
     }
+
     fn get_on_reads_fn(&self) -> Option<OnReadsFn> {
         self.model_ext
-            .as_ref()
+            .clone()
             .and_then(|i| i.get_on_reads_fn())
     }
     fn get_on_updates_fn(&self) -> Option<OnUpdatesFn> {
         self.model_ext
-            .as_ref()
+            .clone()
             .and_then(|i| i.get_on_updates_fn())
     }
+
+    /* fn get_on_reads_fn(&self) -> Option<OnReadsFn> {
+         // let func_map = self.func_map.clone();
+         let func_map_c = self.reads_map.clone();
+         let ext = self.model_ext.clone();
+         Some(Box::new(move |mut params| {
+             let func_map = func_map_c.clone();
+             let ext = ext.clone();
+             Box::pin(async move {
+                 //value中匹配iid
+                 let mut result = vec![];
+                 for (ids, func) in func_map.iter() {
+                     let mut func_params = vec![];
+                     for i in 0..params.len() {
+                         let param = params.get(i).unwrap();
+                         if ids.contains(&param.cid) {
+                             func_params.push(params.remove(i));
+                         }
+                     }
+                     if !func_params.is_empty() {
+                         result.extend(func(func_params).await?);
+                     }
+                 }
+                 if !params.is_empty() {
+                     if let Some(ext) = ext {
+                         result.extend(ext.model_ext.read_chars_value(params).await?);
+                     } else {
+                         info!("未处理读取参数:{:?}",params);
+                     };
+                 };
+                 //读取函数
+                 Ok(result)
+             })
+         }))
+     }
+     fn get_on_updates_fn(&self) -> Option<OnUpdatesFn> {
+         let func_map_c = self.updates_map.clone();
+         let ext = self.model_ext.clone();
+         Some(Box::new(move |mut params| {
+             let func_map = func_map_c.clone();
+             let ext = ext.clone();
+             Box::pin(async move {
+                 //value中匹配iid
+                 let mut result = vec![];
+                 for (ids, func) in func_map.iter() {
+                     let mut func_params = vec![];
+                     for i in 0..params.len() {
+                         let param = params.get(i).unwrap();
+                         if ids.contains(&param.cid) {
+                             func_params.push(params.remove(i));
+                         }
+                     }
+                     if !func_params.is_empty() {
+                         result.extend(func(func_params).await?);
+                     }
+                 }
+                 if !params.is_empty() {
+                     if let Some(ext) = ext {
+                         result.extend(ext.model_ext.update_chars_value(params).await?);
+                     } else {
+                         info!("未处理更新参数:{:?}",params);
+                     }
+                 };
+                 Ok(result)
+             })
+         }))
+     }*/
+}
+
+impl IotHapAccessory {
+    /*fn get_func<P, R,F>(&self, func_map: HashMap<Vec<u64>, Arc<OnRwFn<P, R>>>,
+                        ext_func: Arc<OnRwFn<P, R>>) -> Option<OnRwFn<P, R>>
+        where P: Cid {
+        let func_map_c = func_map.clone();
+        let ext = self.model_ext.clone();
+        Some(Box::new(move |mut params| {
+            let func_map = func_map_c.clone();
+            let ext = ext.clone();
+            Box::pin(async move {
+                //value中匹配iid
+                let mut result = vec![];
+                for (ids, func) in func_map.iter() {
+                    let mut func_params = vec![];
+                    for i in 0..params.len() {
+                        let param = params.get(i).unwrap();
+                        if ids.contains(&param.get_cid()) {
+                            func_params.push(params.remove(i));
+                        }
+                    }
+                    if !func_params.is_empty() {
+                        result.extend(func(func_params).await?);
+                    }
+                }
+                if !params.is_empty() {
+                    if let Some(ext) = ext {
+                        // ext_func()
+                        result.extend(ext.model_ext.update_chars_value(params).await?);
+                    };
+                };
+                Ok(result)
+            })
+        }))
+}*/
 }
 
 impl Serialize for IotHapAccessory {

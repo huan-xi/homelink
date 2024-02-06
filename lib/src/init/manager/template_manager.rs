@@ -236,7 +236,7 @@ mod test {
     #[tokio::test]
     pub async fn test() {
         let manager = TemplateManager::new();
-        let template_dir = PathBuf::from("/Users/huanxi/project/home-link/data/templates");
+        let template_dir = PathBuf::from("/Users/huanxi/project/homelink/data/templates");
         let a = manager.scan_dir_start(template_dir).await.unwrap();
         for a in &manager.mihome_templates {
             println!("{:?}", a.key());

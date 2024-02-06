@@ -8,35 +8,28 @@ use crate::init::manager::device_manager::IotDeviceManager;
 use crate::init::manager::hap_manager::HapManage;
 use crate::init::manager::mi_account_manager::MiAccountManager;
 use crate::init::manager::template_manager::TemplateManager;
+use crate::init::Managers;
 
 
 pub struct AppStateInner {
     conn: DatabaseConnection,
+    managers: Managers,
     // hap_server: Arc<IpServer>,
-    pub hap_metadata: Arc<HapMetadata>,
-    pub device_manager: IotDeviceManager,
-    pub hap_manager: HapManage,
-    pub mi_account_manager: MiAccountManager,
-    pub template_manager: TemplateManager,
+    // pub hap_platform-metadata: Arc<HapMetadata>,
+    // pub device_manager: IotDeviceManager,
+    // pub hap_manager: HapManage,
+    // pub mi_account_manager: MiAccountManager,
+    // pub template_manager: TemplateManager,
     //
 }
 
 impl AppStateInner {
-    pub fn new(conn: DatabaseConnection,
-               hap_metadata: Arc<HapMetadata>,
-               device_manager: IotDeviceManager,
-               hap_manager: HapManage,
-               mi_account_manager: MiAccountManager,
-               template_manager: TemplateManager,
+    pub fn new(conn: DatabaseConnection, managers: Managers,
     ) -> Self {
         let conn_c = conn.clone();
         Self {
             conn,
-            hap_metadata,
-            device_manager,
-            hap_manager,
-            mi_account_manager,
-            template_manager
+            managers,
         }
     }
 
@@ -51,17 +44,20 @@ pub struct AppState {
     inner: Arc<AppStateInner>,
 }
 
+impl Deref for AppStateInner {
+    type Target = Managers;
+
+    fn deref(&self) -> &Self::Target {
+        &self.managers
+    }
+}
+
 impl AppState {
     pub fn new(conn: DatabaseConnection,
-               hap_metadata: Arc<HapMetadata>,
-               device_manager: IotDeviceManager,
-               hap_manager: HapManage,
-               mi_account_manager: MiAccountManager,
-               template_manager: TemplateManager,
+               managers: Managers,
     ) -> Self {
         Self {
-            inner: Arc::new(AppStateInner::new(conn, hap_metadata, device_manager, hap_manager, mi_account_manager
-            ,template_manager)),
+            inner: Arc::new(AppStateInner::new(conn, managers)),
         }
     }
 }

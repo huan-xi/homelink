@@ -4,7 +4,7 @@ use anyhow::anyhow;
 /// 开,将 mode 属性设置到当前值,
 /// 并且将其他属性设置为false,关则将其他设置成false
 
-use hap::characteristic::{CharReadParam, CharUpdateParam, Format, ReadCharValue, UpdateCharValue};
+use hap::characteristic::{CharReadParam, CharUpdateParam, Format, CharReadResult, CharUpdateResult};
 use hap::HapType;
 use log::{error, info, warn};
 use miot_spec::proto::miio_proto::MiotSpecId;
@@ -114,7 +114,7 @@ impl AccessoryModelExt for ModelExt {
                 }
                 _ => None,
             };
-            result.push(ReadCharValue {
+            result.push(CharReadResult {
                 cid: param.cid,
                 success: true,
                 value,
@@ -161,7 +161,7 @@ impl AccessoryModelExt for ModelExt {
                 }
                 _ => {}
             }
-            result.push(UpdateCharValue {
+            result.push(CharUpdateResult {
                 cid: param.cid,
                 success: true,
             })

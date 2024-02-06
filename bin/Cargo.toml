@@ -9,7 +9,7 @@ path = "src/main.rs"
 
 [dependencies]
 lib = { path = "../lib" }
-hap_metadata = { path = "../hap_metadata" }
+hap-metadata = { path = "../hap-metadata" }
 axum.workspace = true
 log4rs.workspace = true
 log.workspace = true

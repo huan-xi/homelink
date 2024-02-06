@@ -21,8 +21,8 @@ use lib::init::manager::template_manager::TemplateManager;
 use lib::init::{logger_init, Managers};
 use lib::js_engine::context::EnvContext;
 use lib::js_engine::init_js_engine::init_js_engine;
-use lib::migration::Migrator;
 use hap_metadata::hap_metadata;
+use lib::init::manager::ble_manager::BleManager;
 
 
 /// 先创建http服务
@@ -42,22 +42,26 @@ async fn main() -> anyhow::Result<()> {
     let conn = db_conn(&config.server).await;
     //数据库版本迁移
     migrator_up(&conn).await;
-
+    let ble_manager = BleManager::new();
+    ble_manager.init().await?;
     let hap_metadata = Arc::new(hap_metadata()?);
     // 初始化hap 服务器
-    let iot_device_manager = IotDeviceManager::new();
+    let device_manager = IotDeviceManager::new();
     let hap_manager = HapManage::new(hap_metadata.clone());
     let template_manager = TemplateManager::new();
 
-
     let mi_account_manager = MiAccountManager::new(conn.clone());
 
-    let app_state = AppState::new(conn.clone(),
-                                  hap_metadata.clone(),
-                                  iot_device_manager.clone(),
-                                  hap_manager.clone(),
-                                  mi_account_manager.clone(),
-                                  template_manager.clone());
+
+
+    let app_state = AppState::new(conn.clone(), Managers {
+        hap_metadata: hap_metadata.clone(),
+        hap_manager: hap_manager.clone(),
+        device_manager: device_manager.clone(),
+        mi_account_manager: mi_account_manager.clone(),
+        template_manager: template_manager.clone(),
+        ble_manager: ble_manager.clone(),
+    });
 
     let app = Router::new()
         .nest_service("/", ServeDir::new("dist/"))
@@ -71,7 +75,7 @@ async fn main() -> anyhow::Result<()> {
         #[cfg(feature = "deno")]
         main_recv: None,
         conn: conn.clone(),
-        dev_manager: iot_device_manager.clone(),
+        dev_manager: device_manager.clone(),
         hap_manager: hap_manager.clone(),
     }).await?;
 
@@ -81,7 +85,7 @@ async fn main() -> anyhow::Result<()> {
         conn: conn.clone(),
         js_engine,
         hap_metadata: hap_metadata.clone(),
-        device_manager: iot_device_manager.clone(),
+        device_manager: device_manager.clone(),
         hap_manager: hap_manager.clone(),
     });
     if res.is_err() {
@@ -104,17 +108,12 @@ async fn main() -> anyhow::Result<()> {
     });
 
     // 初始化hap设备
-    let manager = Managers {
-        hap_manager: hap_manager.clone(),
-        iot_device_manager: iot_device_manager.clone(),
-        mi_account_manager: mi_account_manager.clone(),
-    };
     // 初始化模板
     template_manager.init().await?;
     // 初始化iot设备
-    init_iot_device_manager(&conn, iot_device_manager.clone(), mi_account_manager.clone()).await?;
+    init_iot_device_manager(&conn, device_manager.clone(), mi_account_manager.clone()).await?;
     // 初始化hap 设备
-    init::hap_init::init_hap_list(&conn, hap_manager.clone(), iot_device_manager.clone()).await?;
+    init::hap_init::init_hap_list(&conn, hap_manager.clone(), device_manager.clone()).await?;
 
     // 等待引擎退出
     // let recv = context.js_engine.resp_recv.subscribe();
@@ -142,7 +141,7 @@ async fn main() -> anyhow::Result<()> {
     // 服务停止
     drop(app_state);
     // let _ = js_tx.send(0);
-    iot_device_manager.close().await;
+    device_manager.close().await;
     hap_manager.close().await;
     Ok(())
 }

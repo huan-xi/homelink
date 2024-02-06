@@ -1,6 +1,6 @@
+mod init;
 use std::ops::Deref;
 use std::sync::Arc;
-
 use axum::body::HttpBody;
 use dashmap::DashMap;
 use dashmap::mapref::entry::Entry;
@@ -10,145 +10,15 @@ use tokio::sync::oneshot;
 
 use miot_spec::device::common::emitter::EventType;
 use miot_spec::device::miot_spec_device::MiotSpecDevice;
-use miot_spec::device::MiotDevicePointer;
 
 use crate::config::context::get_app_context;
 use crate::init::DevicePointer;
-
-#[cfg(feature = "deno")]
-use crate::js_engine::channel::{
-    params::OnDeviceEventParam,
-    main_channel::ToModuleEvent
-};
-
-pub struct JsModule {
-    ///与 特征脚本通信的通道
-    // pub sender: Arc<MappingCharacteristicSender>,
-    /// module 的关闭通道
-    pub exit_channel: oneshot::Sender<u8>,
-
-}
-
-#[derive(Clone)]
-pub struct DeviceWithJsEngine {
-    pub(crate) device: MiotDevicePointer,
-    /// 特征 cid 和 对应的module
-    /// 一个设备运行多个特征脚本
-    mapping_js_map: Arc<DashMap<i64, JsModule>>,
-}
-
-impl Deref for DeviceWithJsEngine {
-    type Target = Arc<dyn MiotSpecDevice + Send + Sync>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.device
-    }
-}
-
-impl DeviceWithJsEngine {
-    pub fn new(device: Arc<dyn MiotSpecDevice + Send + Sync>) -> Self {
-        Self {
-            device,
-            mapping_js_map: Default::default(),
-        }
-    }
-
-    /// 初始化js模块,获取通道
-    pub async fn init_mapping_js_module(&self, cid: i64, script: &str, force: bool) -> anyhow::Result<()> {
-        todo!();
-        /*  let chanel_sender = self.mapping_js_map.get_mut(&cid);
-          if let Some(sender) = chanel_sender.as_ref() {
-              //todo force 处理
-              return Ok(sender.sender.clone());
-          }
-
-          //输出到文件
-          let context = get_app_context();
-          let dir = context.config.server.data_dir.as_str();
-          let js_file_str = format!("{}/js_scripts/mapping/mapping_{}.js", dir, cid);
-          let js_file = PathBuf::from(js_file_str.as_str());
-          fs::create_dir_all(js_file.parent().unwrap())?;
-          fs::write(js_file.as_path(), script)?;
-          let url = Url::parse(js_file_str.as_str())?;
-
-          //注册mapping 通道,
-          let channel = context.js_engine.mapping_characteristic_map.get(&cid);
-          let (tx, _) = broadcast::channel(10);
-          let js_to_tx = Arc::new(tx);
-          // 注册模块
-          let (recv, exit, sender) = MappingCharacteristicRecv::new(js_to_tx.clone());
-          let ch_sender = MappingCharacteristicSender::new(sender, js_to_tx.clone());
-          let ch_sender = Arc::new(ch_sender);
-          context.js_engine.mapping_characteristic_map.insert(cid, recv);
-          let module = JsModule { sender: ch_sender.clone(), exit_channel: exit };
-
-          return match context.js_engine
-              .execute_side_module(      ExecuteSideModuleParam::new(1, url)).await
-              .tap_err(|e| error!("执行js错误")) {
-              Ok(_) => {
-                  self.mapping_js_map.insert(cid, module);
-                  Ok(ch_sender.clone())
-              }
-              Err(_) => {
-                  //删除掉
-                  context.js_engine.mapping_characteristic_map.remove(&cid);
-                  Err(anyhow::anyhow!("执行js错误"))
-              }
-          };*/
-    }
-
-
-
-
-
-
-
-
-
-    /*   let source = Source::from_bytes(js_scripts.as_str());
-       let mut js_engine_lock = self.js_engine
-           .lock()
-           .map_err(|e| anyhow!("获取js引擎失败:{:?}", e))?;
-
-       let val = match js_engine_lock.as_mut() {
-           None => {
-               //初始化js引擎
-
-               // let context = boa_engine::Context::default();
-               let context = init_js_engine(self.device.clone());
-               js_engine_lock.replace(context);
-               js_engine_lock.as_mut().unwrap()
-           }
-           Some(js_engine) => {
-               js_engine
-           }
-       }.eval(source).map_err(|e| anyhow!("js执行错误:{:?}", e))?;
-       drop(js_engine_lock);
-       json_value_from_js_value(val)*/
-
-    /*pub async fn get_js_engine(&self) -> boa_engine::Context<'static> {
-        //不存在就初始化
-        let js_engine = self.js_engine.read().await;
-        if js_engine.is_none() {
-            drop(js_engine);
-            let mut js_engine = self.js_engine.write().await;
-            if js_engine.is_none() {
-                info!("初始化设备:{}js引擎", self.device.get_info().did);
-                let js_engine = boa_engine::Context::default();
-                *js_engine = Some(js_engine);
-            }
-        } else {
-
-        }
-    }*/
-}
 
 
 pub struct DeviceTask {
     dev: DevicePointer,
     /// 关闭整个任务
     close_sender: oneshot::Sender<bool>,
-    // exit_recv: tokio::sync::oneshot::Receiver<bool>,
 }
 
 

@@ -6,8 +6,7 @@ use sea_orm::{ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, Jso
 use hap::accessory::{AccessoryInformation, HapAccessory};
 use hap::accessory::bridge::BridgeAccessory;
 use hap::characteristic::configured_name::ConfiguredNameCharacteristic;
-use hap::characteristic::{AsyncCharacteristicCallbacks, CharacteristicCallbacks, HapCharacteristic};
-use hap::characteristic::name::NameCharacteristic;
+use hap::characteristic::{ CharacteristicCallbacks, HapCharacteristic};
 use hap::server::{IpServer, Server};
 use hap::service::HapService;
 use hap::storage::Storage;
@@ -41,12 +40,13 @@ pub fn print_dir() {
     let hex = format!("{:x}", u64);
     println!("{:?}", hex);
 }
-
+/// 对于设备的依赖就是特征读写值,平台设备要转成 hap_platform 设备就必须实现,特征读写方法
+///
 /// 添加单个bridge 到管理器中
 pub async fn add_hap_bridge(conn: &DatabaseConnection, bridge: HapBridgeModel, manage: HapManage, iot_device_map: IotDeviceManager) -> anyhow::Result<()> {
     let config = &get_app_context().config;
 
-    // let str = format!("{}/{}_{}", config.server.data_dir, "hap", bridge.pin_code);
+    // let str = format!("{}/{}_{}", config.server.data_dir, "hap_platform", bridge.pin_code);
     // let mut storage = FileStorage::new(str.as_str()).await?;
     let bid = bridge.bridge_id;
     let bridge_model = HapBridgeEntity::find_by_id(bid)
@@ -88,13 +88,6 @@ pub async fn add_hap_bridge(conn: &DatabaseConnection, bridge: HapBridgeModel, m
         server.add_accessory(bridge).await?;
     }
 
-    /*let serial_number = {
-        let mut rng = rand::thread_rng();
-        let random_bytes: [u8; 16] = rng.gen();
-        hex::encode(random_bytes)
-    };*/
-
-
     // 初始化其他配件
     let accessories = init_hap_accessories(conn,
                                            manage.clone(),
@@ -115,9 +108,7 @@ pub struct AccessoryRelation {
 }
 
 /// 基于设备初始化配件列表
-async fn init_hap_accessories<C: ConnectionTrait>(conn: &C,
-                                                  hap_manage: HapManage,
-                                                  bridge_id: i64, iot_device_map: IotDeviceManager) -> anyhow::Result<Vec<AccessoryRelation>> {
+async fn init_hap_accessories<C: ConnectionTrait>(conn: &C,  hap_manage: HapManage, bridge_id: i64, iot_device_map: IotDeviceManager) -> anyhow::Result<Vec<AccessoryRelation>> {
     let hap_accessories = HapAccessoryEntity::find()
         .filter(HapAccessoryColumn::BridgeId.eq(bridge_id)
             .and(HapAccessoryColumn::Disabled.eq(false)))

@@ -1,12 +1,13 @@
 [workspace]
-members = ["miot_spec", "lib", "hap_metadata", "hap-rs", "libmdns", "mibtl","bin"]
+members = ["miot-spec", "lib", "hap-metadata", "hap-rs", "libmdns", "ble-monitor","bin", "hl-device"]
 resolver = "2"
-#exclude=["hap-rs/codegen"]
+#exclude=["hap_platform-rs/codegen"]
 [profile.dev]
 split-debuginfo = "unpacked"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [workspace.dependencies]
 anyhow = "1.0.76"
+tap = "1.0.1"
 axum = "0.6.20"
 tower-http = { version = "0.4.0", features = ["fs","catch-panic"] }
 rust-embed = "8.2.0"
@@ -25,6 +26,9 @@ rust-crypto = "0.2.36"
 base64 = "0.21.5"
 lazy_static = "1.4.0"
 futures-util = "0.3.30"
+num_enum = "0.7.2"
+thiserror = "1.0.56"
+async-trait = "0.1"
 #deno_runtime = { path = "/Users/huanxi/tmp/deno/runtime", features = ["dont_use_runtime_snapshot"] }
 [profile.release]
 strip = true

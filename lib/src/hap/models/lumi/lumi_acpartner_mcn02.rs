@@ -2,7 +2,7 @@ use std::sync::Arc;
 use futures_util::future::ok;
 use log::info;
 use sea_orm::JsonValue;
-use hap::characteristic::{CharReadParam, CharUpdateParam, ReadCharValue};
+use hap::characteristic::{CharReadParam, CharUpdateParam, CharReadResult};
 use hap::HapType;
 use miot_spec::proto::miio_proto::{MiotSpecDTO, MiotSpecId};
 use crate::hap::models::{AccessoryModelExt, AccessoryModelExtConstructor,AccessoryModelExtPointer, ContextPointer, ReadValueResult, UpdateValueResult};
@@ -69,7 +69,7 @@ impl AccessoryModelExt for ModelExt {
                     None
                 }
             };
-            result.push(ReadCharValue {
+            result.push(CharReadResult {
                 cid: param.cid,
                 success: true,
                 value,
@@ -126,7 +126,7 @@ impl ModelExt {
 
         return None;
     }
-    ///hap Off = 0,Heat = 1,Cool = 2,Auto = 3,
+    ///hap_platform Off = 0,Heat = 1,Cool = 2,Auto = 3,
 
     ///0 - Auto
     /// 1 - Cool

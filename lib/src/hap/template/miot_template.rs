@@ -155,7 +155,7 @@ pub mod test {
 
     #[tokio::test]
     pub async fn test() -> anyhow::Result<()> {
-        let mut file = File::open("/Users/huanxi/project/home-link/templates/mihome/chuangmi.plug.212a01.toml").await.unwrap();
+        let mut file = File::open("/Users/huanxi/project/homelink/templates/mihome/chuangmi.plug.212a01.toml").await.unwrap();
         let mut content = String::new();
         file.read_to_string(&mut content).await?;
         // SecuritySystemAccessory::new();

@@ -2,7 +2,7 @@ use std::sync::Arc;
 use anyhow::anyhow;
 use log::{debug, info};
 use sea_orm::JsonValue;
-use hap::characteristic::{CharReadParam, CharUpdateParam, ReadCharValue, UpdateCharValue};
+use hap::characteristic::{CharReadParam, CharUpdateParam, CharReadResult, CharUpdateResult};
 use hap::HapType;
 use miot_spec::proto::miio_proto::MiotSpecId;
 use crate::hap::models::{AccessoryModelExt, AccessoryModelExtConstructor, AccessoryModelExtPointer, ContextPointer, ReadValueResult, UpdateValueResult};
@@ -43,7 +43,7 @@ impl AccessoryModelExt for ModelExt {
             .map(|v| JsonValue::from(v));
         let mut result = vec![];
         for param in params.into_iter() {
-            result.push(ReadCharValue {
+            result.push(CharReadResult {
                 cid: param.cid,
                 success: true,
                 value: value.clone(),
@@ -67,7 +67,7 @@ impl AccessoryModelExt for ModelExt {
                 value + 1
             };
             ctx.dev.set_property(self.arming_mode, serde_json::json!(value)).await?;
-            results.push(UpdateCharValue {
+            results.push(CharUpdateResult {
                 cid: param.cid,
                 success: true,
             });

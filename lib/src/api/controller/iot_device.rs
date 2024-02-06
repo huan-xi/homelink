@@ -1,11 +1,10 @@
 use axum::extract::{Path, Query, State};
 use axum::Json;
-use log::error;
 use sea_orm::ActiveValue::Set;
-use sea_orm::{EntityTrait, JsonValue};
+use sea_orm::{EntityTrait, JsonValue, PaginatorTrait};
 use crate::api::output::{ApiResp, ApiResult, ok_data};
 use crate::api::state::AppState;
-use crate::db::entity::prelude::{IotDeviceEntity, IotDeviceActiveModel, IotDeviceColumn, IotDeviceModel, MiotDeviceEntity, MiotDeviceModel};
+use crate::db::entity::prelude::{IotDeviceEntity, IotDeviceActiveModel, IotDeviceColumn, IotDeviceModel, MiotDeviceEntity, MiotDeviceModel, HapAccessoryEntity, HapAccessoryColumn};
 use sea_orm::QueryFilter;
 use sea_orm::ColumnTrait;
 use miot_spec::proto::miio_proto::MiotSpecId;
@@ -76,12 +75,24 @@ pub async fn set_property(state: State<AppState>, Path(id): Path<i64>, Json(para
     ok_data(())
 }
 
+pub async fn delete(state: State<AppState>, Path(id): Path<i64>) -> ApiResult<()> {
+    //查询配件
+    let count = HapAccessoryEntity::find()
+        .filter(HapAccessoryColumn::DeviceId.eq(id))
+        .count(state.conn())
+        .await?;
+    if count > 0 {
+        return Err(api_err!("设备下有配件,请先删除配件"));
+    }
+    IotDeviceEntity::delete_by_id(id).exec(state.conn()).await?;
+    Ok(ApiResp::with_data(()))
+}
+
 
 pub async fn restart(state: State<AppState>, Path(id): Path<i64>) -> ApiResult<()> {
     state.device_manager.stop_device(id)?;
     let model = IotDeviceEntity::find_by_id(id).one(state.conn()).await?;
     let iot_device = model.ok_or(api_err!("设备不存在"))?;
-
     match iot_device.device_type.require_gw() {
         true => {
             init_children_device(state.conn(), iot_device, state.device_manager.clone())

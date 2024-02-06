@@ -8,7 +8,7 @@ use once_cell::sync::OnceCell;
 use sea_orm::JsonValue;
 use serde_json::Value;
 use tap::TapFallible;
-use hap::characteristic::{CharReadParam, ReadCharValue, OnReadsFn, OnUpdatesFn, CharUpdateParam, UpdateCharValue};
+use hap::characteristic::{CharReadParam, CharReadResult, OnReadsFn, OnUpdatesFn, CharUpdateParam, CharUpdateResult};
 use miot_spec::device::common::emitter::EventType;
 use miot_spec::device::MiotDevicePointer;
 use crate::hap::models::model_ext_database::{AccessoryModelExtDatabase, MODEL_EXT_DATABASE};
@@ -99,8 +99,8 @@ impl Deref for AccessoryModel {
     }
 }
 
-pub(crate) type ReadValueResult = anyhow::Result<Vec<ReadCharValue>>;
-pub(crate) type UpdateValueResult = anyhow::Result<Vec<UpdateCharValue>>;
+pub(crate) type ReadValueResult = anyhow::Result<Vec<CharReadResult>>;
+pub(crate) type UpdateValueResult = anyhow::Result<Vec<CharUpdateResult>>;
 
 pub(crate) const PARAM_KEY: &str = "PARAM";
 

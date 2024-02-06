@@ -10,7 +10,7 @@ mod kelvin_to_mired_convertor;
 mod scale_down;
 
 pub trait Convertor {
-    /// 转成目标值 hap 的值
+    /// 转成目标值 hap_platform 的值
     fn to(&self, param: Option<ConvertorParamType>, value: Value) -> anyhow::Result<Value>;
     ///
     fn from(&self, param: Option<ConvertorParamType>, value: Value) -> anyhow::Result<Value>;

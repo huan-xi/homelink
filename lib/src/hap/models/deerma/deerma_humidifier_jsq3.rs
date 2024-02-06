@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use hap::characteristic::{CharReadParam, CharUpdateParam, Format, ReadCharValue, UpdateCharValue};
+use hap::characteristic::{CharReadParam, CharUpdateParam, Format, CharReadResult, CharUpdateResult};
 use hap::HapType;
 use log::info;
 use sea_orm::JsonValue;
@@ -70,7 +70,7 @@ impl AccessoryModelExt for ModelExt {
                     None
                 }
             };
-            result.push(ReadCharValue {
+            result.push(CharReadResult {
                 cid: param.cid,
                 success: true,
                 value,
@@ -95,7 +95,7 @@ impl AccessoryModelExt for ModelExt {
                 _ => {}
             }
 
-            result.push(UpdateCharValue {
+            result.push(CharUpdateResult {
                 cid: param.cid,
                 success: true,
             })

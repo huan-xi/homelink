@@ -186,11 +186,7 @@ pub async fn templates(state: State<AppState>, Path(model): Path<String>) -> Api
         .mihome_templates
         .iter()
         .filter(|v| v.model.as_str() == model.as_str())
-        .map(|v| {
-            let mut vv = v.clone();
-            vv.id = v.key().clone();
-            vv
-        })
+        .map(|v| v.clone())
         .collect::<Vec<MiotTemplate>>();
     ok_data(list)
 }

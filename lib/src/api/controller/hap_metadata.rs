@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use axum::extract::{Path, State};
-/// hap 元数据
+/// hap_platform 元数据
 use hap_metadata::{convert_to_kebab_case, hap_metadata};
 use hap_metadata::metadata::HapService;
 use crate::api::output::{ApiResp, ApiResult, err_msg, ok_data};

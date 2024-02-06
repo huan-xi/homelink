@@ -54,7 +54,7 @@ pub struct AccessoryInfo {
 }
 
 
-/// hap 设备管理器
+/// hap_platform 设备管理器
 /// 移除device 必须移除其对应的hap 设备
 #[derive(Default)]
 pub struct HapManageInner {
@@ -208,7 +208,7 @@ impl HapManageInner {
         tokio::spawn(async move {
             let task = async move {
                 let res = server_c.run_handle().await;
-                error!("hap server退出:{:?},res:{:?}",bid, res);
+                error!("hap_platform server退出:{:?},res:{:?}",bid, res);
             };
             loop {
                 tokio::select! {

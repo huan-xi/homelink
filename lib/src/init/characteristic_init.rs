@@ -13,10 +13,6 @@ use hap::HapType;
 use miot_spec::device::common::emitter::{DataListener, EventType};
 use miot_spec::device::common::emitter::EventType::UpdateProperty;
 use miot_spec::proto::miio_proto::MiotSpecId;
-use miot_spec::proto::transport::udp_iot_spec_proto::Utils;
-
-use crate::config::context::get_app_context;
-use crate::db::entity::common::Property;
 use crate::db::entity::hap_characteristic::{HapCharInfo, MappingMethod, MappingParam};
 use crate::db::entity::prelude::HapCharacteristicModel;
 use crate::hap::hap_type::MappingHapType;
@@ -54,7 +50,6 @@ pub async fn to_characteristic(ctx: InitServiceContext,
         id: sid + index as u64 + 1,
         accessory_id: ctx.aid,
         hap_type: ch.characteristic_type.into(),
-        // hap_type: HapType::PowerState,
         format,
         unit,
         max_value: ch.info.max_value
@@ -124,6 +119,7 @@ async fn set_read_update_method(ctx: InitServiceContext, cts: &mut IotCharacteri
                   .map(|i| CharacteristicValue::new(i))
                   .unwrap_or(CharacteristicValue::default());*/
         }
+        // 米家属性映射
         MappingMethod::PropMapping => {
             // 设置读写映射
             if let Some(MappingParam::PropMapping(param)) = ch.mapping_param.clone() {
@@ -239,7 +235,7 @@ impl ToChUtils {
         }
     }
 
-    //hap 转换成目标值
+    //hap_platform 转换成目标值
     pub fn conv_to_value(conv: UnitConv, value: JsonValue) -> JsonValue {
         match conv.0 {
             None => {
@@ -252,7 +248,7 @@ impl ToChUtils {
                         error!("To单位转换错误:{:?}",e);
                     })
                     .unwrap_or(Value::Null);
-                // debug!("convert to hap value:{:?}=>{:?}", old, value);
+                // debug!("convert to hap_platform value:{:?}=>{:?}", old, value);
                 value
             }
         }
@@ -262,7 +258,7 @@ impl ToChUtils {
         dev.read_property(property.siid, property.piid).await
     }
 
-    /// hap 配件更新到设备
+    /// hap_platform 配件更新到设备
     /// 存在target 属性
     pub fn get_set_func(ctx: InitServiceContext,
                         property_id: MiotSpecId,
