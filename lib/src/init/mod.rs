@@ -6,9 +6,10 @@ use tokio::sync::RwLock;
 use hap::accessory::HapAccessory;
 use hap_metadata::metadata::HapMetadata;
 use hl_device::HlDevice;
-use miot_spec::device::miot_spec_device::{AsMiotSpecDevice, MiotSpecDevice};
+use miot_spec::device::miot_spec_device::{AsMiotGatewayDevice, MiotSpecDevice};
 use miot_spec::device::MiotDevicePointer;
 use miot_spec::proto::miio_proto::MiotSpecId;
+use crate::device::platform::PlatformDevice;
 
 
 pub mod hap_init;
@@ -25,14 +26,10 @@ pub type TokioMutex<T> = tokio::sync::Mutex<T>;
 pub type HapAccessoryPointer = Arc<RwLock<Box<dyn HapAccessory>>>;
 pub type AFuturesMutex<T> = Arc<futures_util::lock::Mutex<T>>;
 
-#[async_trait::async_trait]
-pub trait PlatformDevice: HlDevice + AsMiotSpecDevice {
-    async fn read_property(&self, siid: i32, piid: i32) -> anyhow::Result<Option<Value>>;
-    async fn set_property(&self, spec_id: MiotSpecId, value: Value) -> anyhow::Result<()>;
-}
 
-// pub type DevicePointer = Arc<dyn PlatformDevice + Send + Sync + 'static>;
-pub type DevicePointer = MiotDevicePointer;
+
+pub type DevicePointer = Arc<dyn PlatformDevice + Send + Sync + 'static>;
+// pub type DevicePointer = MiotDevicePointer;
 pub type DeviceMap = DashMap<i64, DevicePointer>;
 
 

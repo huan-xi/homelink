@@ -9,9 +9,11 @@ use sea_orm::JsonValue;
 use serde_json::Value;
 use tap::TapFallible;
 use hap::characteristic::{CharReadParam, CharReadResult, OnReadsFn, OnUpdatesFn, CharUpdateParam, CharUpdateResult};
+use hl_device::event::events::DeviceEvent;
 use miot_spec::device::common::emitter::EventType;
 use miot_spec::device::MiotDevicePointer;
 use crate::hap::models::model_ext_database::{AccessoryModelExtDatabase, MODEL_EXT_DATABASE};
+use crate::init::DevicePointer;
 use crate::init::manager::hap_manager::HapManage;
 
 pub mod lumi;
@@ -22,7 +24,7 @@ mod common;
 
 pub struct AccessoryModelContext {
     pub aid: u64,
-    pub(crate) dev: MiotDevicePointer,
+    pub(crate) dev: DevicePointer,
     pub(crate) hap_manager: HapManage,
     /// 资源表,存储局部变量
     pub resource_table: DashMap<String, Box<dyn Any + 'static + Send + Sync>>,
@@ -51,11 +53,11 @@ impl AccessoryModel {
         //订阅设备事件
         if model_ext.is_subscribe_event() {
             let model_ext_c = model_ext.clone();
-            dev.add_listener(Box::new(move |data: EventType| {
+            dev.add_listener(Box::new(move |data| {
                 let model_ext = model_ext_c.clone();
                 Box::pin(async move {
                     model_ext.on_event(data).await;
-                    Ok(())
+                    ()
                 })
             })
             ).await;
@@ -120,7 +122,7 @@ pub trait AccessoryModelExt {
     /// 批量读取特征值
     async fn read_chars_value(&self, params: Vec<CharReadParam>) -> ReadValueResult;
     async fn update_chars_value(&self, params: Vec<CharUpdateParam>) -> UpdateValueResult;
-    async fn on_event(&self, event_type: EventType) {}
+    async fn on_event(&self, event_type: DeviceEvent) {}
 
     /// 是否订阅设备的事件
     fn is_subscribe_event(&self) -> bool { true }

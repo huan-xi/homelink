@@ -11,6 +11,7 @@ use miot_spec::proto::miio_proto::MiotSpecId;
 use crate::hap::models::{AccessoryModelExt, AccessoryModelExtConstructor, AccessoryModelExtPointer, ContextPointer, PARAM_KEY, ReadValueResult, UpdateValueResult};
 use sea_orm::JsonValue;
 use serde_json::json;
+use hl_device::event::events::DeviceEvent;
 use miot_spec::device::common::emitter::EventType;
 use crate::hap::iot::iot_characteristic::CharacteristicValue;
 
@@ -50,7 +51,9 @@ impl AccessoryModelExt for ModelExt {
             .map(|i| i.ctag.clone())
             .collect();
 
-        let results = self.ctx.dev.read_properties(vec![self.params.on, self.params.mode]).await?;
+        let results = self.ctx.dev
+            .as_miot_device()?
+            .read_properties(vec![self.params.on, self.params.mode]).await?;
         let on = results.get(0)
             .and_then(|v| v.value.clone())
             .and_then(|v| v.as_bool())
@@ -153,7 +156,9 @@ impl AccessoryModelExt for ModelExt {
                         info!("update_chars_value:{:?}", result);
                     } else {
                         ///直接设置成false
-                        let result = self.ctx.dev.set_properties(vec![
+                        let result = self.ctx.dev
+                            .as_miot_device()?
+                            .set_properties(vec![
                             (self.params.on, JsonValue::Bool(false)),
                         ]).await?;
                         info!("update_chars_value:{:?}", result);
@@ -170,13 +175,13 @@ impl AccessoryModelExt for ModelExt {
         Ok(result)
     }
 
-    async fn on_event(&self, event_type: EventType) {
-        if let EventType::UpdatePropertyBatch(values) = event_type {
+    async fn on_event(&self, event_type: DeviceEvent) {
+        /*if let EventType::UpdatePropertyBatch(values) = event_type {
             for id in values {
                 /*if id.siid == self.model.siid && id.piid == self.model.piid {
                     //处理
                 };*/
             }
-        };
+        };*/
     }
 }

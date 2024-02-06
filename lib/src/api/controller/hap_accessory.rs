@@ -15,6 +15,7 @@ use sea_orm::*;
 pub async fn add(state: State<AppState>, Json(param): Json<AddHapAccessoryParam>) -> ApiResult<()> {
     let mut model = param.into_model()?;
     model.aid = Set(SNOWFLAKE.next_id());
+    model.create_at = Set(chrono::Local::now().naive_local());
     model.insert(state.conn()).await?;
     Ok(ApiResp::with_data(()))
 }

@@ -6,6 +6,7 @@ use packed_struct::derive::PackedStruct;
 use packed_struct::PackedStruct;
 use serde::Serialize;
 use serde_json::{Map, Value};
+use hl_device::error::DeviceExitError;
 
 use crate::proto::transport::udp_iot_spec_proto::Utils;
 
@@ -134,6 +135,29 @@ pub enum ExitError {
     CloudError,
     Timeout,
     Lock,
+}
+
+impl From<ExitError> for Box<dyn DeviceExitError> {
+    fn from(value: ExitError) -> Self {
+        Box::new(value)
+    }
+}
+
+impl DeviceExitError for ExitError {
+    fn retryable(&self) -> bool {
+        match self {
+            ExitError::ConnectEmpty => false,
+            ExitError::InvalidToken => false,
+            ExitError::NotGateway => false,
+
+            ExitError::Disconnect => true,
+            ExitError::ConnectErr => true,
+            ExitError::BltConnectErr => true,
+            ExitError::CloudError => true,
+            ExitError::Timeout => true,
+            ExitError::Lock => true,
+        }
+    }
 }
 
 impl From<ExitError> for anyhow::Error {

@@ -1,15 +1,21 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
-use anyhow::anyhow;
 
+use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
-use tokio::sync::{broadcast, Mutex, RwLock};
-use crate::device::ble::ble_device::BleDevice;
-use crate::device::common::emitter::{DataEmitter, DataListener, EventType};
-use crate::proto::miio_proto::{MiotSpecDTO, MiotSpecId, MiotSpecProtocolPointer};
 use serde_json::Value;
-use hl_device::HlDevice;
-use crate::proto::protocol::{ExitError};
+use tokio::sync::{broadcast, RwLock};
+use hl_device::error::DeviceExitError;
+
+use hl_device::hl_device::RetryInfo;
+use hl_device::{CharReadParam, CharUpdateParam, HlDevice, ReadCharResults, UpdateCharResults};
+use hl_device::event::HlDeviceListenable;
+use hl_device::platform::hap::hap_device_ext::{AsHapDeviceExt, HapDeviceExt};
+
+use crate::device::common::emitter::{DataEmitter, DataListener, EventType};
+use crate::device::common::utils::get_hap_device_info;
+use crate::proto::miio_proto::{MiotSpecDTO, MiotSpecId, MiotSpecProtocolPointer};
+use crate::proto::protocol::ExitError;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, )]
 pub struct DeviceInfo {
@@ -39,30 +45,6 @@ pub enum DeviceStatus {
     Disconnect,
 }
 
-pub struct RetryInfo {
-    /// 重试次数
-    pub retry_count: Mutex<u32>,
-    /// 最大重试间隔 5 分钟,单位毫秒
-    pub max_interval: u32,
-}
-
-impl RetryInfo {
-    pub async fn incr(&self) -> u32 {
-        let mut write = self.retry_count.lock().await;
-        *write += 1;
-        *write
-    }
-    pub async fn reset(&self) {
-        let mut write = self.retry_count.lock().await;
-        *write = 0;
-    }
-    pub async fn get(&self) -> u32 {
-        let read = self.retry_count.lock().await;
-        // 产生1-1000 随机数
-        let rand = rand::random::<u32>() % 1000 + 1;
-        2u32.pow(*read - 1) * 1000 + rand
-    }
-}
 
 #[tokio::test]
 async fn test_retry_info() {
@@ -71,15 +53,6 @@ async fn test_retry_info() {
         retry_info.incr().await;
         let info = retry_info.get().await;
         println!("{}:{}", i, info);
-    }
-}
-
-impl Default for RetryInfo {
-    fn default() -> Self {
-        Self {
-            retry_count: Mutex::new(0),
-            max_interval: 60_1000,
-        }
     }
 }
 
@@ -117,7 +90,7 @@ pub enum MiotDeviceType {
 }
 
 #[async_trait::async_trait]
-pub trait MiotSpecDevice: AsMiotSpecDevice {
+pub trait MiotSpecDevice: Sync + Send {
     fn get_info(&self) -> &DeviceInfo;
     fn get_base(&self) -> &BaseMiotSpecDevice;
 
@@ -190,9 +163,66 @@ pub trait MiotSpecDevice: AsMiotSpecDevice {
 }
 
 
-pub trait AsMiotSpecDevice {
-    fn as_miot_spec_device(&self) -> Option<&(dyn MiotSpecDevice + Send + Sync)>;
+pub struct MiotSpecDeviceWrapper<T: MiotSpecDevice>(pub(crate) T);
+
+#[async_trait::async_trait]
+impl<T: MiotSpecDevice> HlDevice for MiotSpecDeviceWrapper<T> {
+    fn dev_id(&self) -> &str {
+        self.0.get_info().did.as_str()
+    }
+
+    async fn run(&self) -> Result<(), Box<dyn DeviceExitError>> {
+        self.0.run().await.map_err(|e| Box::new(e) as Box<dyn DeviceExitError>)
+    }
+
+    fn retry_info(&self) -> &RetryInfo {
+        &self.0.get_base().retry_info
+    }
+}
+
+impl<T: MiotSpecDevice> HlDeviceListenable for MiotSpecDeviceWrapper<T> {}
+
+#[async_trait::async_trait]
+impl<T: MiotSpecDevice> HapDeviceExt for MiotSpecDeviceWrapper<T> {
+    fn get_hap_info(&self) -> hl_device::platform::hap::hap_device_ext::DeviceInfo {
+        get_hap_device_info(&self.0)
+    }
+
+    async fn read_chars_value(&self, params: Vec<CharReadParam>) -> ReadCharResults {
+        todo!()
+    }
+
+    async fn update_chars_value(&self, params: Vec<CharUpdateParam>) -> UpdateCharResults {
+        todo!()
+    }
 }
 
 
-// impl HlDevice {}
+impl<T: MiotSpecDevice> AsMiotDevice for MiotSpecDeviceWrapper<T> {
+    fn as_miot_device(&self) -> Result<&dyn MiotSpecDevice, NotSupportMiotDeviceError> {
+        Ok(&self.0)
+    }
+}
+
+pub struct NotSupportMiotDeviceError;
+
+impl From<NotSupportMiotDeviceError> for anyhow::Error {
+    fn from(value: NotSupportMiotDeviceError) -> Self {
+        anyhow!("该设备不是米家设备类型")
+    }
+}
+
+
+
+pub trait AsMiotDevice: Sync + Send {
+    fn as_miot_device(&self) -> Result<&dyn MiotSpecDevice, NotSupportMiotDeviceError> {
+        Err(NotSupportMiotDeviceError)
+    }
+}
+
+pub trait AsMiotGatewayDevice: Sync + Send {
+    fn as_miot_gateway_device(&self) -> Option<&dyn MiotSpecDevice> {
+        None
+    }
+}
+

@@ -16,4 +16,7 @@ impl_new.workspace = true
 thiserror.workspace = true
 async-trait.workspace = true
 serde_json.workspace = true
+rand = "0.8.5"
 
+#[dev-dependencies]
+#proc-macro = "1.75.0"

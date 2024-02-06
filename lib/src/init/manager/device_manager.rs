@@ -1,4 +1,6 @@
 mod init;
+mod mijia;
+
 use std::ops::Deref;
 use std::sync::Arc;
 use axum::body::HttpBody;
@@ -6,6 +8,7 @@ use dashmap::DashMap;
 use dashmap::mapref::entry::Entry;
 use futures_util::FutureExt;
 use log::{error, info};
+use sea_orm::DatabaseConnection;
 use tokio::sync::oneshot;
 
 use miot_spec::device::common::emitter::EventType;
@@ -13,6 +16,7 @@ use miot_spec::device::miot_spec_device::MiotSpecDevice;
 
 use crate::config::context::get_app_context;
 use crate::init::DevicePointer;
+use crate::init::manager::mi_account_manager::MiAccountManager;
 
 
 pub struct DeviceTask {
@@ -26,17 +30,12 @@ pub struct IotDeviceManagerInner {
     device_map: DashMap<i64, DeviceTask>,
     did_map: DashMap<String, i64>,
     device_id_enable_js_map: DashMap<i64, bool>,
+    conn: DatabaseConnection,
+    mi_account_manager: MiAccountManager,
 }
 
 
 impl IotDeviceManagerInner {
-    pub fn new() -> Self {
-        Self {
-            device_map: DashMap::new(),
-            did_map: Default::default(),
-            device_id_enable_js_map: Default::default(),
-        }
-    }
     pub fn push_device(&self, device_id: i64, device: DevicePointer) {
         let dev_c = device.clone();
         let (close_sender, recv) = oneshot::channel();
@@ -46,18 +45,18 @@ impl IotDeviceManagerInner {
             close_sender,
         };
         self.device_map.insert(device_id, device);
-        self.did_map.insert(dev_c.get_info().did.clone(), device_id);
+        //todo  self.did_map.insert(dev_c.get_info().did.clone(), device_id);
         //执行任务
         tokio::spawn(async move {
             let task = async move {
                 loop {
                     let res = dev_c.run().await;
                     //标记重试次数+1
-                    let incr = dev_c.get_base().retry_info.incr().await;
-                    let interval = dev_c.get_base().retry_info.get().await;
-                    error!("设备连接断开:{:?},res:{:?},等待{interval}毫秒后,第{incr}次重试", dev_c.get_info().did, res);
+                    let incr = dev_c.retry_info().incr().await;
+                    let interval = dev_c.retry_info().get().await;
+                    error!("设备连接断开:{:?},res:{:?},等待{interval}毫秒后,第{incr}次重试", dev_c.dev_id(), res);
                     tokio::time::sleep(tokio::time::Duration::from_millis(interval as u64)).await;
-                    info!("设备重连:{}", dev_c.get_info().did);
+                    info!("设备重连:{}", dev_c.dev_id());
                 }
             };
             loop {
@@ -118,14 +117,26 @@ pub struct IotDeviceManager {
 }
 
 impl IotDeviceManager {
-    pub fn new() -> Self { Self { inner: Arc::new(IotDeviceManagerInner::new()) } }
+    pub fn new(conn: DatabaseConnection, mi_account_manager: MiAccountManager) -> Self {
+        Self {
+            inner: Arc::new(
+                IotDeviceManagerInner {
+                    device_map: Default::default(),
+                    did_map: Default::default(),
+                    device_id_enable_js_map: Default::default(),
+                    conn,
+                    mi_account_manager,
+                }
+            )
+        }
+    }
 
     pub fn is_running(&self, id: i64) -> bool {
         self.device_map.contains_key(&id)
     }
     pub fn stop_device(&self, id: i64) -> anyhow::Result<()> {
         let dev = self.device_map.remove(&id);
-        if let Some((id,task)) = dev{
+        if let Some((id, task)) = dev {
             let _ = task.close_sender.send(true);
         }
         Ok(())

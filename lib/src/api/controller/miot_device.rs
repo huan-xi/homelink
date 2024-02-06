@@ -250,7 +250,7 @@ pub async fn convert_to_iot_device(state: State<AppState>, Json(param): Json<MiC
         name: Set(param.name),
         memo: Default::default(),
         disabled: Set(false),
-        source_type: Set(Some(SourcePlatform::MiHome)),
+        source_platform: Set(SourcePlatform::MiHome),
         source_id: Set(Some(param.did.clone())),
         ..Default::default()
     };

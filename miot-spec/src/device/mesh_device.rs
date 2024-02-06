@@ -1,28 +1,25 @@
-
 use crate::device::common::emitter::EventType;
 
-use crate::device::miot_spec_device::{AsMiotSpecDevice, BaseMiotSpecDevice, DeviceInfo, MiotSpecDevice};
+use crate::device::miot_spec_device::{AsMiotGatewayDevice, BaseMiotSpecDevice, DeviceInfo, MiotSpecDevice, MiotSpecDeviceWrapper};
 use crate::device::MiotDevicePointer;
 use crate::proto::miio_proto::{MiotSpecDTO, MiotSpecId, MiotSpecProtocolPointer};
 use crate::proto::protocol::{ExitError};
 
+
+pub type MeshDevice = MiotSpecDeviceWrapper<MeshDeviceInner>;
+
 /// 网关上监听了米家协议
 ///能监听到  miio/report properties_changed
 // mesh 设备
-pub struct MeshDevice {
+pub struct MeshDeviceInner {
     info: DeviceInfo,
     base: BaseMiotSpecDevice,
     gateway: MiotDevicePointer,
 }
 
-impl AsMiotSpecDevice for MeshDevice {
-    fn as_miot_spec_device(&self) -> Option<&(dyn MiotSpecDevice + Send + Sync)>{
-        Some(self)
-    }
-}
 
 #[async_trait::async_trait]
-impl MiotSpecDevice for MeshDevice {
+impl MiotSpecDevice for MeshDeviceInner {
     fn get_info(&self) -> &DeviceInfo { &self.info }
     fn get_base(&self) -> &BaseMiotSpecDevice {
         &self.base
@@ -79,10 +76,10 @@ impl MiotSpecDevice for MeshDevice {
 
 impl MeshDevice {
     pub fn new(info: DeviceInfo, gateway: MiotDevicePointer) -> MeshDevice {
-        MeshDevice {
+        MiotSpecDeviceWrapper(MeshDeviceInner {
             info,
             base: Default::default(),
             gateway,
-        }
+        })
     }
 }

@@ -1,24 +1,22 @@
 use std::sync::Arc;
 use std::time::Duration;
-use async_trait::async_trait;
 
 use hex::FromHex;
 use log::{error, info};
 use tap::TapFallible;
 use tokio::select;
 use tokio::sync::RwLock;
-use hl_device::hap_platform::hap_device_ext::HapDeviceExt;
-use hl_device::{CharReadParam, CharUpdateParam, HlDevice,  ReadCharResults, UpdateCharResults};
-use hl_device::event::{EventListener, HlDeviceListenable};
 
 use crate::device::common::utils::get_poll_func;
-use crate::device::miot_spec_device::{AsMiotSpecDevice, BaseMiotSpecDevice, DeviceInfo, MiotSpecDevice};
+use crate::device::miot_spec_device::{AsMiotGatewayDevice, BaseMiotSpecDevice, DeviceInfo, MiotSpecDevice, MiotSpecDeviceWrapper};
 use crate::proto::miio_proto::MiotSpecProtocolPointer;
 use crate::proto::protocol::ExitError;
 use crate::proto::protocol::ExitError::ConnectErr;
 use crate::proto::transport::udp_iot_spec_proto::UdpMiotSpecProtocol;
 
-pub struct WifiDevice {
+pub type WifiDevice = MiotSpecDeviceWrapper<WifiDeviceInner>;
+
+pub struct WifiDeviceInner {
     pub base: BaseMiotSpecDevice,
     pub info: DeviceInfo,
     ///协议
@@ -30,14 +28,12 @@ pub struct WifiDevice {
     timeout: Duration,
 }
 
-impl AsMiotSpecDevice for WifiDevice {
-    fn as_miot_spec_device(&self) -> Option<&(dyn MiotSpecDevice + Send + Sync)>{
-        Some(self)
-    }
-}
+
+
+impl AsMiotGatewayDevice for WifiDeviceInner {}
 
 #[async_trait::async_trait]
-impl MiotSpecDevice for WifiDevice {
+impl MiotSpecDevice for WifiDeviceInner {
     fn get_info(&self) -> &DeviceInfo { &self.info }
     fn get_base(&self) -> &BaseMiotSpecDevice {
         &self.base
@@ -73,29 +69,10 @@ impl MiotSpecDevice for WifiDevice {
     }
 }
 
-impl HlDevice for WifiDevice {}
-
-#[async_trait::async_trait]
-impl HlDeviceListenable for WifiDevice {
-    async fn add_listener(&self, listener: EventListener) {
-        todo!()
-    }
-}
-
-#[async_trait::async_trait]
-impl HapDeviceExt for WifiDevice {
-    async fn read_chars_value(&self, params: Vec<CharReadParam>) -> ReadCharResults {
-        todo!()
-    }
-
-    async fn update_chars_value(&self, params: Vec<CharUpdateParam>) -> UpdateCharResults {
-        todo!()
-    }
-}
 
 
 
-impl WifiDevice {
+impl WifiDeviceInner {
     // 设置协议
     async fn connect(&self) -> Result<MiotSpecProtocolPointer, ExitError> {
         let mut write = self.proto.write().await;
@@ -118,8 +95,11 @@ impl WifiDevice {
         write.replace(proto.clone());
         Ok(proto)
     }
+}
+
+impl WifiDevice {
     pub async fn new(info: DeviceInfo) -> anyhow::Result<Self> {
-        Ok(WifiDevice {
+        Ok(MiotSpecDeviceWrapper(WifiDeviceInner {
             base: BaseMiotSpecDevice {
                 ..std::default::Default::default()
             },
@@ -127,6 +107,6 @@ impl WifiDevice {
             proto: Arc::new(RwLock::new(None)),
             interval: Duration::from_secs(120),
             timeout: Duration::from_millis(2000),
-        })
+        }))
     }
 }

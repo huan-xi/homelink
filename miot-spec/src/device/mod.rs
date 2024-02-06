@@ -11,4 +11,4 @@ pub mod common;
 pub mod cloud_device;
 
 
-pub type MiotDevicePointer = Arc<dyn MiotSpecDevice + Send + Sync + 'static>;
+pub type MiotDevicePointer = Arc<dyn MiotSpecDevice  + 'static>;

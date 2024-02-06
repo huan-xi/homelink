@@ -40,7 +40,9 @@ impl AccessoryModelExt for ModelExt {
             .map(|i| i.ctag.clone())
             .collect();
         //读取值
-        let values = self.ctx.dev.read_properties(vec![self.on, self.target_humidity]).await?;
+        let values = self.ctx.dev
+            .as_miot_device()?
+            .read_properties(vec![self.on, self.target_humidity]).await?;
         let on = values.get(0);
         let target_humidity = values.get(1);
         info!("read_chars_value:{:?}", types);

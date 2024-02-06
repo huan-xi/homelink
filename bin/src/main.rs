@@ -13,7 +13,6 @@ use lib::config::cfgs::Configs;
 use lib::config::context::{APP_CONTEXT, ApplicationContext, get_app_context};
 use lib::db::init::{db_conn, migrator_up};
 use lib::init;
-use lib::init::device_init::init_iot_device_manager;
 use lib::init::manager::device_manager::IotDeviceManager;
 use lib::init::manager::hap_manager::HapManage;
 use lib::init::manager::mi_account_manager::MiAccountManager;
@@ -45,13 +44,13 @@ async fn main() -> anyhow::Result<()> {
     let ble_manager = BleManager::new();
     ble_manager.init().await?;
     let hap_metadata = Arc::new(hap_metadata()?);
+    let mi_account_manager = MiAccountManager::new(conn.clone());
     // 初始化hap 服务器
-    let device_manager = IotDeviceManager::new();
+    let device_manager = IotDeviceManager::new(conn.clone(), mi_account_manager.clone());
+    // 初始化iot设备
+    device_manager.init().await?;
     let hap_manager = HapManage::new(hap_metadata.clone());
     let template_manager = TemplateManager::new();
-
-    let mi_account_manager = MiAccountManager::new(conn.clone());
-
 
 
     let app_state = AppState::new(conn.clone(), Managers {
@@ -110,8 +109,8 @@ async fn main() -> anyhow::Result<()> {
     // 初始化hap设备
     // 初始化模板
     template_manager.init().await?;
-    // 初始化iot设备
-    init_iot_device_manager(&conn, device_manager.clone(), mi_account_manager.clone()).await?;
+
+    // init_iot_device_manager(&conn, device_manager.clone(), mi_account_manager.clone()).await?;
     // 初始化hap 设备
     init::hap_init::init_hap_list(&conn, hap_manager.clone(), device_manager.clone()).await?;
 

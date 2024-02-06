@@ -3,6 +3,7 @@ use futures_util::future::BoxFuture;
 use futures_util::FutureExt;
 use log::error;
 use tokio::time;
+use hl_device::platform::hap::hap_device_ext;
 use crate::device::common::emitter::EventType;
 use crate::device::miot_spec_device::{MiotSpecDevice};
 use crate::proto::miio_proto::{MiotSpecDTO, MiotSpecId};
@@ -74,3 +75,21 @@ pub fn get_poll_func<'a, T: MiotSpecDevice + Sync + Send>(dev: &'a T, did: &'a s
     }.boxed()
 }
 
+pub fn get_hap_device_info<T: MiotSpecDevice>(dev: &T) -> hap_device_ext::DeviceInfo {
+    let info = dev.get_info();
+
+    let firmware_revision = info
+        .extra.as_ref()
+        .and_then(|i| i.fw_version.clone());
+    let parts: Vec<&str> = info.model.split('.').collect();
+    let manufacturer = parts.first()
+        .map(|f| f.to_string())
+        .unwrap_or("未知制造商".to_string());
+    hap_device_ext::DeviceInfo {
+        manufacturer,
+        model: info.model.clone(),
+        serial_number: info.did.clone(),
+        software_revision: None,
+        firmware_revision,
+    }
+}

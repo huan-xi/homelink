@@ -5,7 +5,7 @@ use sea_orm::JsonValue;
 use hap::characteristic::{CharReadParam, CharUpdateParam, CharReadResult};
 use hap::HapType;
 use miot_spec::proto::miio_proto::{MiotSpecDTO, MiotSpecId};
-use crate::hap::models::{AccessoryModelExt, AccessoryModelExtConstructor,AccessoryModelExtPointer, ContextPointer, ReadValueResult, UpdateValueResult};
+use crate::hap::models::{AccessoryModelExt, AccessoryModelExtConstructor, AccessoryModelExtPointer, ContextPointer, ReadValueResult, UpdateValueResult};
 
 
 pub struct ModelExt {
@@ -28,7 +28,6 @@ impl AccessoryModelExtConstructor for ModelExt {
 }
 
 
-
 /// 温度传感器?
 ///https://home.miot-spec.com/s/lumi.acpartner.mcn02
 /// https://home.miot-spec.com/spec?type=urn:miot-spec-v2:device:air-conditioner:0000A004:lumi-mcn02:1
@@ -46,7 +45,10 @@ impl AccessoryModelExt for ModelExt {
         info!("read_chars_value:{:?}", types);
 
         let mut result = vec![];
-        let values = self.ctx.dev.read_properties(vec![self.on, self.model, self.target_temperature]).await?;
+        let values = self.ctx
+            .dev
+            .as_miot_device()?
+            .read_properties(vec![self.on, self.model, self.target_temperature]).await?;
         let on = values.get(0);
         let model = values.get(1);
         let target_temperature = values.get(2);
@@ -103,7 +105,7 @@ impl AccessoryModelExt for ModelExt {
                     }
                 }
                 HapType::TargetTemperature => {
-                    self. ctx.dev.set_property(self.target_temperature, param.new_value.clone()).await?;
+                    self.ctx.dev.set_property(self.target_temperature, param.new_value.clone()).await?;
                     self.ctx.hap_manager.update_char_value_by_id(self.ctx.aid, param.sid, HapType::CurrentTemperature, param.new_value).await?;
                 }
                 _ => {}

@@ -121,6 +121,7 @@ impl AddHapAccessoryParam {
             disabled: Set(self.disabled.unwrap_or(false)),
             category: Set(self.category),
             script: Set(self.script),
+            update_at:Set(chrono::Local::now().naive_local()),
             ..Default::default()
         })
     }

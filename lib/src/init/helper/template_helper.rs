@@ -98,7 +98,7 @@ pub fn to_device_model(ctx: DeviceModelCtx, device: &DeviceTemplate) -> anyhow::
         name: Set(ctx.name),
         memo: Set(device.desc.clone()),
         disabled: Set(false),
-        source_type: Set(Some(SourcePlatform::MiHome)),
+        source_platform: Set(SourcePlatform::MiHome),
         source_id: Set(Some(ctx.did.clone())),
         poll_interval: Set(device.interval.unwrap_or(60_000) as i32),
         timeout: Set(device.timeout.unwrap_or(1_000) as i32),

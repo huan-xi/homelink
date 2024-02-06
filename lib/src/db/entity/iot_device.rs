@@ -56,7 +56,6 @@ impl IotDeviceType {
 /// 来源设备平台
 #[derive(EnumIter, DeriveActiveEnum, Copy, Clone, Hash, Debug, PartialEq, Eq, Serialize, Deserialize, )]
 #[sea_orm(rs_type = "i32", db_type = "Integer")]
-
 pub enum SourcePlatform {
     MiHome = 2
 }
@@ -129,7 +128,7 @@ pub struct Model {
     pub name: String,
     pub memo: Option<String>,
     pub disabled: bool,
-    pub source_type: Option<SourcePlatform>,
+    pub source_platform: SourcePlatform,
     pub source_id: Option<String>,
     /// 轮询时间
     pub poll_interval: i32,
@@ -158,7 +157,7 @@ pub enum Column {
     Disabled,
     Name,
     Memo,
-    SourceType,
+    SourcePlatform,
     SourceId,
     PollInterval,
     Timeout,
@@ -203,7 +202,7 @@ impl ColumnTrait for Column {
             Self::DeviceId => ColumnType::BigInteger.def(),
             Self::Tag => ColumnType::String(None).def().null(),
             Self::DeviceType => ColumnType::Integer.def(),
-            Self::SourceType => ColumnType::Integer.def(),
+            Self::SourcePlatform => ColumnType::Integer.def(),
             Self::Params => ColumnType::Json.def().null(),
             Self::GatewayId => ColumnType::BigInteger.def().null(),
             Self::Disabled => ColumnType::Boolean.def(),

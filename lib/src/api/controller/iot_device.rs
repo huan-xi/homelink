@@ -12,7 +12,6 @@ use crate::api::params::{AddServiceParam, DisableParam, QueryIotDeviceParam, Tes
 use crate::api::results::{IotDeviceResult, MiotDeviceResult};
 use crate::api_err;
 use crate::db::entity::iot_device::SourcePlatform;
-use crate::init::device_init::{init_children_device, init_iot_device_manager, init_mi_device};
 
 pub async fn list(state: State<AppState>, Query(param): Query<QueryIotDeviceParam>) -> ApiResult<Vec<IotDeviceResult>> {
     let mut query = IotDeviceEntity::find();
@@ -28,7 +27,7 @@ pub async fn list(state: State<AppState>, Query(param): Query<QueryIotDevicePara
     for i in list.into_iter() {
         let running = dev_manager.is_running(i.device_id);
         //查询对应的来源设
-        let source = if let (Some(st), Some(id)) = (i.source_type, i.source_id.clone()) {
+        let source = if let (st, Some(id)) = (i.source_platform, i.source_id.clone()) {
             match st {
                 SourcePlatform::MiHome => {
                     //查询对应的设备
@@ -93,7 +92,7 @@ pub async fn restart(state: State<AppState>, Path(id): Path<i64>) -> ApiResult<(
     state.device_manager.stop_device(id)?;
     let model = IotDeviceEntity::find_by_id(id).one(state.conn()).await?;
     let iot_device = model.ok_or(api_err!("设备不存在"))?;
-    match iot_device.device_type.require_gw() {
+   /* match iot_device.device_type.require_gw() {
         true => {
             init_children_device(state.conn(), iot_device, state.device_manager.clone())
                 .await
@@ -104,7 +103,7 @@ pub async fn restart(state: State<AppState>, Path(id): Path<i64>) -> ApiResult<(
                 .await
                 .map_err(|e| api_err!("启动失败{e}"))?
         }
-    };
+    };*/
 
     ok_data(())
 }

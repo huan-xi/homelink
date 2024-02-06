@@ -1,8 +1,7 @@
-
 use std::time::Duration;
 use futures_util::future::BoxFuture;
 
-use crate::device::miot_spec_device::{AsMiotSpecDevice, BaseMiotSpecDevice, DeviceInfo, MiotSpecDevice};
+use crate::device::miot_spec_device::{AsMiotGatewayDevice, BaseMiotSpecDevice, DeviceInfo, MiotSpecDevice};
 use crate::proto::miio_proto::MiotSpecProtocolPointer;
 use crate::proto::protocol::ExitError;
 
@@ -15,12 +14,16 @@ pub struct MiCloudDevice<T: MiCloudExt> {
     ext: T,
 }
 
+// impl<T: MiCloudExt > HlDevice for MiCloudDevice<T> {}
+
+impl<T: MiCloudExt > AsMiotGatewayDevice for MiCloudDevice<T> {}
+
 //定义一个获取写一个的闭包
 pub type MiCloudProtoGetFunc = Box<dyn Fn() -> BoxFuture<'static, Result<MiotSpecProtocolPointer, ExitError>> + Send + Sync + 'static>;
 
 
 #[async_trait::async_trait]
-pub trait MiCloudExt {
+pub trait MiCloudExt: Send + Sync {
     async fn get_proto(&self) -> Result<MiotSpecProtocolPointer, ExitError>;
     async fn register_property(&self, siid: i32, piid: i32);
 }
@@ -32,12 +35,6 @@ impl<T: MiCloudExt> MiCloudDevice<T> {
             info,
             ext,
         }
-    }
-}
-
-impl<T: MiCloudExt + Send + Sync> AsMiotSpecDevice for MiCloudDevice<T> {
-    fn as_miot_spec_device(&self) -> Option<&(dyn MiotSpecDevice + Send + Sync)>{
-        Some(self)
     }
 }
 

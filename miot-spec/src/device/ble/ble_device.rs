@@ -2,7 +2,7 @@ use std::sync::{Arc};
 
 use anyhow::anyhow;
 
-use crate::device::miot_spec_device::{AsMiotSpecDevice, BaseMiotSpecDevice, DeviceInfo, MiotDeviceType, MiotSpecDevice};
+use crate::device::miot_spec_device::{AsMiotDevice, BaseMiotSpecDevice, DeviceInfo, MiotDeviceType, MiotSpecDevice};
 
 use hex::FromHex;
 use log::{debug, error};
@@ -10,7 +10,7 @@ use log::{debug, error};
 use packed_struct::{PackedStruct};
 use serde_json::Value;
 use tokio::sync::RwLock;
-use crate::device::ble::value_types::{BleValue, BleValueType};
+use crate::device::ble::value_types::{BleValue, BleValueType, ValueLsbI16};
 
 use crate::device::common::emitter::{EventType};
 use crate::device::MiotDevicePointer;
@@ -25,10 +25,10 @@ use crate::proto::protocol::ExitError::NotGateway;
 ///spec_map 用户
 
 
-pub struct BleDevice<T: AsMiotSpecDevice> {
+pub struct BleDevice<T: AsMiotDevice> {
     pub info: DeviceInfo,
     base: BaseMiotSpecDevice,
-    gateway: Arc<T>,
+    gateway:T,
     // 值
     values: Arc<RwLock<BleValue>>,
     spec_map: bimap::BiMap<MiotSpecId, BleValueType>,
@@ -36,14 +36,10 @@ pub struct BleDevice<T: AsMiotSpecDevice> {
     proto: Arc<RwLock<Option<MiotSpecProtocolPointer>>>,
 }
 
-impl<T: AsMiotSpecDevice+ Sync + Send> AsMiotSpecDevice for BleDevice<T> {
-    fn as_miot_spec_device(&self) -> Option<&(dyn MiotSpecDevice + Send + Sync)>{
-        Some(self)
-    }
-}
+impl<T: AsMiotDevice + Sync + Send> AsMiotDevice for BleDevice<T> {}
 
 #[async_trait::async_trait]
-impl<T: AsMiotSpecDevice+ Sync + Send> MiotSpecDevice for BleDevice<T> {
+impl<T: AsMiotDevice> MiotSpecDevice for BleDevice<T> {
     fn get_info(&self) -> &DeviceInfo { &self.info }
 
     fn get_base(&self) -> &BaseMiotSpecDevice {
@@ -65,13 +61,14 @@ impl<T: AsMiotSpecDevice+ Sync + Send> MiotSpecDevice for BleDevice<T> {
         };
         Ok(None)
     }
+
     /// 1.同步网关的状态
     async fn run(&self) -> Result<(), ExitError> {
         // let gw_proto = self.gateway.get_proto().await?;
         // let mut recv = gw_proto.recv();
         let mut recv = self.gateway
-            .as_miot_spec_device()
-            .ok_or(NotGateway)?
+            .as_miot_device()
+            .map_err(|_| NotGateway)?
             .get_event_recv().await;
 
         while let Ok(EventType::GatewayMsg(msg)) = recv.recv().await {
@@ -99,10 +96,10 @@ impl<T: AsMiotSpecDevice+ Sync + Send> MiotSpecDevice for BleDevice<T> {
     }
 }
 
-impl<T: AsMiotSpecDevice + Sync + Send> BleDevice<T> {
+impl<T: AsMiotDevice> BleDevice<T> {
     //网关上设置一个监听器,监听属于我的消息
     //蓝牙协议
-    pub fn new(info: DeviceInfo, gateway: Arc<T>, spec_map: bimap::BiMap<MiotSpecId, BleValueType>) -> Self {
+    pub fn new(info: DeviceInfo, gateway: T, spec_map: bimap::BiMap<MiotSpecId, BleValueType>) -> Self {
         Self {
             info,
             base: BaseMiotSpecDevice {

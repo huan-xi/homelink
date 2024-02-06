@@ -1,2 +1,2 @@
-
-mod native_ble;
+pub mod native_ble;
+pub mod platform;

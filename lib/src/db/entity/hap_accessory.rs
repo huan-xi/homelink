@@ -99,8 +99,8 @@ impl ColumnTrait for Column {
             Self::Aid => ColumnType::Integer.def().null(),
             Self::ModelParams => ColumnType::String(None).def().null(),
             Self::TempId => ColumnType::String(None).def().null(),
-            Self::CreateAt => ColumnType::DateTime.def().null(),
-            Self::UpdateAt => ColumnType::DateTime.def().null(),
+            Self::CreateAt => ColumnType::DateTime.def(),
+            Self::UpdateAt => ColumnType::DateTime.def(),
         }
     }
 }

@@ -121,7 +121,7 @@ async fn set_read_update_method(ctx: InitServiceContext, cts: &mut IotCharacteri
         }
         // 米家属性映射
         MappingMethod::PropMapping => {
-            // 设置读写映射
+            /*// 设置读写映射
             if let Some(MappingParam::PropMapping(param)) = ch.mapping_param.clone() {
                 let ps: MiotSpecId = param.into();
                 let read = ToChUtils::get_read_func(ctx.device.clone(), ps, unit_conv.clone());
@@ -136,7 +136,7 @@ async fn set_read_update_method(ctx: InitServiceContext, cts: &mut IotCharacteri
                 ctx.device.add_listener(listener).await;
             } else {
                 return Err(anyhow!("映射参数不能为空"));
-            }
+            }*/
         }
     }
 
@@ -178,7 +178,7 @@ pub struct ToChUtils;
 
 
 impl ToChUtils {
-    pub fn get_miot_listener(ctx: InitServiceContext,
+ /*   pub fn get_miot_listener(ctx: InitServiceContext,
                              cid: u64,
                              property: MiotSpecId,
                              unit_conv: UnitConv) -> DataListener<EventType> {
@@ -217,7 +217,7 @@ impl ToChUtils {
                 Err(anyhow!("数据类型错误"))
             }.boxed()
         })
-    }
+    }*/
 
     pub fn conv_from_value(conv: UnitConv, value: JsonValue) -> JsonValue {
         match conv.0 {

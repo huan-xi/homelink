@@ -22,26 +22,24 @@ pub(crate) async fn init_hap_accessory<'a, C: ConnectionTrait>(conn: &C, hap_man
                                                                device: DevicePointer, hap_accessory: HapAccessoryModel) -> anyhow::Result<HapAccessoryPointer> {
     let aid = hap_accessory.aid as u64;
     let mut hss: Vec<Box<dyn HapService>> = vec![];
-    let device = device.clone();
+    let dev_c = device.clone();
+    let hap_device = dev_c
+        .as_hap_device_ext()
+        .ok_or(anyhow!("设备不支持hap"))?;
+
     // 初始化配件服务
-    let dev_info = device.get_info().clone();
+    let dev_info = hap_device.get_hap_info();
+
     let name = hap_accessory.name.clone();
-    let name_c = name.clone();
-    let software_revision = dev_info
-        .extra
-        .and_then(|i| i.fw_version);
-    let parts: Vec<&str> = dev_info.model.split('.').collect();
-    let manufacturer = parts.first()
-        .map(|f| f.to_string())
-        .unwrap_or("未知制造商".to_string());
+
     // 可以从设备信息中获取
     let info = AccessoryInformation {
-        name,
-        model: dev_info.model.clone(),
-        firmware_revision: dev_info.firmware_revision.clone(),
-        software_revision,
-        serial_number: dev_info.did,
-        manufacturer,
+        name: name.clone(),
+        model: dev_info.model,
+        firmware_revision: dev_info.firmware_revision,
+        software_revision: dev_info.software_revision,
+        serial_number: dev_info.serial_number,
+        manufacturer: dev_info.manufacturer,
         ..Default::default()
     };
     let mut service = info.to_service(1, aid)?;
@@ -59,11 +57,11 @@ pub(crate) async fn init_hap_accessory<'a, C: ConnectionTrait>(conn: &C, hap_man
         .all(conn)
         .await?;
     if services.is_empty() {
-        return Err(anyhow!("配件:{},无服务",name_c));
+        return Err(anyhow!("配件:{},无服务",name));
     };
 
     // 初始化配件model
-    let model = init_accessory_model(aid,hap_accessory.clone(), &device, hap_manage.clone()).await?;
+    let model = init_accessory_model(aid, hap_accessory.clone(), &device, hap_manage.clone()).await?;
     // 初始化属性映射
     let accessory = Arc::new(RwLock::new(Box::new(IotHapAccessory::new(aid, hss, model)) as Box<dyn HapAccessory>));
     let ch_id = SNOWFLAKE.next_id();
@@ -88,7 +86,7 @@ pub(crate) async fn init_hap_accessory<'a, C: ConnectionTrait>(conn: &C, hap_man
         // 转成服务, 服务需要服务类型和服务的必填特征
     }
     //检测特征id 是否重复
-    check_ids(name_c, &accessory).await?;
+    check_ids(name, &accessory).await?;
 
     // 查询script
     #[cfg(feature = "deno")]
@@ -120,7 +118,6 @@ async fn init_accessory_model(aid: u64, hap_accessory: HapAccessoryModel, device
                 let model_c = model_c.clone();
                 Box::pin(async move {
                     model_c.on_event(data).await;
-                    Ok(())
                 })
             })).await;
         };

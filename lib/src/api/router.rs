@@ -87,7 +87,7 @@ pub fn api() -> Router<AppState> {
               // .route("/delete_device", get(controller::miot-spec::delete_device))
               ,
         )
-        .nest("/hap_platform-metadata",
+        .nest("/hap_metadata",
               Router::new()
                   .route("/characteristic_meta/:hap_type", get(controller::hap_metadata::get_characteristic_meta))
                   .route("/service_meta/:hap_type", get(controller::hap_metadata::get_service_meta))
