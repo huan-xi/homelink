@@ -73,7 +73,7 @@ pub async fn add_hap_bridge(conn: &DatabaseConnection, bridge: HapBridgeModel, m
             return Err(anyhow!("单配件桥接器没有配件"));
         }
         if accessories.len() > 1 {
-            return Err(anyhow!("单配件桥接器配件大于0"));
+            return Err(anyhow!("单配件桥接器配件大于1"));
         }
     } else {
         // 初始化bridge 设备
@@ -167,10 +167,9 @@ pub(crate) async fn add_service(ctx: InitServiceContext, service_chs: (HapServic
     for (index, ch) in chs.into_iter()
         .filter(|ch| !ch.disabled).enumerate().into_iter() {
         let ctx = ctx.clone();
-        let c_tag = stag.clone();
         match to_characteristic(ctx, index, ch).await {
             Ok(cts) => {
-                hap_service.push_characteristic(c_tag, Box::new(cts));
+                hap_service.push_characteristic( Box::new(cts));
                 success = true;
             }
             Err(e) => {
@@ -194,7 +193,7 @@ pub(crate) async fn add_service(ctx: InitServiceContext, service_chs: (HapServic
                     Ok(Some(name))
                 }
             }));
-            hap_service.push_characteristic(Some("configured-name".to_string()), Box::new(name));
+            hap_service.push_characteristic(Box::new(name));
         }
     };
 

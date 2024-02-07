@@ -7,6 +7,7 @@ use packed_struct::PackedStruct;
 use serde::Serialize;
 use serde_json::{Map, Value};
 use hl_device::error::DeviceExitError;
+use crate::device::miot_spec_device::NotSupportMiotDeviceError;
 
 use crate::proto::transport::udp_iot_spec_proto::Utils;
 
@@ -135,6 +136,12 @@ pub enum ExitError {
     CloudError,
     Timeout,
     Lock,
+}
+
+impl From<NotSupportMiotDeviceError> for ExitError {
+    fn from(_: NotSupportMiotDeviceError) -> Self {
+        ExitError::NotGateway
+    }
 }
 
 impl From<ExitError> for Box<dyn DeviceExitError> {

@@ -2,7 +2,7 @@ use std::sync::Arc;
 use anyhow::anyhow;
 use log::{debug, info};
 use sea_orm::JsonValue;
-use hap::characteristic::{CharReadParam, CharUpdateParam, CharReadResult, CharUpdateResult};
+use hap::characteristic::delegate::{CharReadParam, CharUpdateParam, CharReadResult, CharUpdateResult};
 use hap::HapType;
 use miot_spec::proto::miio_proto::MiotSpecId;
 use crate::hap::models::{AccessoryModelExt, AccessoryModelExtConstructor, AccessoryModelExtPointer, ContextPointer, ReadValueResult, UpdateValueResult};

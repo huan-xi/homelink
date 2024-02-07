@@ -4,14 +4,13 @@ use std::sync::Arc;
 use anyhow::anyhow;
 use dashmap::DashMap;
 use log::{error, info};
-use once_cell::sync::OnceCell;
 use sea_orm::JsonValue;
 use serde_json::Value;
 use tap::TapFallible;
-use hap::characteristic::{CharReadParam, CharReadResult, OnReadsFn, OnUpdatesFn, CharUpdateParam, CharUpdateResult};
+use hap::characteristic::delegate::{CharReadParam, CharReadResult, OnReadsFn, OnUpdatesFn, CharUpdateParam, CharUpdateResult, CharReadsDelegate, CharUpdateDelegate};
 use hl_device::event::events::DeviceEvent;
-use miot_spec::device::common::emitter::EventType;
-use miot_spec::device::MiotDevicePointer;
+use crate::db::entity::hap_accessory::ModelDelegateParam;
+use crate::hap::models::delegate::{ModelDelegate, ModelDelegates};
 use crate::hap::models::model_ext_database::{AccessoryModelExtDatabase, MODEL_EXT_DATABASE};
 use crate::init::DevicePointer;
 use crate::init::manager::hap_manager::HapManage;
@@ -20,6 +19,7 @@ pub mod lumi;
 mod deerma;
 mod model_ext_database;
 mod common;
+pub mod delegate;
 
 
 pub struct AccessoryModelContext {
@@ -36,13 +36,19 @@ pub type ContextPointer = Arc<AccessoryModelContext>;
 pub type AccessoryModelPointer = Arc<AccessoryModel>;
 
 /// 配件模型
-#[derive(Clone)]
 pub struct AccessoryModel {
     pub model_ext: AccessoryModelExtPointer,
+    pub delegate: ModelDelegates,
 }
 
 impl AccessoryModel {
-    pub async fn new(ctx: AccessoryModelContext, name: &str, option: Option<Value>) -> anyhow::Result<Self> {
+    pub async fn new(ctx: AccessoryModelContext, mut delegate_param: Vec<ModelDelegateParam>) -> anyhow::Result<Self> {
+        let delegate_param = delegate_param
+            .remove(0);
+
+        let name = delegate_param.model.as_str();
+        let option = delegate_param.params.clone();
+
         let ctx = Arc::new(ctx);
         let ext = MODEL_EXT_DATABASE.get_or_init(|| AccessoryModelExtDatabase::default()).get(name);
         let model_ext_new_func = ext
@@ -63,34 +69,29 @@ impl AccessoryModel {
             ).await;
         }
 
+        let delegate = ModelDelegates {
+            delegates: Arc::new(vec![ModelDelegate {
+                chars: delegate_param.chars.into_iter().map(|i| i.into()).collect(),
+                ext: model_ext.clone(),
+            }]),
+        };
+
         Ok(Self {
             model_ext,
+            delegate,
         })
     }
 
 
-    pub fn get_on_reads_fn(&self) -> Option<OnReadsFn> {
-        let ext = self.model_ext.clone();
-        Some(Box::new(move |ids| {
-            let ext = ext.clone();
-            Box::pin(async move {
-                let result = ext.read_chars_value(ids).await?;
-                //读取函数
-                Ok(result)
-            })
-        }))
+    pub fn get_on_read_delegate(&self) -> Option<Box<dyn CharReadsDelegate>> {
+        let delegate = self.delegate.clone();
+        Some(Box::new(delegate))
     }
 
 
-    pub fn get_on_updates_fn(&self) -> Option<OnUpdatesFn> {
-        let ext = self.model_ext.clone();
-        Some(Box::new(move |params| {
-            let ext = ext.clone();
-            Box::pin(async move {
-                let result = ext.update_chars_value(params).await?;
-                Ok(result)
-            })
-        }))
+    pub fn get_on_update_delegate(&self) -> Option<Box<dyn CharUpdateDelegate>> {
+        let delegate = self.delegate.clone();
+        Some(Box::new(delegate))
     }
 }
 

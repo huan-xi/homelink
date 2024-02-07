@@ -57,10 +57,6 @@ impl MiotSpecProtocol for OpenMiIOMqttSpecProtocol {
         self.id.fetch_add(1, Ordering::SeqCst)
     }
     async fn send<'a>(&'a self, cmd: &'a str) -> anyhow::Result<()> {
-    /*    if !self.client.is_connected() {
-            self.client.reconnect().await?;
-        };
-*/
         self.client.publish("miio/command", QoS::AtLeastOnce, false, cmd).await?;
         Ok(())
     }

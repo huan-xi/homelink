@@ -4,7 +4,8 @@ use anyhow::anyhow;
 /// 开,将 mode 属性设置到当前值,
 /// 并且将其他属性设置为false,关则将其他设置成false
 
-use hap::characteristic::{CharReadParam, CharUpdateParam, Format, CharReadResult, CharUpdateResult};
+use hap::characteristic::delegate::{CharReadParam, CharUpdateParam, CharReadResult, CharUpdateResult};
+use hap::characteristic::Format;
 use hap::HapType;
 use log::{error, info, warn};
 use miot_spec::proto::miio_proto::MiotSpecId;
@@ -159,8 +160,8 @@ impl AccessoryModelExt for ModelExt {
                         let result = self.ctx.dev
                             .as_miot_device()?
                             .set_properties(vec![
-                            (self.params.on, JsonValue::Bool(false)),
-                        ]).await?;
+                                (self.params.on, JsonValue::Bool(false)),
+                            ]).await?;
                         info!("update_chars_value:{:?}", result);
                     }
                 }

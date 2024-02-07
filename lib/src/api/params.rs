@@ -105,7 +105,6 @@ pub struct AddHapAccessoryParam {
     bridge_id: i64,
     name: String,
     memo: Option<String>,
-    script: Option<String>,
     disabled: Option<bool>,
     category: BridgeCategory,
     listening_props: PropertyVec,
@@ -120,7 +119,6 @@ impl AddHapAccessoryParam {
             memo: Set(self.memo),
             disabled: Set(self.disabled.unwrap_or(false)),
             category: Set(self.category),
-            script: Set(self.script),
             update_at:Set(chrono::Local::now().naive_local()),
             ..Default::default()
         })
@@ -166,22 +164,9 @@ impl CharacteristicParam {
         let model = HapCharacteristicActiveModel {
             cid: Default::default(),
             characteristic_type: Set(self.characteristic_type),
-            mapping_method: Set(self.mapping_method),
-            mapping_param: Set(mapping_param),
             name: Set(self.name),
-            // format: Set(self.format),
-            // unit: Set(self.unit),
-            // min_value: Set(self.min_value.map(|v| CharacteristicValue::format(format, v).value)),
-            // max_value: Set(self.max_value.map(|v| CharacteristicValue::format(format, v).value)),
-            // max_len: Set(self.max_len),
-            unit_convertor: Set(self.unit_convertor),
             service_id: Set(service_id),
             disabled: Set(false),
-            // fixed_value: Default::default(),
-            convertor_param: match self.convertor_param {
-                None => NotSet,
-                Some(s) => Set(Some(s))
-            },
             ..Default::default()
         };
 

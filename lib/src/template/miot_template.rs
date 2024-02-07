@@ -3,6 +3,7 @@ use sea_orm::{FromJsonQueryResult, JsonValue};
 use serde::{Deserialize, Serialize};
 use hap::characteristic::{Format, Perm, Unit};
 use miot_spec::proto::miio_proto::MiotSpecId;
+use crate::db::entity::hap_accessory::ModelDelegateParam;
 use crate::db::entity::hap_bridge::BridgeCategory;
 use crate::db::entity::hap_characteristic::{HapCharInfo, MappingMethod, MappingParam};
 use crate::db::entity::iot_device::{DeviceParam, IotDeviceType};
@@ -75,15 +76,17 @@ pub struct AccessoryTemplate {
     #[serde(default = "default_text")]
     pub tag: String,
 
-    #[serde(default)]
+/*    #[serde(default)]
     pub model: Option<String>,
     #[serde(default)]
-    pub model_params: Option<JsonValue>,
+    pub model_params: Option<JsonValue>,*/
     #[serde(default)]
     pub desc: Option<String>,
     /// 配件的名称,默认取上一级
     #[serde(default)]
     pub name: Option<String>,
+    #[serde(default)]
+    pub hap_delegates: Vec<ModelDelegateParam>,
     pub services: Vec<ServiceTemplate>,
 
 }
@@ -106,25 +109,15 @@ pub struct ServiceTemplate {
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct CharacteristicTemplate {
-    pub mapping_method: MappingMethod,
-    #[serde(default)]
-    pub mapping_param: Option<MappingParam>,
-    /// 配件的类型
     pub char_type: MappingHapType,
-    /*pub format: Format,
-    pub perms: Vec<Perm>,
-    pub unit: Option<Unit>,*/
     #[serde(default)]
-    pub name: Option<String>,
-    #[serde(default)]
-    pub unit_convertor: Option<UnitConvertor>,
-    #[serde(default)]
-    pub convertor_param: Option<ConvertorParamType>,
     pub info: HapCharInfoTemp,
+    pub name: Option<String>,
+    pub description: Option<String>,
 }
 
 
-#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize, Default)]
 pub struct HapCharInfoTemp {
     pub format: Option<Format>,
     pub unit: Option<Unit>,
@@ -151,7 +144,7 @@ pub mod test {
     use crate::db::entity::hap_accessory::Column::Category;
     use crate::hap::hap_type::MappingHapType;
     use crate::hap::hap_type::MappingHapType::SecuritySystemTargetState;
-    use crate::hap::template::miot_template::MiotTemplate;
+    use crate::template::miot_template::MiotTemplate;
 
     #[tokio::test]
     pub async fn test() -> anyhow::Result<()> {

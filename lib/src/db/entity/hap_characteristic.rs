@@ -120,13 +120,15 @@ pub struct Model {
     pub name: Option<String>,
     pub characteristic_type: MappingHapType,
     /// 服务的映射类型
-    pub mapping_method: MappingMethod,
-    pub mapping_param: Option<MappingParam>,
 
-    /// 单位转换器
-    pub unit_convertor: Option<UnitConvertor>,
-    pub convertor_param: Option<ConvertorParamType>,
+    // 单位转换器
+    // pub unit_convertor: Option<UnitConvertor>,
+    // pub convertor_param: Option<ConvertorParamType>,
+    // pub mapping_method: MappingMethod,
+    // pub mapping_param: Option<MappingParam>,
+
     pub info: HapCharInfo,
+    pub memo: Option<String>,
 
 }
 
@@ -134,15 +136,15 @@ pub struct Model {
 pub enum Column {
     Cid,
     ServiceId,
-    MappingParam,
     Name,
-    // Tag,
     Disabled,
     CharacteristicType,
-    MappingMethod,
-    UnitConvertor,
-    ConvertorParam,
+    // MappingParam,
+    // MappingMethod,
+    // UnitConvertor,
+    // ConvertorParam,
     Info,
+    Memo
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DerivePrimaryKey)]
@@ -169,13 +171,15 @@ impl ColumnTrait for Column {
             Self::Cid => ColumnType::BigInteger.def(),
             Self::ServiceId => ColumnType::BigInteger.def().indexed(),
             Self::Disabled => ColumnType::Boolean.def(),
-            Self::MappingParam => ColumnType::String(None).def().null(),
-            Self::Name => ColumnType::String(Some(64)).def().null(),
-            Self::MappingMethod => ColumnType::Integer.def(),
             Self::CharacteristicType => ColumnType::Integer.def(),
-            Self::UnitConvertor => ColumnType::Integer.def().null(),
-            Self::ConvertorParam => ColumnType::String(None).def().null(),
+            Self::Name => ColumnType::String(Some(64)).def().null(),
+            // Self::MappingParam => ColumnType::String(None).def().null(),
+            // Self::MappingMethod => ColumnType::Integer.def(),
+
+            // Self::UnitConvertor => ColumnType::Integer.def().null(),
+            // Self::ConvertorParam => ColumnType::String(None).def().null(),
             Self::Info => ColumnType::String(None).def().null(),
+            Self::Memo => ColumnType::String(None).def().null(),
         }
     }
 }

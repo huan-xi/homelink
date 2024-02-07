@@ -3,11 +3,12 @@ use anyhow::anyhow;
 use log::error;
 use sea_orm::DatabaseConnection;
 use tap::TapFallible;
-use miot_spec::device::miot_spec_device::{AsMiotDevice,DeviceInfo, MiotSpecDevice, NotSupportMiotDeviceError};
+use miot_spec::device::miot_spec_device::{AsMiotDevice, DeviceInfo, MiotSpecDevice, NotSupportMiotDeviceError};
 use crate::db::entity::prelude::{IotDeviceModel, MiotDeviceEntity};
 use sea_orm::*;
 use miot_spec::device::ble::ble_device::BleDevice;
 use miot_spec::device::gateway::gateway::OpenMiioGatewayDevice;
+use miot_spec::device::mesh_device::MeshDevice;
 use miot_spec::device::wifi_device::WifiDevice;
 use crate::db::entity::iot_device::{DeviceParam, IotDeviceType};
 use crate::init::DevicePointer;
@@ -26,7 +27,7 @@ impl AsMiotDevice for MiotDeviceArc {
 
 impl IotDeviceManagerInner {
     /// 初始化米家子设备
-    pub(crate) async fn init_mi_device_child<T: AsMiotDevice>(&self, dev: IotDeviceModel, gw: T) -> anyhow::Result<DevicePointer> {
+    pub(crate) async fn init_mi_device_child<T: AsMiotDevice + 'static>(&self, dev: IotDeviceModel, gw: T) -> anyhow::Result<DevicePointer> {
         //查米家设备
         let source_id = dev.source_id.ok_or(anyhow!("设备来源id不存在"))?;
         let (_, dev_info) = get_device_info(&self.conn, source_id.as_str()).await?;
@@ -39,18 +40,14 @@ impl IotDeviceManagerInner {
                     // return Ok(Arc::new(ble_dev));
                     todo!();
                 }
-                Err(anyhow!("初始化设备失败，MiBleDevice 参数类型错误"))
+                Err(anyhow!("初始化子设备失败，MiBleDevice 参数类型错误"))
             }
             IotDeviceType::MiMeshDevice => {
-                if let Some(DeviceParam::MeshParam) = dev.params {
-                    todo!();
-                    // let ble_dev = MeshDevice::new(dev_info, gw.clone());
-                    // return Ok(Arc::new(ble_dev));
-                }
-                Err(anyhow!("初始化设备失败，MiMeshDevice参数类型错误"))
+                let ble_dev = MeshDevice::new(dev_info, gw);
+                return Ok(Arc::new(ble_dev));
             }
             _ => {
-                Err(anyhow!("初始化设备失败，设备类型错误"))
+                Err(anyhow!("初始化设备失败，设备类型错误,该设备不支持子设备"))
             }
         };
     }
@@ -61,7 +58,7 @@ impl IotDeviceManagerInner {
         let (account_id, param) = get_device_info(&self.conn, source_id.as_str()).await?;
         return match dev.device_type {
             IotDeviceType::MiWifiDevice => {
-                return Ok(Arc::new(WifiDevice::new(param).await?));
+                return Ok(Arc::new(WifiDevice::new(param)?));
             }
             IotDeviceType::MiGatewayDevice => {
                 let dev = OpenMiioGatewayDevice::new(param).await?;
@@ -76,7 +73,7 @@ impl IotDeviceManagerInner {
                 todo!();
             }
             _ => {
-                Err(anyhow!("初始化设备失败，设备类型错误"))
+                Err(anyhow!("初始化设备失败，设备类型错误,该设备需要网关"))
             }
         };
     }

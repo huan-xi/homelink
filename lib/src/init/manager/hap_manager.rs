@@ -61,8 +61,8 @@ pub struct HapManageInner {
     server_map: dashmap::DashMap<i64, HapTask>,
     // 配件id关系
     accessory_map: dashmap::DashMap<u64, AccessoryInfo>,
-    /// 每个配件同时只能运行一个
-    aid_ch_map: dashmap::DashMap<u64, ChannelInfo>,
+    // 每个配件同时只能运行一个
+    // aid_ch_map: dashmap::DashMap<u64, ChannelInfo>,
     /// 配件与设备的关系
     dev_aid_map: dashmap::DashMap<i64, u64>,
 
@@ -152,23 +152,24 @@ impl HapManageInner {
 
         let services = lock.get_mut_services_by_tag(service_tag.as_str());
         for svc in services {
-            let chs = svc.get_mut_characteristics_by_tag(char_tag.as_str());
+            todo!();
+           /* let chs = svc.get_mut_characteristics_by_tag(char_tag.as_str());
             for ch in chs {
                 ch.set_value(value.clone()).await?;
-            }
+            }*/
         }
         Ok(())
     }
-    pub async fn put_accessory_ch(&self, aid: u64, ch_id: i64, status: bool) {
-        self.aid_ch_map.insert(aid, ChannelInfo::new(ch_id, status));
-    }
-
-    pub async fn get_accessory_ch_id(&self, aid: u64) -> anyhow::Result<i64> {
-        self.aid_ch_map
-            .get(&aid)
-            .map(|i| i.ch_id)
-            .ok_or(anyhow!("未运行js脚本"))
-    }
+    // pub async fn put_accessory_ch(&self, aid: u64, ch_id: i64, status: bool) {
+    //     self.aid_ch_map.insert(aid, ChannelInfo::new(ch_id, status));
+    // }
+    //
+    // pub async fn get_accessory_ch_id(&self, aid: u64) -> anyhow::Result<i64> {
+    //     self.aid_ch_map
+    //         .get(&aid)
+    //         .map(|i| i.ch_id)
+    //         .ok_or(anyhow!("未运行js脚本"))
+    // }
 
     pub async fn refresh_accessory_config(&self, aid: u64) {
         /* if let Some(bid) = self.aid_bid_map.get(&aid) {

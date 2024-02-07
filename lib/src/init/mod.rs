@@ -13,11 +13,9 @@ use crate::device::platform::PlatformDevice;
 
 
 pub mod hap_init;
-pub mod device_init;
 mod characteristic_init;
 pub mod manager;
 mod accessory_init;
-mod manager_init;
 pub(crate) mod helper;
 pub mod logger_init;
 

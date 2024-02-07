@@ -1,9 +1,10 @@
 use std::sync::Arc;
-use hap::characteristic::{CharReadParam, CharUpdateParam, Format, CharReadResult, CharUpdateResult};
+use hap::characteristic::delegate::{CharReadParam, CharUpdateParam, CharReadResult, CharUpdateResult};
 use hap::HapType;
 use log::info;
 use sea_orm::JsonValue;
 use serde_json::json;
+use hap::characteristic::Format;
 use miot_spec::proto::miio_proto::MiotSpecId;
 use crate::hap::iot::iot_characteristic::CharacteristicValue;
 use crate::hap::models::{AccessoryModelExt, AccessoryModelExtConstructor,  AccessoryModelExtPointer, ContextPointer, ReadValueResult, UpdateValueResult};

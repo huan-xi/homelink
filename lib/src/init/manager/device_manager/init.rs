@@ -1,17 +1,15 @@
 use std::sync::Arc;
+
 use anyhow::anyhow;
 use log::error;
-use crate::db::entity::prelude::{IotDeviceColumn, IotDeviceEntity, IotDeviceModel, MiotDeviceEntity};
-use crate::init::manager::device_manager::{IotDeviceManager, IotDeviceManagerInner};
 use sea_orm::*;
-use miot_spec::device::gateway::gateway::OpenMiioGatewayDevice;
+
 use miot_spec::device::miot_spec_device::AsMiotDevice;
-use miot_spec::device::wifi_device::{WifiDevice, WifiDeviceInner};
-use crate::db::entity::iot_device::{IotDeviceType, SourcePlatform};
-use crate::device::platform::PlatformDevice;
-use crate::init::DevicePointer;
+
+use crate::db::entity::iot_device::SourcePlatform;
+use crate::db::entity::prelude::{IotDeviceColumn, IotDeviceEntity, IotDeviceModel};
+use crate::init::manager::device_manager::IotDeviceManagerInner;
 use crate::init::manager::device_manager::mijia::MiotDeviceArc;
-use crate::init::manager::mi_account_manager::{MiAccountManager, MiCloudDeviceExt};
 
 impl IotDeviceManagerInner {
     pub async fn init(&self) -> anyhow::Result<()> {
@@ -65,11 +63,9 @@ impl IotDeviceManagerInner {
             SourcePlatform::MiHome => {
                 // let gw = gw.as_miot_device()?;
                 self.init_mi_device_child(dev, MiotDeviceArc(gw)).await?
-
             }
         };
-
-        // gw.add_child(dev_id, dev);
+        self.push_device(dev_id, dev);
         Ok(())
     }
 

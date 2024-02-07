@@ -37,7 +37,7 @@ pub fn api() -> Router<AppState> {
                   .route("/list", get(controller::iot_device::list))
                   .route("/disable/:id", put(controller::iot_device::disable))
                   .route("/restart/:id", put(controller::iot_device::restart))
-                  .route("/:id", put(controller::iot_device::delete))
+                  .route("/:id", delete(controller::iot_device::delete))
                   .route("/set_property/:id", post(controller::iot_device::set_property))
                   .route("/read_property/:id", post(controller::iot_device::read_property))
               // .route("/", post(controller::iot_device::add_device))

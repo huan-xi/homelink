@@ -1,10 +1,9 @@
-use hap::characteristic::{CharReadParam, CharUpdateParam, ReadCharResults, UpdateCharResults};
-use crate::error::DeviceExitError;
+use hap::characteristic::delegate::{CharReadParam, CharUpdateParam, ReadCharResults, UpdateCharResults};
 use crate::event::HlDeviceListenable;
 use crate::hl_device::RetryInfo;
 use crate::HlDevice;
 
-#[derive(Debug)]
+#[derive(Debug,Clone)]
 pub struct DeviceInfo {
     pub manufacturer: String,
     /// Contains the manufacturer-specific model of the accessory, e.g. "A1234".

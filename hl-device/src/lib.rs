@@ -6,12 +6,12 @@ pub mod platform;
 
 pub type HlDeviceResult<T> = Result<T, error::HlDeviceError>;
 
-pub use hap::characteristic::CharReadParam;
-pub use hap::characteristic::CharReadResult;
-pub use hap::characteristic::CharUpdateParam;
-pub use hap::characteristic::CharUpdateResult;
-pub use hap::characteristic::ReadCharResults;
-pub use hap::characteristic::UpdateCharResults;
+pub use hap::characteristic::delegate::CharReadParam;
+pub use hap::characteristic::delegate::CharReadResult;
+pub use hap::characteristic::delegate::CharUpdateParam;
+pub use hap::characteristic::delegate::CharUpdateResult;
+pub use hap::characteristic::delegate::ReadCharResults;
+pub use hap::characteristic::delegate::UpdateCharResults;
 pub use hl_device::HlDevice;
 
 

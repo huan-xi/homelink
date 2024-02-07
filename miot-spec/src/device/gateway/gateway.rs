@@ -77,7 +77,7 @@ impl MiotSpecDevice for OpenMiioGatewayDeviceInner {
                     _ = poll => break
                 }
         }
-        // futures_util::join!(listen, a);
+        self.proto.write().await.take();
         Err(ExitError::Disconnect)
     }
 }

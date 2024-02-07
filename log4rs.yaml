@@ -15,6 +15,8 @@ root:
   appenders:
     - stdout
 loggers:
+  "ble_monitor::parser::xiaomi::parser":
+    level: warn
   "miot_spec::proto::transport::open_miio_mqtt_proto":
     level: info
   "hap::transport::http::hap_api":

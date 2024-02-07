@@ -14,7 +14,7 @@ use crate::db::entity::iot_device::SourcePlatform;
 use crate::db::entity::prelude::MiotDeviceModel;
 use crate::db::service::hap_bridge_service::create_hap_bridge;
 use crate::db::SNOWFLAKE;
-use crate::hap::template::miot_template::MiotTemplate;
+use crate::template::miot_template::MiotTemplate;
 use crate::init::helper::template_helper::{AccessoryCtx, DeviceModelCtx, to_accessory_model, to_char_model, to_device_model, to_service_model};
 use crate::init::manager::hap_manager::HapManage;
 

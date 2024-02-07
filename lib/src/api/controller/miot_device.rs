@@ -22,7 +22,7 @@ use crate::db::entity::iot_device::DeviceParam::{MiGatewayParam, WifiDeviceParam
 use crate::db::entity::mi_account::MiAccountStatus;
 use crate::db::entity::prelude::{IotDeviceActiveModel, IotDeviceEntity, MiAccountActiveModel, MiAccountEntity, MiAccountModel, MiotDeviceActiveModel, MiotDeviceEntity, MiotDeviceModel};
 use crate::db::SNOWFLAKE;
-use crate::hap::template::miot_template::MiotTemplate;
+use crate::template::miot_template::MiotTemplate;
 use crate::init::manager::template_manager::{ApplyTemplateOptions, BridgeMode, SourcePlatformModel};
 
 // accounts

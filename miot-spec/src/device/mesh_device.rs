@@ -1,35 +1,38 @@
 use crate::device::common::emitter::EventType;
 
-use crate::device::miot_spec_device::{AsMiotGatewayDevice, BaseMiotSpecDevice, DeviceInfo, MiotSpecDevice, MiotSpecDeviceWrapper};
+use crate::device::miot_spec_device::{AsMiotDevice, AsMiotGatewayDevice, BaseMiotSpecDevice, DeviceInfo, MiotSpecDevice, MiotSpecDeviceWrapper};
 use crate::device::MiotDevicePointer;
 use crate::proto::miio_proto::{MiotSpecDTO, MiotSpecId, MiotSpecProtocolPointer};
 use crate::proto::protocol::{ExitError};
 
 
-pub type MeshDevice = MiotSpecDeviceWrapper<MeshDeviceInner>;
+pub type MeshDevice<T> = MiotSpecDeviceWrapper<MeshDeviceInner<T>>;
 
 /// 网关上监听了米家协议
 ///能监听到  miio/report properties_changed
 // mesh 设备
-pub struct MeshDeviceInner {
+pub struct MeshDeviceInner<T: AsMiotDevice> {
     info: DeviceInfo,
     base: BaseMiotSpecDevice,
-    gateway: MiotDevicePointer,
+    gateway: T,
 }
 
 
 #[async_trait::async_trait]
-impl MiotSpecDevice for MeshDeviceInner {
+impl<T: AsMiotDevice> MiotSpecDevice for MeshDeviceInner<T> {
     fn get_info(&self) -> &DeviceInfo { &self.info }
     fn get_base(&self) -> &BaseMiotSpecDevice {
         &self.base
     }
     async fn get_proto(&self) -> Result<MiotSpecProtocolPointer, ExitError> {
-        self.gateway.get_proto().await
+        self.gateway
+            .as_miot_device()?.get_proto().await
     }
 
     async fn run(&self) -> Result<(), ExitError> {
-        let mut recv = self.gateway.get_event_recv().await;
+        let mut recv = self.gateway
+            .as_miot_device()?
+            .get_event_recv().await;
         //{"id":1996772508,"method":"properties_changed","params":[{"did":"1023054714","siid":2,"piid":1,"value":false}],"type":16}
         while let Ok(EventType::GatewayMsg(msg)) = recv.recv().await {
             let mut data = msg.data;
@@ -74,8 +77,8 @@ impl MiotSpecDevice for MeshDeviceInner {
     }
 }
 
-impl MeshDevice {
-    pub fn new(info: DeviceInfo, gateway: MiotDevicePointer) -> MeshDevice {
+impl<T: AsMiotDevice> MeshDevice<T> {
+    pub fn new(info: DeviceInfo, gateway: T) -> MeshDevice<T> {
         MiotSpecDeviceWrapper(MeshDeviceInner {
             info,
             base: Default::default(),

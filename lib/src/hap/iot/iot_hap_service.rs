@@ -23,7 +23,6 @@ pub struct IotHapService {
     // pub name: Option<NameCharacteristic>,
     characteristic_map: HashMap<u64, Box<dyn HapCharacteristic>>,
     tag: Option<String>,
-    tag_id_map: HashMap<String, Vec<u64>>,
 }
 
 impl IotHapService {
@@ -37,15 +36,11 @@ impl IotHapService {
             linked_services: vec![],
             characteristic_map,
             tag,
-            tag_id_map: Default::default(),
         }
     }
-    pub fn push_characteristic(&mut self, tag: Option<String>, characteristic: Box<dyn HapCharacteristic>) {
+    pub fn push_characteristic(&mut self, characteristic: Box<dyn HapCharacteristic>) {
         let id = characteristic.get_id();
         self.characteristic_map.insert(id, characteristic);
-        if let Some(tag) = tag {
-            self.tag_id_map.entry(tag).or_insert(vec![]).push(id);
-        }
     }
 }
 
@@ -125,15 +120,7 @@ impl HapService for IotHapService {
     fn get_mut_characteristics(&mut self) -> Vec<&mut dyn HapCharacteristic> {
         self.characteristic_map.iter_mut().map(|mut i| i.1.as_mut() as &mut dyn HapCharacteristic).collect()
     }
-    fn get_mut_characteristics_by_tag(&mut self, tag: &str) -> Vec<&mut dyn HapCharacteristic> {
-        let ids = self.tag_id_map.get(tag);
-        if let Some(ids) = ids {
-            return self.characteristic_map.values_mut()
-                .filter(|i| ids.contains(&i.get_id()))
-                .map(|i| i.as_mut() as &mut dyn HapCharacteristic).collect();
-        }
-        vec![]
-    }
+
 }
 
 impl Serialize for IotHapService {

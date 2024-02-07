@@ -1,7 +1,7 @@
 use dashmap::DashMap;
 use log::info;
 use ble_monitor::BleValue;
-use hap::characteristic::{CharReadParam, CharUpdateParam, ReadCharResults, UpdateCharResults};
+use hl_device::{CharReadParam, CharUpdateParam, ReadCharResults, UpdateCharResults};
 use hl_device::error::DeviceExitError;
 use hl_device::event::{EventListener, HlDeviceListenable};
 use hl_device::hl_device::RetryInfo;

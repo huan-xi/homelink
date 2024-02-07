@@ -1,9 +1,9 @@
 use std::sync::Arc;
-use hap::characteristic::{CharReadParam, CharUpdateParam};
+use hap::characteristic::{CharReadParam, CharReadResult, CharUpdateParam, CharUpdateResult};
 use hap::HapType;
 use log::info;
 use miot_spec::proto::miio_proto::MiotSpecId;
-use crate::hap::models::{AccessoryModelExt, ContextPointer, ReadValueResult, UpdateValueResult};
+use crate::hap::models::{AccessoryModelExt, AccessoryModelExtConstructor, AccessoryModelExtPointer, ContextPointer, ReadValueResult, UpdateValueResult};
 use sea_orm::JsonValue;
 
 pub struct ModelExt {
@@ -18,6 +18,7 @@ impl Default for ModelExt {
         }
     }
 }
+
 impl AccessoryModelExtConstructor for ModelExt {
     fn new(ctx: ContextPointer, params: Option<JsonValue>) -> anyhow::Result<AccessoryModelExtPointer> {
         Ok(Arc::new(Self {}))
@@ -25,10 +26,9 @@ impl AccessoryModelExtConstructor for ModelExt {
 }
 
 
-
 #[async_trait::async_trait]
 impl AccessoryModelExt for ModelExt {
-    async fn read_chars_value(&self, ctx: ContextPointer, params: Vec<CharReadParam>) -> ReadValueResult {
+    async fn read_chars_value(&self, params: Vec<CharReadParam>) -> ReadValueResult {
         let types: Vec<HapType> = params.iter()
             .map(|i| i.ctag.clone())
             .collect();
@@ -38,7 +38,7 @@ impl AccessoryModelExt for ModelExt {
             let value = match param.ctag {
                 _ => None,
             };
-            result.push(ReadCharValue {
+            result.push(CharReadResult {
                 cid: param.cid,
                 success: true,
                 value,
@@ -47,7 +47,7 @@ impl AccessoryModelExt for ModelExt {
         Ok(result)
     }
 
-    async fn update_chars_value(&self, ctx: ContextPointer, params: Vec<CharUpdateParam>) -> UpdateValueResult {
+    async fn update_chars_value(&self, params: Vec<CharUpdateParam>) -> UpdateValueResult {
         let types: Vec<(HapType, JsonValue, JsonValue)> = params.iter()
             .map(|i| (i.ctag.clone(), i.old_value.clone(), i.new_value.clone()))
             .collect();
@@ -55,12 +55,9 @@ impl AccessoryModelExt for ModelExt {
         let mut result = vec![];
         for param in params {
             match param.ctag {
-
-                _ => {
-
-                }
+                _ => {}
             }
-            result.push(UpdateCharValue {
+            result.push(CharUpdateResult {
                 cid: param.cid,
                 success: true,
             })

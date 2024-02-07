@@ -28,7 +28,7 @@ use crate::proto::protocol::ExitError::NotGateway;
 pub struct BleDevice<T: AsMiotDevice> {
     pub info: DeviceInfo,
     base: BaseMiotSpecDevice,
-    gateway:T,
+    gateway: T,
     // 值
     values: Arc<RwLock<BleValue>>,
     spec_map: bimap::BiMap<MiotSpecId, BleValueType>,

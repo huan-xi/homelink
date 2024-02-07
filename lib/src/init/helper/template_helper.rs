@@ -1,10 +1,11 @@
 use sea_orm::ActiveValue::Set;
 use crate::db::entity::common::{Property, PropertyVec};
+use crate::db::entity::hap_accessory::ModelDelegateParamVec;
 use crate::db::entity::hap_characteristic::HapCharInfo;
 use crate::db::entity::iot_device::SourcePlatform;
 use crate::db::entity::prelude::{HapAccessoryActiveModel, HapCharacteristicActiveModel, HapServiceActiveModel, IotDeviceActiveModel, IotDeviceModel, MiotDeviceModel};
 use crate::db::SNOWFLAKE;
-use crate::hap::template::miot_template::{AccessoryTemplate, CharacteristicTemplate, DeviceTemplate, ServiceTemplate};
+use crate::template::miot_template::{AccessoryTemplate, CharacteristicTemplate, DeviceTemplate, ServiceTemplate};
 
 #[derive(Clone)]
 pub struct AccessoryCtx {
@@ -49,11 +50,13 @@ pub fn to_char_model(sid: i64, char: &CharacteristicTemplate, default: HapCharIn
         disabled: Set(false),
         name: Set(char.name.clone()),
         characteristic_type: Set(char.char_type),
-        mapping_method: Set(char.mapping_method),
-        mapping_param: Set(char.mapping_param.clone()),
-        unit_convertor: Set(char.unit_convertor.clone()),
-        convertor_param: Set(char.convertor_param.clone()),
+        // mapping_method: Set(char.mapping_method),
+        // mapping_param: Set(char.mapping_param.clone()),
+        // unit_convertor: Set(char.unit_convertor.clone()),
+        // convertor_param: Set(char.convertor_param.clone()),
+        memo: Set(char.description.clone()),
         info: Set(info),
+        ..Default::default()
     })
 }
 
@@ -66,15 +69,17 @@ pub fn to_accessory_model(ctx: AccessoryCtx, accessory: &AccessoryTemplate) -> a
         bridge_id: Set(ctx.bridge_id),
         disabled: Set(false),
         category: Set(accessory.category),
-        script: Default::default(),
-        script_params: Default::default(),
-        model: Set(accessory.model.clone()),
-        model_params: Set(accessory.model_params.clone()),
+        hap_model_delegates: Set(ModelDelegateParamVec(accessory.hap_delegates.clone())),
+        // script: Default::default(),
+        // script_params: Default::default(),
+        // model: Set(accessory.model.clone()),
+        // model_params: Set(accessory.model_params.clone()),
         memo: Set(accessory.desc.clone()),
         info: Default::default(),
         temp_id: Set(Some(ctx.dev_ctx.id.clone())),
         create_at: Set(chrono::Local::now().naive_local()),
         update_at: Set(chrono::Local::now().naive_local()),
+        ..Default::default()
     })
 }
 

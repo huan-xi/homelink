@@ -947,6 +947,12 @@ impl Into<HapType> for MappingHapType {
         HapType::from_str(self.to_string().as_str()).unwrap()
     }
 }
+impl From<HapType> for MappingHapType {
+    fn from(hap_type: HapType) -> Self {
+        MappingHapType::from_str(hap_type.to_string().as_str()).unwrap()
+    }
+}
+
 
 #[test]
 pub fn test() {

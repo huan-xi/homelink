@@ -29,7 +29,6 @@ pub struct WifiDeviceInner {
 }
 
 
-
 impl AsMiotGatewayDevice for WifiDeviceInner {}
 
 #[async_trait::async_trait]
@@ -62,14 +61,12 @@ impl MiotSpecDevice for WifiDeviceInner {
                     _ = poll => break,
                 }
         }
-        // join(listen, poll).await;
+        self.proto.write().await.take();
         Err(ExitError::Disconnect)
         // 该表当前设备的状态
         //ExitCode::OK
     }
 }
-
-
 
 
 impl WifiDeviceInner {
@@ -98,7 +95,7 @@ impl WifiDeviceInner {
 }
 
 impl WifiDevice {
-    pub async fn new(info: DeviceInfo) -> anyhow::Result<Self> {
+    pub fn new(info: DeviceInfo) -> anyhow::Result<Self> {
         Ok(MiotSpecDeviceWrapper(WifiDeviceInner {
             base: BaseMiotSpecDevice {
                 ..std::default::Default::default()

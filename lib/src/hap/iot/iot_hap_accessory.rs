@@ -1,17 +1,14 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use impl_new::New;
-use log::info;
 
 use serde::{Serialize, Serializer};
 use serde::ser::SerializeStruct;
-use tokio::sync::Mutex;
 
 use hap::accessory::HapAccessory;
-use hap::characteristic::{Cid, OnReadsFn, OnRwFn, OnUpdateFn, OnUpdatesFn};
+use hap::characteristic::delegate::{CharReadsDelegate, CharUpdateDelegate, Cid, OnReadsFn, OnRwFn, OnUpdatesFn};
 use hap::HapType;
 use hap::service::HapService;
-use miot_spec::device::miot_spec_device::MiotSpecDevice;
 
 use crate::hap::models::{AccessoryModel};
 
@@ -115,16 +112,16 @@ impl HapAccessory for IotHapAccessory {
     fn get_mut_service_by_id(&mut self, id: u64) -> Option<&mut dyn HapService> {
         self.services.get_mut(&id).map(|i| i.as_mut() as &mut dyn HapService)
     }
-
-    fn get_on_reads_fn(&self) -> Option<OnReadsFn> {
+    fn get_on_read_delegate(&self) -> Option<Box<dyn CharReadsDelegate>> {
         self.model_ext
-            .clone()
-            .and_then(|i| i.get_on_reads_fn())
+            .as_ref()
+            .and_then(|i| i.get_on_read_delegate())
     }
-    fn get_on_updates_fn(&self) -> Option<OnUpdatesFn> {
+
+    fn get_on_updates_delegate(&self) -> Option<Box<dyn CharUpdateDelegate>>  {
         self.model_ext
-            .clone()
-            .and_then(|i| i.get_on_updates_fn())
+            .as_ref()
+            .and_then(|i| i.get_on_update_delegate())
     }
 
     /* fn get_on_reads_fn(&self) -> Option<OnReadsFn> {
