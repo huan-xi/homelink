@@ -1,0 +1,81 @@
+[package]
+name = "lib"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+hap-metadata = { path = "../target-platform/hap/hap-metadata" }
+miot-proto = { path = "../source-platform/xiaomi/miot-proto" }
+ble-monitor = { path = "../source-platform/ble-native/ble-monitor" }
+hl-integration = { path = "../hl-integration" }
+target-hap = { path = "../target-platform/hap/target-hap" }
+
+hap = { path = "../target-platform/hap/hap-rs" }
+xiaomi-ble-packet = { path = "../source-platform/xiaomi/xiaomi-ble-packet" }
+hex = "0.4.3"
+anyhow = "1.0.76"
+tokio = { workspace = true }
+md5 = { version = "0.7.0", features = [] }
+aes = { version = "0.7.5", features = [] }
+log = { workspace = true }
+packed_struct = "0.10.1"
+#block-modes = "0.9.1"
+block-modes = "0.8"
+rust-crypto.workspace = true
+serde_json = "1.0.108"
+serde = { version = "1.0.193", features = ["derive"] }
+bytes.workspace = true
+tap.workspace = true
+toml = "0.8.8"
+log4rs = { version = "1.2.0", features = ["default"] }
+lazy_static.workspace = true
+
+axum.workspace = true
+
+
+
+#axum = "0.7.3"
+#axum-extra = "0.9.0"
+#axum-server = "0.4.6"
+dashmap = "5.5.3"
+sea-orm = { version = "0.12.10", features = ["macros", "runtime-tokio-native-tls", "with-chrono"] }
+rand = "0.7.3"
+futures-util = "0.3.30"
+strum = "0.25.0"
+strum_macros = "0.25.3"
+mime = "0.3.17"
+serde-aux = "4.3.1"
+snowdon = "0.2.0"
+base64.workspace = true
+chrono.workspace = true
+evalexpr = "11.3.0"
+async-trait = "0.1.77"
+num_enum = "0.7.2"
+bimap = { version = "0.6.3", features = ["serde"] }
+uuid = { version = "0.8", features = ["v4", "serde"] }
+#deno_runtime = { workspace = true}
+deno_runtime = { workspace = true, optional = true }
+once_cell = { workspace = true }
+derive_builder = "0.12.0"
+rust-embed.workspace = true
+impl_new = "0.2.1"
+sea-orm-migration = "0.12.12"
+thiserror = "1.0.56"
+tower-http.workspace = true
+url = "2.4.1"
+async-recursion = "1.0.5"
+btleplug = "0.11.5"
+#dirs = "5.0.1"
+#url = "2.1"
+[dev-dependencies]
+
+[features]
+default = ["sqlite", ]
+#default = ["postgres", "mysql", "sqlite"]
+#mysql = ["sea-orm/sqlx-mysql"]
+#postgres = ["sea-orm/sqlx-postgres"]
+sqlite = ["sea-orm/sqlx-sqlite"]
+deno = ["deno_runtime"]
+#deno = []

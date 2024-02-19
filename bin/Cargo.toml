@@ -8,8 +8,13 @@ path = "src/main.rs"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-lib = { path = "../lib" }
-hap-metadata = { path = "../hap-metadata" }
+lib = { path = "../core" }
+hap-metadata = { path = "../target-platform/hap/hap-metadata" }
+target-hap = { path = "../target-platform/hap/target-hap" }
+xiaomi-integration= { path = "../source-platform/xiaomi/xiaomi-integration" }
+hl-integration = { path = "../hl-integration" }
+
+
 axum.workspace = true
 log4rs.workspace = true
 log.workspace = true

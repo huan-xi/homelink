@@ -1,11 +1,11 @@
 target
 data
-lib/examples
+core/examples
 log
 .idea
-hap-rs/.idea
+target-platform/hap/hap-rs/.idea
 Cargo.lock
 test.json
 test1.json
-lib/src/test
+core/src/test
 dist

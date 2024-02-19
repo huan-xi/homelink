@@ -1,5 +1,12 @@
 [workspace]
-members = ["miot-spec", "lib", "hap-metadata", "hap-rs", "libmdns", "ble-monitor","bin", "hl-device"]
+members = [ "core",
+    "target-platform/hap/hap-metadata", "target-platform/hap/hap-rs", "libmdns",
+    "source-platform/ble-native/ble-monitor", "bin", "hl-integration",
+    "source-platform/xiaomi/xiaomi-ble-packet",
+    "source-platform/xiaomi/miot-proto",
+    "source-platform/xiaomi/xiaomi-integration",
+    "target-platform/hap/target-hap", "hl-common",
+]
 resolver = "2"
 #exclude=["hap_platform-rs/codegen"]
 [profile.dev]
@@ -7,9 +14,10 @@ split-debuginfo = "unpacked"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [workspace.dependencies]
 anyhow = "1.0.76"
+
 tap = "1.0.1"
 axum = "0.6.20"
-tower-http = { version = "0.4.0", features = ["fs","catch-panic"] }
+tower-http = { version = "0.4.0", features = ["fs", "catch-panic"] }
 rust-embed = "8.2.0"
 serde_json = "1.0.113"
 serde = { version = "1.0.193", features = ["derive"] }
@@ -29,6 +37,12 @@ futures-util = "0.3.30"
 num_enum = "0.7.2"
 thiserror = "1.0.56"
 async-trait = "0.1"
+packed_struct = "0.10.1"
+strum = "0.26.1"
+strum_macros = "0.26"
+dashmap = "5.5.3"
+rand = "0.8.5"
+bimap = { version = "0.6.3", features = ["serde"] }
 #deno_runtime = { path = "/Users/huanxi/tmp/deno/runtime", features = ["dont_use_runtime_snapshot"] }
 [profile.release]
 strip = true

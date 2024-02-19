@@ -6,22 +6,23 @@ use log::{error, info};
 use tokio::select;
 use tokio::sync::oneshot;
 use tower_http::services::ServeDir;
-
+use hl_integration::integration::HlSourceIntegrator;
 use lib::api::router;
 use lib::api::state::AppState;
 use lib::config::cfgs::Configs;
 use lib::config::context::{APP_CONTEXT, ApplicationContext, get_app_context};
 use lib::db::init::{db_conn, migrator_up};
-use lib::init;
 use lib::init::manager::device_manager::IotDeviceManager;
-use lib::init::manager::hap_manager::HapManage;
 use lib::init::manager::mi_account_manager::MiAccountManager;
 use lib::init::manager::template_manager::TemplateManager;
 use lib::init::{logger_init, Managers};
-use lib::js_engine::context::EnvContext;
-use lib::js_engine::init_js_engine::init_js_engine;
+// use lib::js_engine::context::EnvContext;
+// use lib::js_engine::init_js_engine::init_js_engine;
 use hap_metadata::hap_metadata;
+use lib::init::hap_init::init_hap_list;
 use lib::init::manager::ble_manager::BleManager;
+use target_hap::hap_manager::HapManage;
+use xiaomi_integration::integration::XiaomiIntegration;
 
 
 /// 先创建http服务
@@ -42,15 +43,18 @@ async fn main() -> anyhow::Result<()> {
     //数据库版本迁移
     migrator_up(&conn).await;
     let ble_manager = BleManager::new();
-    ble_manager.init().await?;
+    ble_manager.init().await;
     let hap_metadata = Arc::new(hap_metadata()?);
     let mi_account_manager = MiAccountManager::new(conn.clone());
+    let template_manager = TemplateManager::new();
     // 初始化hap 服务器
-    let device_manager = IotDeviceManager::new(conn.clone(), mi_account_manager.clone());
+    let device_manager = IotDeviceManager::new(conn.clone(),
+                                               mi_account_manager.clone(),
+                                               ble_manager.clone());
     // 初始化iot设备
     device_manager.init().await?;
-    let hap_manager = HapManage::new(hap_metadata.clone());
-    let template_manager = TemplateManager::new();
+
+    let hap_manager = HapManage::new();
 
 
     let app_state = AppState::new(conn.clone(), Managers {
@@ -68,21 +72,21 @@ async fn main() -> anyhow::Result<()> {
         .with_state(app_state.clone());
 
     //初始化js 引擎
-    let js_engine = init_js_engine(config.server.data_dir.clone(), EnvContext {
-        info: "home gateway".to_string(),
-        version: "v1.0.0".to_string(),
-        #[cfg(feature = "deno")]
-        main_recv: None,
-        conn: conn.clone(),
-        dev_manager: device_manager.clone(),
-        hap_manager: hap_manager.clone(),
-    }).await?;
+    /*    let js_engine = init_js_engine(config.server.data_dir.clone(), EnvContext {
+            info: "home gateway".to_string(),
+            version: "v1.0.0".to_string(),
+            #[cfg(feature = "deno")]
+            main_recv: None,
+            conn: conn.clone(),
+            dev_manager: device_manager.clone(),
+            hap_manager: hap_manager.clone(),
+        }).await?;*/
 
 
     let res = APP_CONTEXT.set(ApplicationContext {
         config,
         conn: conn.clone(),
-        js_engine,
+        // js_engine,
         hap_metadata: hap_metadata.clone(),
         device_manager: device_manager.clone(),
         hap_manager: hap_manager.clone(),
@@ -91,7 +95,11 @@ async fn main() -> anyhow::Result<()> {
         panic!("APP_CONTEXT 初始化失败");
     }
     let context = get_app_context();
-
+    
+    //初始化集成
+    init_integration().await?;
+    
+    init_hap_list(&conn, hap_manager.clone(), device_manager.clone()).await?;
 
     let api_server =
         axum::Server::bind(&addr)
@@ -106,13 +114,15 @@ async fn main() -> anyhow::Result<()> {
         let _ = api_server_ch_send.send(false);
     });
 
+
     // 初始化hap设备
     // 初始化模板
+
     template_manager.init().await?;
 
     // init_iot_device_manager(&conn, device_manager.clone(), mi_account_manager.clone()).await?;
     // 初始化hap 设备
-    init::hap_init::init_hap_list(&conn, hap_manager.clone(), device_manager.clone()).await?;
+    // init::hap_init::init_hap_list(&conn, hap_manager.clone(), device_manager.clone()).await?;
 
     // 等待引擎退出
     // let recv = context.js_engine.resp_recv.subscribe();
@@ -136,12 +146,18 @@ async fn main() -> anyhow::Result<()> {
     }
 
     // api_server_ch.await?;
-    context.js_engine.close().await;
+    // context.js_engine.close().await;
     // 服务停止
     drop(app_state);
     // let _ = js_tx.send(0);
     device_manager.close().await;
     hap_manager.close().await;
+    Ok(())
+}
+
+async fn init_integration() ->anyhow::Result<()>{
+    let integration = XiaomiIntegration {};
+    integration.init()?;
     Ok(())
 }
 

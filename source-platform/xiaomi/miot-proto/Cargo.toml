@@ -1,0 +1,50 @@
+[package]
+name = "miot-proto"
+version = "0.1.0"
+edition = "2021"
+[lib]
+#proc-macro = true
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+hl-integration = { path = "../../../hl-integration" }
+target-hap = { path = "../../../target-platform/hap/target-hap" }
+xiaomi-ble-packet = { path = "../xiaomi-ble-packet" }
+
+hex = "0.4.3"
+tokio.workspace = true
+strum.workspace = true
+anyhow.workspace = true
+log = { workspace = true }
+serde_json = { workspace = true }
+serde = { workspace = true }
+futures-util = { workspace = true }
+
+md5 = { version = "0.7.0", features = [] }
+aes = { version = "0.7.5", features = [] }
+
+packed_struct = "0.10.1"
+block-modes = "0.8"
+
+reqwest = { version = "0.11.20", features = ["cookies", "json"] }
+rand = "0.8.5"
+#paho-mqtt = { version = "0.12.3", default-features = false, features = ["vendored-ssl"] }
+mini-telnet = "0.1.8"
+
+base64.workspace = true
+tap = "1.0.1"
+async-channel = "1.9.0"
+reqwest_cookie_store = "0.6.0"
+async-trait = "0.1.77"
+num_enum = "0.7.2"
+bimap = "0.6.3"
+rust-crypto.workspace = true
+
+impl_new.workspace = true
+rumqttc = { version = "0.23.0", features = ["default"] }
+#[target.x86_64-unknown-linux-musl.dependencies]
+native-tls = { version = "0.2.11", features = ["vendored"] }
+strum_macros = "0.26.1"
+
+[dev-dependencies]
+env_logger = "0"

@@ -1,0 +1,184 @@
+use std::sync::{Arc};
+
+use anyhow::anyhow;
+
+use crate::device::miot_spec_device::{AsMiotDevice, BaseMiotSpecDevice, DeviceInfo, MiotDeviceType, MiotSpecDevice};
+
+use hex::FromHex;
+use log::{debug, error};
+
+use packed_struct::{PackedStruct};
+use serde_json::{json, Value};
+use tokio::sync::RwLock;
+use xiaomi_ble_packet::ble_value_type::{BleValue, MiBleValueType, ValueLsbI16};
+
+use crate::device::common::emitter::{EventType};
+use crate::proto::miio_proto::{MiotSpecDTO, MiotSpecId, MiotSpecProtocolPointer};
+use crate::proto::protocol::{ExitError, RecvMessage};
+use crate::proto::protocol::ExitError::NotGateway;
+
+
+/// https://tasmota.github.io/docs/Bluetooth/
+/// 低功耗蓝牙设备
+/// 目前低功耗蓝牙设备只支持被动获取数据
+///spec_map 用户
+
+
+pub struct BleDevice<T: AsMiotDevice> {
+    pub info: DeviceInfo,
+    base: BaseMiotSpecDevice,
+    gateway: T,
+    // 值
+    // values: Arc<RwLock<BleValue>>,
+    // spec_map: bimap::BiMap<MiotSpecId, MiBleValueType>,
+    // 传输协议
+    proto: Arc<RwLock<Option<MiotSpecProtocolPointer>>>,
+}
+
+impl<T: AsMiotDevice + Sync + Send> AsMiotDevice for BleDevice<T> {}
+
+#[async_trait::async_trait]
+impl<T: AsMiotDevice> MiotSpecDevice for BleDevice<T> {
+    fn get_info(&self) -> &DeviceInfo { &self.info }
+
+    fn get_base(&self) -> &BaseMiotSpecDevice {
+        &self.base
+    }
+
+    async fn get_proto(&self) -> Result<MiotSpecProtocolPointer, ExitError> {
+        return Err(ExitError::BltConnectErr);
+    }
+
+
+    // read_property
+    async fn read_property(&self, siid: i32, piid: i32) -> anyhow::Result<Option<Value>> {
+        todo!();
+        // if let Some(val) = self.spec_map.get_by_left(&MiotSpecId::new(siid, piid)) {
+        //     let read = self.values.read().await;
+        //     if let Some(val) = read.get_value(*val) {
+        //         return Ok(Some(val));
+        //     }
+        // };
+        Ok(None)
+    }
+
+    /// 1.同步网关的状态
+    async fn run(&self) -> Result<(), ExitError> {
+        // let gw_proto = self.gateway.get_proto().await?;
+        // let mut recv = gw_proto.recv();
+        let mut recv = self.gateway
+            .as_miot_device()
+            .map_err(|_| NotGateway)?
+            .get_event_recv().await;
+
+        while let Ok(EventType::GatewayMsg(msg)) = recv.recv().await {
+            /// 收到数据
+            let data = msg.get_json_data();
+            if let Some(method) = data.get("method") {
+                //异步蓝牙事件
+                if method.as_str() == Some("_async.ble_event") {
+                    if let Some(v) = data.get("params") {
+                        let did = v.as_object()
+                            .and_then(|i| i.get("dev"))
+                            .and_then(|i| i.as_object())
+                            .and_then(|i| i.get("did"))
+                            .and_then(|i| i.as_str());
+
+                        if Some(self.info.did.as_str()) == did {
+                            //获取evt
+                            self.set_value_from_param(v).await;
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+impl<T: AsMiotDevice> BleDevice<T> {
+    //网关上设置一个监听器,监听属于我的消息
+    //蓝牙协议
+    pub fn new(info: DeviceInfo, gateway: T, spec_map: bimap::BiMap<MiotSpecId, MiBleValueType>) -> Self {
+        todo!();
+        /*Self {
+            info,
+            base: BaseMiotSpecDevice {
+                ..BaseMiotSpecDevice::default()
+            },
+            gateway,
+            spec_map,
+            values: Default::default(),
+            proto: Arc::new(Default::default()),
+        }*/
+    }
+
+    async fn set_value_from_param(&self, param: &Value) {
+        todo!();
+      /*  let evt_vec = param.as_object()
+            .and_then(|i| i.get("evt"))
+            .and_then(|i| i.as_array());
+        if let Some(data) = evt_vec {
+            let mut ble_value = BleValue::default();
+            // 数据列表
+            for val in data {
+                //处理数据
+                if let Some(eid) = val.get("eid").and_then(|i| i.as_u64()) {
+                    if let Some(edata) = val.get("edata")
+                        .and_then(|i| i.as_str())
+                        .and_then(|i| <Vec<u8>>::from_hex(i.as_bytes()).ok()) {
+                        //tid,edata
+                        match Self::mapping_value(eid, edata) {
+                            Ok((tp, val)) => {
+                                ble_value.set_value(tp, val);
+                            }
+                            Err(err) => {
+                                error!("解析蓝牙事件数据错误错误:{:?},eid:0x{:x}", err, eid);
+                            }
+                        };
+                    }
+                }
+            }
+            //  数据提交
+            self.values.write().await.extend(ble_value.clone());
+            for (tp, value) in ble_value.value_map.into_iter() {
+                match self.spec_map.get_by_right(&tp) {
+                    None => {
+                        debug!("emit empty:{:?}", tp);
+                    }
+                    Some(ps) => {
+                        let event = EventType::UpdateProperty(MiotSpecDTO {
+                            did: self.info.did.clone(),
+                            siid: ps.siid,
+                            piid: ps.piid,
+                            value: Some(value),
+                        });
+
+                        self.emit(event).await;
+                    }
+                };
+            }
+        }*/
+    }
+    /// 值映射
+    fn mapping_value(eid: u64, edata: Vec<u8>) -> anyhow::Result<(MiBleValueType, serde_json::Value)> {
+        todo!();
+       /* match MiBleValueType::try_from(eid as u16) {
+            Ok(val) => {
+                Ok((val, json!(val.unpack(edata.as_slice())?)))
+            }
+            Err(_) => {
+                Err(anyhow!("未知的蓝牙事件: eid:0x{:x},edata:{:?}", eid,edata))
+            }
+        }*/
+    }
+}
+
+
+#[test]
+pub fn test() {
+    //8C00
+    let token_bytes = <[u8; 2]>::from_hex("D002".as_bytes()).unwrap();
+    let a = ValueLsbI16::unpack(&token_bytes).unwrap();
+    println!("{:?}", a);
+}

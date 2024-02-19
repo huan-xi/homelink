@@ -38,7 +38,7 @@ service_type = "SecuritySystem"
 [[devices.accessories.services.characteristics]]
 mapping_method = "AccessoryModel"
 name = "security-system-state.current"
-description = "安防系统当前状态"
+desc = "安防系统当前状态"
 hap_type = "SecuritySystemCurrentState"
 format = "uint8"
 # 读写权限
@@ -50,7 +50,7 @@ valid_values = [0, 1, 2, 3, 4]
 [[devices.accessories.services.characteristics]]
 mapping_method = "AccessoryModel"
 name = "security-system-state.target"
-description = "安防系统target状态"
+desc = "安防系统target状态"
 hap_type = "SecuritySystemCurrentState"
 format = "uint8"
 # 读写权限
