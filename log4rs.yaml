@@ -20,7 +20,7 @@ loggers:
   "miot_spec::proto::transport::open_miio_mqtt_proto":
     level: info
   "hap::transport::http::hap_api":
-    level: info
+    level: debug
   "hap::transport::http::handler::pair_verify":
     level: info
   "rumqttc::state":

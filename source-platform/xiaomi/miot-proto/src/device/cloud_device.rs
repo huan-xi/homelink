@@ -1,13 +1,22 @@
 use std::time::Duration;
 use futures_util::future::BoxFuture;
 
-use crate::device::miot_spec_device::{ BaseMiotSpecDevice, DeviceInfo, MiotSpecDevice};
+use crate::device::miot_spec_device::{BaseMiotSpecDevice, DeviceInfo, MiotDeviceType, MiotSpecDevice, MiotSpecDeviceWrapper};
 use crate::proto::miio_proto::MiotSpecProtocolPointer;
 use crate::proto::protocol::ExitError;
 
 
+pub type MiCloudDevice = MiotSpecDeviceWrapper;
+
+
+impl MiCloudDevice {
+    pub fn new_cloud_device(inner: Box<dyn MiotSpecDevice>) -> Self {
+        Self(inner, MiotDeviceType::Cloud)
+    }
+}
+
 /// 通过云端接入的设备
-pub struct MiCloudDevice<T: MiCloudExt> {
+pub struct MiCloudDeviceInner<T: MiCloudExt> {
     pub base: BaseMiotSpecDevice,
     pub info: DeviceInfo,
     ///协议
@@ -25,7 +34,7 @@ pub trait MiCloudExt: Send + Sync {
     async fn register_property(&self, siid: i32, piid: i32);
 }
 
-impl<T: MiCloudExt> MiCloudDevice<T> {
+impl<T: MiCloudExt> MiCloudDeviceInner<T> {
     pub fn new(info: DeviceInfo, ext: T) -> Self {
         Self {
             base: Default::default(),
@@ -36,7 +45,7 @@ impl<T: MiCloudExt> MiCloudDevice<T> {
 }
 
 #[async_trait::async_trait]
-impl<T: MiCloudExt + Send + Sync> MiotSpecDevice for MiCloudDevice<T> {
+impl<T: MiCloudExt + Send + Sync> MiotSpecDevice for MiCloudDeviceInner<T> {
     fn get_info(&self) -> &DeviceInfo {
         &self.info
     }

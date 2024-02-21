@@ -1,4 +1,5 @@
 use std::any::Any;
+use std::collections::HashMap;
 use std::ops::Deref;
 use std::sync::Arc;
 use anyhow::anyhow;
@@ -7,12 +8,14 @@ use log::error;
 use serde_json::Value;
 use tap::TapFallible;
 use hap::characteristic::delegate::{CharReadParam, CharReadResult, CharReadsDelegate, CharUpdateDelegate, CharUpdateParam, CharUpdateResult};
-use hl_integration::event::events::DeviceEvent;
+use hl_integration::event::events::{DeviceEvent, DeviceEventPointer};
 use crate::delegate::database::get_hap_model_ext_database;
 use crate::delegate::model_delegates::{ModelDelegate, ModelDelegates};
 use crate::hap_manager::HapManage;
-use crate::types::{CharIdentifier,  ModelDelegateParam};
-use hl_integration::{HlSourceDevice, JsonValue};
+use crate::types::{CharIdentifier, ModelDelegateParam};
+use hl_integration::{HlSourceDevice, JsonValue, SourceDevicePointer};
+use hl_integration::convertor::UnitConvertor;
+
 pub type HapModelExtPointer = Arc<dyn HapModelExt + Send + Sync + 'static>;
 pub type ContextPointer = Arc<AccessoryModelContext>;
 pub type AccessoryModelPointer = Arc<HapAccessoryDelegateModel>;
@@ -20,10 +23,12 @@ pub type AccessoryModelPointer = Arc<HapAccessoryDelegateModel>;
 /// 模型扩展上下文
 pub struct AccessoryModelContext {
     pub aid: u64,
-    pub dev: Arc<dyn HlSourceDevice>,
+    pub dev: SourceDevicePointer,
     pub hap_manager: HapManage,
     /// 资源表,存储局部变量
     pub resource_table: DashMap<String, Box<dyn Any + 'static + Send + Sync>>,
+    /// 单位转换器
+    pub convertor_map: HashMap<CharIdentifier, UnitConvertor>,
 }
 
 impl AccessoryModelContext {
@@ -33,13 +38,20 @@ impl AccessoryModelContext {
 }
 
 
-
-
 /// 配件模型
 pub struct HapAccessoryDelegateModel {
     pub model_ext: HapModelExtPointer,
-
+    pub dev: SourceDevicePointer,
+    pub listener_id: Option<i64>,
     pub delegate: ModelDelegates,
+}
+
+impl Drop for HapAccessoryDelegateModel {
+    fn drop(&mut self) {
+        if let Some(id) = self.listener_id {
+            self.dev.remove_listener(id);
+        }
+    }
 }
 
 impl HapAccessoryDelegateModel {
@@ -58,16 +70,17 @@ impl HapAccessoryDelegateModel {
         let model_ext = model_ext_new_func(ctx, params)
             .tap_err(|e| error!("创建模型扩展失败{:?}",e))?;
         //订阅设备事件
+        let mut listener_id = None;
         if model_ext.is_subscribe_event() {
             let model_ext_c = model_ext.clone();
-            dev.add_listener(Box::new(move |data| {
+
+            listener_id = Some(dev.add_listener(Box::new(move |data| {
                 let model_ext = model_ext_c.clone();
                 Box::pin(async move {
                     model_ext.on_event(data).await;
                     ()
                 })
-            })
-            ).await;
+            })).await);
         }
 
         let delegate = ModelDelegates {
@@ -79,6 +92,8 @@ impl HapAccessoryDelegateModel {
 
         Ok(Self {
             model_ext,
+            dev,
+            listener_id,
             delegate,
         })
     }
@@ -96,6 +111,7 @@ impl HapAccessoryDelegateModel {
     }
 }
 
+
 impl Deref for HapAccessoryDelegateModel {
     type Target = HapModelExtPointer;
     fn deref(&self) -> &Self::Target {
@@ -105,8 +121,6 @@ impl Deref for HapAccessoryDelegateModel {
 
 pub type ReadValueResult = anyhow::Result<Vec<CharReadResult>>;
 pub type UpdateValueResult = anyhow::Result<Vec<CharUpdateResult>>;
-
-pub const PARAM_KEY: &str = "PARAM";
 
 
 pub trait AccessoryModelExtConstructor {
@@ -124,7 +138,7 @@ pub trait HapModelExt {
     /// 批量读取特征值
     async fn read_chars_value(&self, params: Vec<CharReadParam>) -> ReadValueResult;
     async fn update_chars_value(&self, params: Vec<CharUpdateParam>) -> UpdateValueResult;
-    async fn on_event(&self, event_type: DeviceEvent) {}
+    async fn on_event(&self, event_type: DeviceEventPointer) {}
 
     /// 是否订阅设备的事件
     fn is_subscribe_event(&self) -> bool { true }

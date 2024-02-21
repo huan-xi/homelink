@@ -97,7 +97,6 @@ impl MiAccountManagerInner {
 pub struct MiCloudDeviceExt {
     account_id: String,
     manager: MiAccountManager,
-
 }
 
 #[async_trait::async_trait]

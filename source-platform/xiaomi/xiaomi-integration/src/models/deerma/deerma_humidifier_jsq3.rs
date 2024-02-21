@@ -4,7 +4,7 @@ use log::info;
 use serde_json::json;
 
 use hl_integration::JsonValue;
-use miot_proto::device::miot_spec_device::AsMiotDevice;
+use miot_proto::device::miot_spec_device::{AsMiotDevice, MiotDeviceArc};
 use miot_proto::proto::miio_proto::MiotSpecId;
 use target_hap::delegate::{CharReadParam, CharReadResult, CharUpdateParam, CharUpdateResult};
 use target_hap::delegate::model::{AccessoryModelExtConstructor, ContextPointer, HapModelExt, HapModelExtPointer, ReadValueResult, UpdateValueResult};
@@ -16,15 +16,18 @@ use target_hap::iot::characteristic_value::CharacteristicValue;
 pub struct ModelExt {
     ctx: ContextPointer,
     on: MiotSpecId,
+    dev: MiotDeviceArc,
     target_humidity: MiotSpecId,
 }
 
 impl AccessoryModelExtConstructor for ModelExt {
     fn new(ctx: ContextPointer, params: Option<JsonValue>) -> anyhow::Result<HapModelExtPointer> {
+        let dev= MiotDeviceArc(ctx.dev.clone());
         Ok(Arc::new(
             Self {
                 ctx,
                 on: MiotSpecId::new(2, 1),
+                dev,
                 target_humidity: MiotSpecId::new(2, 6),
             }
         ))
@@ -44,7 +47,7 @@ impl HapModelExt for ModelExt {
             .map(|i| i.ctag.clone())
             .collect();
         //读取值
-        let values = self.ctx.dev
+        let values = self.dev
             .as_miot_device()?
             .read_properties(vec![self.on, self.target_humidity]).await?;
         let on = values.get(0);
@@ -59,7 +62,6 @@ impl HapModelExt for ModelExt {
                         .and_then(|i| i.value.clone())
                 }
                 HapType::TargetHumidifierDehumidifierState | HapType::CurrentHumidifierDehumidifierState => {
-
                     // pub enum Value {
                     //     Inactive = 0,
                     //     Idle = 1,
@@ -96,7 +98,7 @@ impl HapModelExt for ModelExt {
             match param.ctag {
                 HapType::Active => {
                     let val = CharacteristicValue::format(Format::Bool, param.new_value);
-                    ctx.dev.set_property(self.on, val.value).await?;
+                    self.dev.set_property(self.on, val.value).await?;
                 }
                 _ => {}
             }

@@ -9,25 +9,25 @@ use futures_util::TryStreamExt;
 
 use packed_struct::PackedStruct;
 use serde::{Deserialize, Serialize};
-use xiaomi_ble_packet::ble_value_type::MiBleValueType;
+use xiaomi_ble_packet::ble_value_type::{BleValue, MiBleValueType};
 
 
 #[derive(Default, Debug, Clone)]
-pub struct BleValue {
-    pub value_map: HashMap<MiBleValueType, Value>,
+pub struct BleValues {
+    pub value_map: HashMap<MiBleValueType, BleValue>,
 }
 
-impl BleValue {
+impl BleValues {
     pub fn extend(&mut self, other: Self) {
         self.value_map.extend(other.value_map);
     }
-    pub fn set_value(&mut self, key: MiBleValueType, val: Value) {
+    pub fn set_value(&mut self, key: MiBleValueType, val:  BleValue) {
         self.value_map.insert(key, val);
     }
 }
 
-impl BleValue {
-    pub fn get_value(&self, value_type: MiBleValueType) -> Option<Value> {
+impl BleValues {
+    pub fn get_value(&self, value_type: MiBleValueType) -> Option<BleValue> {
         self.value_map.get(&value_type).cloned()
     }
 }

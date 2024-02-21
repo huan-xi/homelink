@@ -65,7 +65,7 @@ pub struct MiConvertToIotParam {
     /// did
     pub id: String,
     pub did: String,
-    pub device_type: IotDeviceType,
+    pub device_type: String,
     pub name: String,
     #[serde(default, deserialize_with = "deserialize_option_number_from_string")]
     pub gateway_id: Option<i64>,

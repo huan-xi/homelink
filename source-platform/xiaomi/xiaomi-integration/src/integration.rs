@@ -18,6 +18,7 @@ impl HlSourceIntegrator for XiaomiIntegration {
 
         database.insert("common.mode_switch".to_string(), models::common::mode_switch::ModelExt::new)?;
         database.insert("common.miot_spec_prop_mapping".to_string(), models::common::miot_spec_prop_mapping::ModelExt::new)?;
+        database.insert("common.ble_value_mapping".to_string(), models::common::ble_value_mapping::ModelExt::new)?;
         // model_map.insert("common.native_ble".to_string(), common::native_ble::ModelExt::new);
         // model_map.insert("lumi.acpartner.vmcn02".to_string(), lumi::lumi_acpartner_mcn02::ModelExt::new);
         database.insert("lumi.gateway.mgl03".to_string(), models::lumi::lumi_gateway_mgl03::ModelExt::new)?;

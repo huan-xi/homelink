@@ -9,6 +9,7 @@ edition = "2021"
 miot-proto = { path = "../miot-proto" }
 hl-integration = { path = "../../../hl-integration" }
 target-hap = { path = "../../../target-platform/hap/target-hap" }
+xiaomi-ble-packet = { path = "../xiaomi-ble-packet" }
 tokio.workspace = true
 bimap.workspace = true
 anyhow.workspace = true

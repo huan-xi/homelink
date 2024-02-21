@@ -1,5 +1,8 @@
 use std::collections::HashSet;
 use std::sync::Arc;
+use std::time::Duration;
+use anyhow::anyhow;
+use tokio::time::timeout;
 use hap::characteristic::delegate::{CharReadParam, CharReadsDelegate, CharUpdateDelegate, CharUpdateParam, ReadCharResults, UpdateCharResults};
 use crate::delegate::model::HapModelExtPointer;
 use crate::types::CharIdentifier;
@@ -51,8 +54,13 @@ impl CharReadsDelegate for ModelDelegate {
     }
 
     async fn reads_value(&self, param: Vec<CharReadParam>) -> ReadCharResults {
-        let results = self.ext.read_chars_value(param).await?;
-        Ok(results)
+        let results = timeout(Duration::from_millis(500), async {
+            self.ext.read_chars_value(param).await
+        }).await
+            .map_err(|_| anyhow!("读取超时"))?;
+        // let results =
+        //     self.ext.read_chars_value(param).await?;
+        Ok(results?)
     }
 }
 

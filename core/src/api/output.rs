@@ -90,6 +90,8 @@ pub fn err_msg<T>(str: &'static str) -> ApiResult<T> {
     Err(ApiError::StrMsg(str))
 }
 
+
+
 pub fn ok_data<T>(data: T) -> ApiResult<T> {
     Ok(ApiResp {
         code: 200,

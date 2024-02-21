@@ -1,11 +1,13 @@
 use std::collections::HashMap;
 use std::sync::Arc;
+
 use anyhow::anyhow;
 use bimap::BiMap;
 use log::{info, warn};
+
 use hl_integration::JsonValue;
 use miot_proto::device::miot_spec_device::{AsMiotDevice, MiotDeviceArc};
-use miot_proto::proto::miio_proto::{MiotSpecDTO, MiotSpecId};
+use miot_proto::proto::miio_proto::MiotSpecId;
 use target_hap::delegate::{CharReadParam, CharReadResult, CharUpdateParam, CharUpdateResult};
 use target_hap::delegate::model::{AccessoryModelExtConstructor, ContextPointer, HapModelExt, HapModelExtPointer, ReadValueResult, UpdateValueResult};
 use target_hap::hap::HapType;
@@ -25,6 +27,9 @@ pub struct PropMappingParam {
     ctag: HapTypeWrapper,
     siid: i32,
     piid: i32,
+    /// 单位转换器,和单位转换器参数
+    convertor: Option<String>,
+    convertor_params: Option<JsonValue>,
 }
 
 
@@ -33,6 +38,7 @@ pub struct ModelExt {
     ctx: ContextPointer,
     dev: MiotDeviceArc,
     mapping: BiMap<CharIdentifier, MiotSpecId>,
+
 }
 
 
@@ -43,7 +49,8 @@ impl AccessoryModelExtConstructor for ModelExt {
         let params: Vec<PropMappingParam> = serde_json::from_value(params)?;
         let mut mapping = BiMap::new();
         for param in params {
-            mapping.insert(CharIdentifier::new(param.stag, param.ctag), MiotSpecId::new(param.siid, param.piid));
+            let cid = CharIdentifier::new(param.stag, param.ctag);
+            mapping.insert(cid.clone(), MiotSpecId::new(param.siid, param.piid));
         }
 
         let dev = MiotDeviceArc(ctx.dev.clone());
@@ -68,7 +75,8 @@ impl HapModelExt for ModelExt {
         let mut ids = vec![];
         for param in params.into_iter() {
             let stag = param.stag;
-            match self.mapping.get_by_left(&CharIdentifier::new(stag.clone(), param.ctag)) {
+            let cid = CharIdentifier::new(stag.clone(), param.ctag);
+            match self.mapping.get_by_left(&cid) {
                 None => {
                     warn!("no mapping for stag:{:?},ctag:{:?}",stag, param.ctag);
                     result.push(CharReadResult {
@@ -78,7 +86,7 @@ impl HapModelExt for ModelExt {
                     });
                 }
                 Some(aid) => {
-                    cids.push((param.cid, param.format));
+                    cids.push((param.cid, param.format, cid, ));
                     ids.push(aid.clone());
                 }
             }
@@ -102,7 +110,17 @@ impl HapModelExt for ModelExt {
                     }
                     Some(val) => {
                         let value = val.value.clone();
-                        let value = value.map(|v| CharacteristicValue::format(cid.1, v).value);
+                        //格式化
+                        let mut value = value.map(|v| CharacteristicValue::format(cid.1, v).value);
+                        //转换
+                        if let Some(val) = value.clone() {
+                            if let Some(c) = self.ctx.convertor_map.get(&cid.2) {
+                                if let Ok(val) = c.ext.from(val) {
+                                    value = Some(val);
+                                }
+                            }
+                        }
+
                         result.push(CharReadResult {
                             cid: cid.0,
                             success: true,
@@ -136,8 +154,15 @@ impl HapModelExt for ModelExt {
                 }
                 Some(aid) => {
                     cids.push(param.cid);
-                    let value = CharacteristicValue::try_format(param.format, param.new_value)?;
-                    ids.push((aid.clone(), value.value));
+                    let mut value = CharacteristicValue::try_format(param.format, param.new_value)?.value;
+                    //转换
+                    if let Some(c) = self.ctx.convertor_map.get(&CharIdentifier::new(stag.clone(), param.ctag)) {
+                        if let Ok(val) = c.ext.to(value.clone()) {
+                            value = val
+                        }
+                    }
+
+                    ids.push((aid.clone(), value));
                 }
             }
         }

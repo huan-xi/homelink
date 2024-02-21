@@ -20,6 +20,7 @@ use sea_orm::QueryFilter;
 use target_hap::hap_manager::HapManage;
 use crate::db::entity::hap_bridge::{BonjourStatusFlagWrapper, BridgeInfo, Model, PairingsWrapper};
 use crate::db::service::hap_bridge_service::create_hap_bridge;
+use crate::init::hap_init::add_hap_bridge;
 use crate::init::manager::device_manager::IotDeviceManager;
 
 /// 添加桥接器
@@ -27,10 +28,9 @@ pub async fn add(state: State<AppState>, Json(param): Json<AddHapBridgeParam>) -
     //查询名字是否存在
     let hap_bridge = create_hap_bridge(state.conn(), param.pin_code, param.category, param.name, false).await?;
 
-    /*add_hap_bridge(state.conn(), hap_bridge, state.hap_manager.clone(), state.device_manager.clone())
+    add_hap_bridge(state.conn(), hap_bridge, state.hap_manager.clone(), state.device_manager.clone())
         .await
-        .map_err(|e| api_err!("添加成功,启动失败{e}")).unwrap();*/
-    todo!();
+        .map_err(|e| api_err!("添加成功,启动失败{e}")).unwrap();
     ok_data(())
 }
 
@@ -67,9 +67,9 @@ pub async fn restart(state: State<AppState>, Path(id): Path<i64>) -> ApiResult<(
     state.hap_manager.stop_server(id).await?;
     let model = HapBridgeEntity::find_by_id(id).one(state.conn()).await?;
     let hap_bridge = model.ok_or(api_err!("桥接器不存在"))?;
-    /*add_hap_bridge(state.conn(), hap_bridge, state.hap_manager.clone(), state.device_manager.clone())
+    add_hap_bridge(state.conn(), hap_bridge, state.hap_manager.clone(), state.device_manager.clone())
         .await
-        .map_err(|e| api_err!("停止成功,启动失败{e}"))?;*/
+        .map_err(|e| api_err!("停止成功,启动失败{e}"))?;
     ok_data(())
 }
 
@@ -141,6 +141,3 @@ pub async fn disable(state: State<AppState>, Path(id): Path<i64>, Query(param): 
     ok_data(())
 }
 
-pub async fn add_hap_bridge(conn: &DatabaseConnection, bridge: HapBridgeModel, manage: HapManage, iot_device_map: IotDeviceManager) -> anyhow::Result<()> {
-    todo!()
-}

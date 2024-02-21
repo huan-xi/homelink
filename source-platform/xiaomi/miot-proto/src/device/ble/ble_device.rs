@@ -1,21 +1,25 @@
-use std::sync::{Arc};
-
 use anyhow::anyhow;
-
-use crate::device::miot_spec_device::{AsMiotDevice, BaseMiotSpecDevice, DeviceInfo, MiotDeviceType, MiotSpecDevice};
-
 use hex::FromHex;
-use log::{debug, error};
-
-use packed_struct::{PackedStruct};
+use log::error;
+use packed_struct::PackedStruct;
 use serde_json::{json, Value};
 use tokio::sync::RwLock;
-use xiaomi_ble_packet::ble_value_type::{BleValue, MiBleValueType, ValueLsbI16};
 
-use crate::device::common::emitter::{EventType};
-use crate::proto::miio_proto::{MiotSpecDTO, MiotSpecId, MiotSpecProtocolPointer};
-use crate::proto::protocol::{ExitError, RecvMessage};
+use hl_integration::error::DeviceExitError;
+use hl_integration::event::{EventListener, HlDeviceListenable};
+use hl_integration::event::emitter::DeviceEventEmitter;
+use hl_integration::hl_device::{HlDevice, RetryInfo};
+use hl_integration::HlSourceDevice;
+use hl_integration::platform::hap::hap_device;
+use hl_integration::platform::hap::hap_device::HapDevice;
+use xiaomi_ble_packet::ble_value_type::{BleValue, MiBleValueType, ValueLsbI16};
+use crate::device::ble::value_types::BleValues;
+
+use crate::device::common::emitter::MijiaEvent;
+use crate::device::common::utils::get_hap_device_info;
+use crate::device::miot_spec_device::{AsMiotDevice, DeviceInfo, MiotDeviceType, MiotSpecDevice};
 use crate::proto::protocol::ExitError::NotGateway;
+use crate::proto::protocol::RecvMessage;
 
 
 /// https://tasmota.github.io/docs/Bluetooth/
@@ -26,52 +30,31 @@ use crate::proto::protocol::ExitError::NotGateway;
 
 pub struct BleDevice<T: AsMiotDevice> {
     pub info: DeviceInfo,
-    base: BaseMiotSpecDevice,
+    pub(crate) emitter: DeviceEventEmitter,
+    pub retry_info: RetryInfo,
+    pub values: RwLock<BleValues>,
     gateway: T,
-    // 值
-    // values: Arc<RwLock<BleValue>>,
-    // spec_map: bimap::BiMap<MiotSpecId, MiBleValueType>,
-    // 传输协议
-    proto: Arc<RwLock<Option<MiotSpecProtocolPointer>>>,
 }
 
-impl<T: AsMiotDevice + Sync + Send> AsMiotDevice for BleDevice<T> {}
 
 #[async_trait::async_trait]
-impl<T: AsMiotDevice> MiotSpecDevice for BleDevice<T> {
-    fn get_info(&self) -> &DeviceInfo { &self.info }
-
-    fn get_base(&self) -> &BaseMiotSpecDevice {
-        &self.base
+impl<T: AsMiotDevice> HlDevice for BleDevice<T> {
+    fn dev_id(&self) -> String {
+        self.info.did.clone()
     }
 
-    async fn get_proto(&self) -> Result<MiotSpecProtocolPointer, ExitError> {
-        return Err(ExitError::BltConnectErr);
+    fn device_type(&self) -> &str {
+        MiotDeviceType::Ble.as_ref()
     }
 
-
-    // read_property
-    async fn read_property(&self, siid: i32, piid: i32) -> anyhow::Result<Option<Value>> {
-        todo!();
-        // if let Some(val) = self.spec_map.get_by_left(&MiotSpecId::new(siid, piid)) {
-        //     let read = self.values.read().await;
-        //     if let Some(val) = read.get_value(*val) {
-        //         return Ok(Some(val));
-        //     }
-        // };
-        Ok(None)
-    }
-
-    /// 1.同步网关的状态
-    async fn run(&self) -> Result<(), ExitError> {
-        // let gw_proto = self.gateway.get_proto().await?;
-        // let mut recv = gw_proto.recv();
+    async fn run(&self) -> Result<(), Box<dyn DeviceExitError>> {
         let mut recv = self.gateway
             .as_miot_device()
             .map_err(|_| NotGateway)?
-            .get_event_recv().await;
+            .get_event_recv()
+            .await;
 
-        while let Ok(EventType::GatewayMsg(msg)) = recv.recv().await {
+        while let Ok(MijiaEvent::GatewayMsg(msg)) = recv.recv().await {
             /// 收到数据
             let data = msg.get_json_data();
             if let Some(method) = data.get("method") {
@@ -94,32 +77,50 @@ impl<T: AsMiotDevice> MiotSpecDevice for BleDevice<T> {
         }
         Ok(())
     }
+
+    fn retry_info(&self) -> &RetryInfo {
+        &self.retry_info
+    }
 }
 
+#[async_trait::async_trait]
+impl<T: AsMiotDevice> HlDeviceListenable for BleDevice<T> {
+    async fn add_listener(&self, listener: EventListener) -> i64 {
+        self.emitter.add_listener(listener).await
+    }
+
+    fn remove_listener(&self, id: i64) -> i64 {
+        self.emitter.remove_listener(id)
+    }
+}
+
+
+impl<T: AsMiotDevice + 'static> HlSourceDevice for BleDevice<T> {}
+
+impl<T: AsMiotDevice> HapDevice for BleDevice<T> {
+    fn get_hap_info(&self) -> hap_device::DeviceInfo {
+        get_hap_device_info(&self.info)
+    }
+}
+
+
 impl<T: AsMiotDevice> BleDevice<T> {
-    //网关上设置一个监听器,监听属于我的消息
-    //蓝牙协议
-    pub fn new(info: DeviceInfo, gateway: T, spec_map: bimap::BiMap<MiotSpecId, MiBleValueType>) -> Self {
-        todo!();
-        /*Self {
+    pub fn new(info: DeviceInfo, gateway: T) -> Self {
+        Self {
             info,
-            base: BaseMiotSpecDevice {
-                ..BaseMiotSpecDevice::default()
-            },
-            gateway,
-            spec_map,
+            emitter: Default::default(),
+            retry_info: Default::default(),
             values: Default::default(),
-            proto: Arc::new(Default::default()),
-        }*/
+            gateway,
+        }
     }
 
     async fn set_value_from_param(&self, param: &Value) {
-        todo!();
-      /*  let evt_vec = param.as_object()
+        let evt_vec = param.as_object()
             .and_then(|i| i.get("evt"))
             .and_then(|i| i.as_array());
         if let Some(data) = evt_vec {
-            let mut ble_value = BleValue::default();
+            let mut ble_value = BleValues::default();
             // 数据列表
             for val in data {
                 //处理数据
@@ -128,7 +129,7 @@ impl<T: AsMiotDevice> BleDevice<T> {
                         .and_then(|i| i.as_str())
                         .and_then(|i| <Vec<u8>>::from_hex(i.as_bytes()).ok()) {
                         //tid,edata
-                        match Self::mapping_value(eid, edata) {
+                        match Self::mapping_value(eid as u16, edata) {
                             Ok((tp, val)) => {
                                 ble_value.set_value(tp, val);
                             }
@@ -141,39 +142,43 @@ impl<T: AsMiotDevice> BleDevice<T> {
             }
             //  数据提交
             self.values.write().await.extend(ble_value.clone());
-            for (tp, value) in ble_value.value_map.into_iter() {
-                match self.spec_map.get_by_right(&tp) {
-                    None => {
-                        debug!("emit empty:{:?}", tp);
-                    }
-                    Some(ps) => {
-                        let event = EventType::UpdateProperty(MiotSpecDTO {
-                            did: self.info.did.clone(),
-                            siid: ps.siid,
-                            piid: ps.piid,
-                            value: Some(value),
-                        });
+            /*          for (tp, value) in ble_value.value_map.into_iter() {
+                          match self.spec_map.get_by_right(&tp) {
+                              None => {
+                                  debug!("emit empty:{:?}", tp);
+                              }
+                              Some(ps) => {
+                                  let event = EventType::UpdateProperty(MiotSpecDTO {
+                                      did: self.info.did.clone(),
+                                      siid: ps.siid,
+                                      piid: ps.piid,
+                                      value: Some(value),
+                                  });
 
-                        self.emit(event).await;
-                    }
-                };
-            }
-        }*/
+                                  self.emit(event).await;
+                              }
+                          };
+                      }*/
+        }
     }
+
     /// 值映射
-    fn mapping_value(eid: u64, edata: Vec<u8>) -> anyhow::Result<(MiBleValueType, serde_json::Value)> {
-        todo!();
-       /* match MiBleValueType::try_from(eid as u16) {
-            Ok(val) => {
-                Ok((val, json!(val.unpack(edata.as_slice())?)))
+    fn mapping_value(eid: u16, edata: Vec<u8>) -> anyhow::Result<(MiBleValueType, BleValue)> {
+        match MiBleValueType::try_from(eid) {
+            Ok(tp) => {
+                let value = tp.unpack(edata.as_slice())?;
+                Ok((tp, value))
             }
             Err(_) => {
                 Err(anyhow!("未知的蓝牙事件: eid:0x{:x},edata:{:?}", eid,edata))
             }
-        }*/
+        }
+    }
+
+    pub async fn get_value(&self, value_type: MiBleValueType) -> Option<BleValue> {
+        self.values.read().await.get_value(value_type)
     }
 }
-
 
 #[test]
 pub fn test() {

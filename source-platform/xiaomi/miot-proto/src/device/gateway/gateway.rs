@@ -10,7 +10,7 @@ use tokio::select;
 
 use crate::proto::protocol::{ExitError};
 use tokio::sync::RwLock;
-use crate::device::common::emitter::EventType;
+use crate::device::common::emitter::MijiaEvent;
 use crate::device::miot_spec_device::{ BaseMiotSpecDevice, DeviceInfo, MiotDeviceType, MiotSpecDevice, MiotSpecDeviceWrapper};
 use crate::device::common::utils::get_poll_func;
 use crate::proto::miio_proto::{MiotSpecProtocolPointer};
@@ -63,7 +63,7 @@ impl MiotSpecDevice for OpenMiioGatewayDeviceInner {
         let listen = p_arc.start_listen();
         let forward = async {
             while let Ok(msg) = p_arc.recv().recv().await {
-                let _ = self.base.tx.send(EventType::GatewayMsg(msg));
+                let _ = self.base.tx.send(MijiaEvent::GatewayMsg(msg));
             };
         };
 

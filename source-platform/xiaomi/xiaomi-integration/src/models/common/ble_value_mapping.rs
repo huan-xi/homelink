@@ -1,20 +1,42 @@
 use std::sync::Arc;
+use anyhow::anyhow;
 
 use log::{info};
-use hl_integration::JsonValue;
+use serde_json::json;
+use hl_integration::{JsonValue, SourceDevicePointer};
+use miot_proto::device::ble::ble_device::BleDevice;
+use miot_proto::device::miot_spec_device::MiotDeviceArc;
 use target_hap::delegate::{CharReadParam, CharReadResult, CharUpdateParam, CharUpdateResult};
 use target_hap::delegate::model::{AccessoryModelExtConstructor, ContextPointer, HapModelExt, HapModelExtPointer, ReadValueResult, UpdateValueResult};
 use target_hap::hap::HapType;
+use xiaomi_ble_packet::ble_value_type::MiBleValueType;
 
+/// 通过值类型获取 ble 设备上的值
+
+pub struct BleDeviceWrapper {
+    pub dev: SourceDevicePointer,
+}
+
+impl BleDeviceWrapper {
+    pub fn as_ble_device(&self) -> anyhow::Result<&BleDevice<MiotDeviceArc>> {
+        self.dev.downcast_ref::<BleDevice<MiotDeviceArc>>()
+            .ok_or(anyhow!("设备不是ble 设备"))
+    }
+}
 
 pub struct ModelExt {
     ctx: ContextPointer,
+    dev: BleDeviceWrapper,
 }
 
 
 impl AccessoryModelExtConstructor for ModelExt {
-    fn new(ctx: ContextPointer, params: Option<JsonValue>) -> anyhow::Result<HapModelExtPointer> {
-        Ok(Arc::new(Self { ctx }))
+    fn new(ctx: ContextPointer, _params: Option<JsonValue>) -> anyhow::Result<HapModelExtPointer> {
+        let dev = BleDeviceWrapper {
+            dev: ctx.dev.clone(),
+        };
+        let _ = dev.as_ble_device()?;
+        Ok(Arc::new(Self { ctx, dev }))
     }
 }
 
@@ -29,6 +51,18 @@ impl HapModelExt for ModelExt {
         let mut result = vec![];
         for param in params.into_iter() {
             let value = match param.ctag {
+                HapType::CurrentTemperature => {
+                    let value = self.dev.as_ble_device()?
+                        .get_value(MiBleValueType::Temperature)
+                        .await;
+                    value.map(|v| json!(v.as_u64() as f32/ 10.0))
+                }
+                HapType::CurrentRelativeHumidity => {
+                    let value = self.dev.as_ble_device()?
+                        .get_value(MiBleValueType::Humidity)
+                        .await;
+                    value.map(|v| json!(v.as_u64() as f32/ 10.0))
+                }
                 _ => None,
             };
             result.push(CharReadResult {

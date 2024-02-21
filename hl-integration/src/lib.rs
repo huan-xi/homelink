@@ -8,6 +8,9 @@ pub mod hl_device;
 pub mod platform;
 pub mod integration;
 
+/// 单位转换器
+pub mod convertor;
+
 pub type HlDeviceResult<T> = Result<T, error::HlDeviceError>;
 
 

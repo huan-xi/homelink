@@ -7,8 +7,6 @@ use miot_proto::proto::miio_proto::MiotSpecId;
 use target_hap::hap_type_wrapper::HapTypeWrapper;
 use target_hap::types::CharIdentifier;
 use crate::db::entity::hap_bridge::BridgeCategory;
-use crate::db::entity::iot_device::{DeviceParam, IotDeviceType};
-use crate::hap::hap_type::MappingHapType;
 use crate::unit_convertor::{UnitConvertor, UnitConvertorType};
 
 fn default_text() -> String {
@@ -52,7 +50,7 @@ impl FromStr for HlDeviceTemplate {
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct DeviceTemplate {
-    pub device_type: IotDeviceType,
+    pub device_type: String,
     #[serde(default = "default_text")]
     pub tag: String,
     pub interval: Option<u64>,
@@ -127,7 +125,7 @@ pub struct CharacteristicTemplate {
     #[serde(default)]
     pub memo: Option<String>,
     /// 单位转换
-    pub unit_convertor: Option<UnitConvertorType>,
+    pub convertor: Option<String>,
     pub convertor_param: Option<JsonValue>,
 }
 
@@ -163,7 +161,7 @@ pub mod test {
 
     #[tokio::test]
     pub async fn test() -> anyhow::Result<()> {
-        let mut file = File::open("/Users/huanxi/project/homelink/templates/mihome/chuangmi.plug.212a01.toml").await.unwrap();
+        let mut file = File::open("/Users/huanxi/project/homelink/templates/mijia/chuangmi.plug.212a01.toml").await.unwrap();
         let mut content = String::new();
         file.read_to_string(&mut content).await?;
         // SecuritySystemAccessory::new();

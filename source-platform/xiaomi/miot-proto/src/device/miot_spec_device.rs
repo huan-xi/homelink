@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
 
 use anyhow::anyhow;
@@ -10,13 +11,14 @@ use hl_integration::error::DeviceExitError;
 
 use hl_integration::hl_device::{HlDevice, RetryInfo};
 // use hl_integration::{CharReadParam, CharUpdateParam, HlDevice, ReadCharResults, UpdateCharResults};
-use hl_integration::event::HlDeviceListenable;
+use hl_integration::event::{EventListener, HlDeviceListenable};
+use hl_integration::event::emitter::DeviceEventEmitter;
 use hl_integration::HlSourceDevice;
 use hl_integration::platform::hap::hap_device;
 use hl_integration::platform::hap::hap_device::HapDevice;
 // use hl_integration::platform::hap::hap_device_ext::{AsHapDeviceExt, HapDeviceExt};
 
-use crate::device::common::emitter::{DataEmitter, DataListener, EventType};
+use crate::device::common::emitter::{DataEmitter, DataListener, MijiaEvent};
 use crate::device::common::utils::get_hap_device_info;
 use crate::proto::miio_proto::{MiotSpecDTO, MiotSpecId, MiotSpecProtocolPointer};
 use crate::proto::protocol::ExitError;
@@ -67,8 +69,10 @@ pub struct BaseMiotSpecDevice {
     pub poll_properties: Arc<RwLock<HashSet<MiotSpecId>>>,
     /// 存储属性数据
     pub value_map: Arc<RwLock<HashMap<MiotSpecId, serde_json::Value>>>,
-    pub(crate) emitter: Arc<RwLock<DataEmitter<EventType>>>,
-    pub tx: broadcast::Sender<EventType>,
+
+    pub tx: broadcast::Sender<MijiaEvent>,
+    // Arc<RwLock<DataEmitter<EventType>>>
+    pub(crate) emitter: DeviceEventEmitter,
     pub retry_info: RetryInfo,
 }
 
@@ -79,26 +83,25 @@ impl Default for BaseMiotSpecDevice {
             status: RwLock::new(DeviceStatus::Run),
             poll_properties: Arc::new(RwLock::new(HashSet::new())),
             value_map: Arc::new(Default::default()),
-            emitter: Arc::new(RwLock::new(DataEmitter::new())),
+            emitter: DeviceEventEmitter::default(),
             tx,
             retry_info: Default::default(),
         }
     }
 }
 
-#[derive(strum_macros::AsRefStr, EnumString, Debug, Clone)]
+#[derive(strum_macros::AsRefStr, EnumString, Debug, Clone, Copy)]
 pub enum MiotDeviceType {
     #[strum(serialize = "xiaomi_wifi")]
     Wifi,
     #[strum(serialize = "xiaomi_gw_zigbee")]
     Zigbee,
-    #[strum(serialize = "xiaomi_gw_ble")]
+    #[strum(serialize = "xiaomi_gw_mqtt")]
     MqttGateway,
-    // MiCloudDevice = 6,
-    /// 米家网关代理设备
-    // GatewayProxy = 7,
     #[strum(serialize = "xiaomi_gw_ble")]
     Ble,
+    #[strum(serialize = "xiaomi_cloud")]
+    Cloud,
     #[strum(serialize = "xiaomi_gw_mesh")]
     Mesh,
 }
@@ -172,7 +175,7 @@ pub trait MiotSpecDevice: Sync + Send {
         Ok(value)
     }
 
-    async fn get_event_recv(&self) -> broadcast::Receiver<EventType> {
+    async fn get_event_recv(&self) -> broadcast::Receiver<MijiaEvent> {
         self.get_base().tx.subscribe()
     }
     /// 创建连接并且 监听
@@ -185,18 +188,32 @@ pub trait MiotSpecDevice: Sync + Send {
         write.insert(MiotSpecId { siid, piid });
     }
 
-    /// 添加指定格式的数据监听器
-    async fn emit(&self, event: EventType) {
-        self.get_base().emitter.write().await.emit(event).await
+    fn get_emitter(&self) -> &DeviceEventEmitter {
+        &self.get_base().emitter
     }
-    async fn add_listener(&self, listener: DataListener<EventType>) {
-        self.get_base().emitter.write().await.add_listener(listener)
-    }
+
+    // 添加指定格式的数据监听器
+    // async fn emit(&self, event: EventType) {
+    //     self.get_base().emitter.write().await.emit(event).await
+    // }
+    // async fn add_listener(&self, listener: DataListener<EventType>) {
+    //     self.get_base().emitter.write().await.add_listener(listener)
+    // }
 }
 
 
-pub struct MiotSpecDeviceWrapper(pub(crate) Box<dyn MiotSpecDevice>,
-                                 pub(crate) MiotDeviceType);
+#[async_trait::async_trait]
+impl HlDeviceListenable for dyn MiotSpecDevice {
+    async fn add_listener(&self, listener: EventListener) -> i64 {
+        self.get_emitter().add_listener(listener).await
+    }
+
+    fn remove_listener(&self, id: i64) -> i64 {
+        self.get_emitter().remove_listener(id)
+    }
+}
+
+pub struct MiotSpecDeviceWrapper(pub(crate) Box<dyn MiotSpecDevice>, pub(crate) MiotDeviceType);
 
 impl HlSourceDevice for MiotSpecDeviceWrapper {}
 
@@ -224,22 +241,42 @@ impl HlDevice for MiotSpecDeviceWrapper {
         &self.0.get_base().retry_info
     }
 }
+#[async_trait::async_trait]
+impl HlDeviceListenable for MiotSpecDeviceWrapper {
+    async fn add_listener(&self, listener: EventListener) -> i64 {
+        self.0.add_listener(listener).await
+    }
 
-impl HlDeviceListenable for MiotSpecDeviceWrapper {}
+    fn remove_listener(&self, id: i64) -> i64 {
+        self.0.remove_listener(id)
+    }
+}
 
 #[async_trait::async_trait]
 impl HapDevice for MiotSpecDeviceWrapper {
     fn get_hap_info(&self) -> hap_device::DeviceInfo {
-        get_hap_device_info(self.0.as_ref())
+        get_hap_device_info(self.0.as_ref().get_info())
     }
 }
 
 
 pub struct NotSupportMiotDeviceError;
 
+impl Display for NotSupportMiotDeviceError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str("该设备不是米家设备类型")
+    }
+}
+
+impl Debug for NotSupportMiotDeviceError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str("该设备不是米家设备类型")
+    }
+}
+
 impl From<NotSupportMiotDeviceError> for anyhow::Error {
     fn from(value: NotSupportMiotDeviceError) -> Self {
-        anyhow!("该设备不是米家设备类型")
+        anyhow!("{:?}",value)
     }
 }
 
@@ -261,7 +298,6 @@ impl MiotDeviceArc {
     pub async fn set_property(&self, spec_id: MiotSpecId, value: Value) -> anyhow::Result<()> {
         self.as_miot_device()?.set_property(spec_id, value).await
     }
-
 }
 
 pub struct MiotDeviceBox {

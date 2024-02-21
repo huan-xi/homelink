@@ -28,9 +28,9 @@ pub async fn list(state: State<AppState>, Query(param): Query<QueryIotDevicePara
     for i in list.into_iter() {
         let running = dev_manager.is_running(i.device_id);
         //查询对应的来源设
-        let source = if let (st, Some(id)) = (i.source_platform, i.source_id.clone()) {
-            match st {
-                SourcePlatform::MiHome => {
+        let source = if let (st, Some(id)) = (i.source_platform.clone(), i.source_id.clone()) {
+            match st.as_ref() {
+                "mijia" => {
                     //查询对应的设备
                     MiotDeviceEntity::find_by_id(id).one(state.conn()).await?
                 }

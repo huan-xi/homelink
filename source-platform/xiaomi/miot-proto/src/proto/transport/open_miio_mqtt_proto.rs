@@ -90,7 +90,7 @@ impl MiotSpecProtocol for OpenMiIOMqttSpecProtocol {
                         Event::Incoming(incoming) => {
                             if let Incoming::Publish(msg) = incoming {
                                 let topic = msg.topic.as_str();
-                                debug!("Received topic:{} message: {}",topic, msg.payload.len());
+                                // debug!("Received topic:{} message: {}",topic, msg.payload.len());
                                 match String::from_utf8(msg.payload.to_vec()) {
                                     Ok(str) => {
                                         match topic {

@@ -109,7 +109,7 @@ impl TemplateManagerInner {
 
     pub fn has_template(&self, platform: SourcePlatform, model: &str) -> bool {
         match platform {
-            SourcePlatform::MiHome => {
+            SourcePlatform::Mijia => {
                 if self.mihome_templates.contains_key(model) {
                     return true;
                 };
@@ -332,7 +332,7 @@ mod test {
     #[tokio::test]
     pub async fn test_file() {
         init_logger();
-        let template_dir = PathBuf::from("/Users/huanxi/project/homelink/data/templates/mihome/yeelink/yeelink.light.lamp22.toml");
+        let template_dir = PathBuf::from("/Users/huanxi/project/homelink/data/templates/mijia/yeelink/yeelink.light.lamp22.toml");
 
         let content = tokio::fs::read_to_string(template_dir).await.unwrap();
         //解析文件内容

@@ -172,13 +172,13 @@ impl HapModelExt for ModelExt {
         Ok(result)
     }
 
-    async fn on_event(&self, event_type: DeviceEvent) {
-        /*if let EventType::UpdatePropertyBatch(values) = event_type {
-            for id in values {
-                /*if id.siid == self.model.siid && id.piid == self.model.piid {
-                    //处理
-                };*/
-            }
-        };*/
-    }
+    // async fn on_event(&self, event_type: DeviceEvent) {
+    //     /*if let EventType::UpdatePropertyBatch(values) = event_type {
+    //         for id in values {
+    //             /*if id.siid == self.model.siid && id.piid == self.model.piid {
+    //                 //处理
+    //             };*/
+    //         }
+    //     };*/
+    // }
 }

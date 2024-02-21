@@ -1,4 +1,5 @@
-use crate::device::common::emitter::EventType;
+use std::sync::Arc;
+use crate::device::common::emitter::MijiaEvent;
 
 use crate::device::miot_spec_device::{AsMiotDevice,  BaseMiotSpecDevice, DeviceInfo, MiotDeviceType, MiotSpecDevice, MiotSpecDeviceWrapper};
 use crate::proto::miio_proto::{MiotSpecDTO, MiotSpecId, MiotSpecProtocolPointer};
@@ -33,7 +34,7 @@ impl<T: AsMiotDevice> MiotSpecDevice for MeshDeviceInner<T> {
             .as_miot_device()?
             .get_event_recv().await;
         //{"id":1996772508,"method":"properties_changed","params":[{"did":"1023054714","siid":2,"piid":1,"value":false}],"type":16}
-        while let Ok(EventType::GatewayMsg(msg)) = recv.recv().await {
+        while let Ok(MijiaEvent::GatewayMsg(msg)) = recv.recv().await {
             let mut data = msg.data;
             if let Some(true) = data
                 .remove("method")
@@ -59,14 +60,15 @@ impl<T: AsMiotDevice> MiotSpecDevice for MeshDeviceInner<T> {
                                             piid: piid as i32,
                                             value: Some(value),
                                         };
-                                        self.base.emitter.write().await.emit(EventType::UpdateProperty(result.clone())).await;
+                                        // self.base.emitter.write().await.emit(MijiaEvent::UpdateProperty(result.clone())).await;
                                         updates.push(result);
                                     }
                                 }
                             }
                         }
                         if !updates.is_empty() {
-                            self.base.emitter.write().await.emit(EventType::UpdatePropertyBatch(updates)).await;
+                            let event =Arc::new( MijiaEvent::PropertiesChanged(updates));
+                            self.base.emitter.emit(event).await;
                         }
                     };
                 }

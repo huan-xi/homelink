@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+use std::str::FromStr;
 use std::sync::Arc;
 
 use anyhow::anyhow;
@@ -6,11 +8,14 @@ use tokio::sync::RwLock;
 
 use hap::accessory::{AccessoryInformation, HapAccessory};
 use hap::service::HapService;
+use hl_integration::convertor::ext_factory::get_unit_convertor_factory;
+use hl_integration::convertor::UnitConvertor;
 use target_hap::delegate::model::{AccessoryModelContext, HapAccessoryDelegateModel};
 use hl_integration::platform::hap::hap_device::{AsHapDevice, HapDevice};
 use target_hap::hap_manager::HapManage;
+use target_hap::hap_type_wrapper::HapTypeWrapper;
 use target_hap::iot::iot_hap_accessory::IotHapAccessory;
-use crate::db::entity::hap_characteristic::MappingMethod::AccessoryModel;
+use target_hap::types::CharIdentifier;
 
 use crate::db::entity::prelude::{HapAccessoryModel, HapCharacteristicEntity, HapServiceColumn, HapServiceEntity};
 use crate::init::{DevicePointer, HapAccessoryPointer};
@@ -62,9 +67,23 @@ pub(crate) async fn init_hap_accessory<'a, C: ConnectionTrait>(conn: &C, hap_man
     if services.is_empty() {
         return Err(anyhow!("配件:{},无服务",name));
     };
+    let mut convertor_map = HashMap::new();
+
+    // 处理chars 上的类型转换器
+    for (svc, chars) in services.iter() {
+        for char in chars.iter() {
+            if let Some(conv) = char.convertor.clone() {
+                let conv = get_unit_convertor_factory()
+                    .get_convertor(conv.as_str(), char.convertor_param.clone())?;
+                let t = HapTypeWrapper::from_str(&char.characteristic_type)?;
+                let cid = CharIdentifier::new(svc.tag.clone().unwrap_or("default".to_string()), t);
+                convertor_map.insert(cid, UnitConvertor::new(conv));
+            };
+        }
+    }
 
     // 初始化配件 委托 model
-    let model = init_hap_delegate(aid, hap_accessory.clone(), &device, hap_manage.clone()).await?;
+    let model = init_hap_delegate(aid, hap_accessory.clone(), &device, hap_manage.clone(), convertor_map).await?;
     // 初始化属性映射
     let accessory = Arc::new(RwLock::new(Box::new(IotHapAccessory::new(aid, hss, model)) as Box<dyn HapAccessory>));
 
@@ -95,7 +114,7 @@ pub(crate) async fn init_hap_accessory<'a, C: ConnectionTrait>(conn: &C, hap_man
 }
 
 
-async fn init_hap_delegate(aid: u64, hap_accessory: HapAccessoryModel, device: &DevicePointer, hap_manager: HapManage) -> anyhow::Result<Option<HapAccessoryDelegateModel>> {
+async fn init_hap_delegate(aid: u64, hap_accessory: HapAccessoryModel, device: &DevicePointer, hap_manager: HapManage, convertor_map: HashMap<CharIdentifier, UnitConvertor>) -> anyhow::Result<Option<HapAccessoryDelegateModel>> {
     if hap_accessory.hap_model_delegates.0.is_empty() {
         return Ok(None);
     };
@@ -106,6 +125,7 @@ async fn init_hap_delegate(aid: u64, hap_accessory: HapAccessoryModel, device: &
             dev: device.clone(),
             hap_manager,
             resource_table: Default::default(),
+            convertor_map,
         };
         // 事件订阅
         let model = HapAccessoryDelegateModel::new(ctx, hap_accessory.hap_model_delegates.0).await?;

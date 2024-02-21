@@ -12,6 +12,7 @@ use target_hap::hap_type_wrapper::HapTypeWrapper;
 use target_hap::iot::characteristic_value::CharacteristicValue;
 use target_hap::types::CharIdentifier;
 
+/// 加湿器
 pub struct ModelExt {
     ctx: ContextPointer,
     on: MiotSpecId,

@@ -21,7 +21,7 @@ impl MiotSpecProtocol for CloudMiioProto {
     }
 
     async fn send<'a>(&'a self, _cmd: &'a str) -> anyhow::Result<()> {
-        Ok(())
+        todo!("can not send")
     }
 
     fn recv(&self) -> Receiver<JsonMessage> {

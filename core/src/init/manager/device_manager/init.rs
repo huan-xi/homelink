@@ -5,9 +5,7 @@ use anyhow::anyhow;
 use log::error;
 use sea_orm::*;
 
-use miot_proto::device::miot_spec_device::{AsMiotDevice, MiotDeviceArc, MiotDeviceType};
-
-use crate::db::entity::iot_device::SourcePlatform;
+use miot_proto::device::miot_spec_device::{AsMiotDevice, MiotDeviceArc};
 use crate::db::entity::prelude::{IotDeviceColumn, IotDeviceEntity, IotDeviceModel};
 use crate::init::manager::device_manager::IotDeviceManagerInner;
 
@@ -45,12 +43,15 @@ impl IotDeviceManagerInner {
     /// 不需要网关的设备
     pub async fn init_no_gw(&self, dev: IotDeviceModel) -> anyhow::Result<()> {
         let dev_id = dev.device_id;
-        let dev = match dev.source_platform {
-            SourcePlatform::MiHome => {
+        let dev = match dev.source_platform.as_str() {
+            "mijia" => {
                 self.init_mi_device_no_gw(dev).await?
             }
-            SourcePlatform::NativeBle => {
+            "ble-native" => {
                 self.init_native_ble(dev).await?
+            }
+            _ => {
+                return Err(anyhow!("暂不支持:{}类型设备接入",dev.source_platform.as_str()));
             }
         };
         self.push_device(dev_id, dev);
@@ -62,8 +63,8 @@ impl IotDeviceManagerInner {
         let gw_id = dev.gateway_id.ok_or(anyhow!("设备{}未设置网关id", dev_id))?;
         let gw = self.get_device(gw_id)
             .ok_or(anyhow!("网关设备{}不存在", gw_id))?;
-        let dev = match dev.source_platform {
-            SourcePlatform::MiHome => {
+        let dev = match dev.source_platform.as_str() {
+            "mijia" => {
                 self.init_mi_device_child(dev, MiotDeviceArc(gw)).await?
             }
             _ => {
@@ -74,9 +75,7 @@ impl IotDeviceManagerInner {
         Ok(())
     }
 
-    pub fn test(&self, arc: Arc<dyn AsMiotDevice>) {
-
-    }
+    pub fn test(&self, arc: Arc<dyn AsMiotDevice>) {}
 }
 
 

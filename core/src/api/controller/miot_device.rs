@@ -1,3 +1,4 @@
+use std::str::FromStr;
 use std::time::Duration;
 
 use anyhow::anyhow;
@@ -9,6 +10,7 @@ use sea_orm::{ActiveModelTrait, EntityTrait, PaginatorTrait};
 use sea_orm::ActiveValue::Set;
 use tap::TapFallible;
 use tokio::net::UdpSocket;
+use miot_proto::device::miot_spec_device::MiotDeviceType;
 use miot_proto::proto::transport::udp_iot_spec_proto::UdpMiotSpecProtocol;
 
 
@@ -173,7 +175,7 @@ pub async fn list(state: State<AppState>) -> ApiResult<Vec<MiotDeviceModelResult
         .await?;
     let mut results = vec![];
     for model in list {
-        let has_template = state.template_manager.has_template(SourcePlatform::MiHome, model.model.as_str());
+        let has_template = state.template_manager.has_template(SourcePlatform::Mijia, model.model.as_str());
         results.push(MiotDeviceModelResult {
             model,
             has_template,
@@ -194,7 +196,7 @@ pub async fn templates(state: State<AppState>, Path(model): Path<String>) -> Api
 }
 
 pub async fn convert_by_template(state: State<AppState>, Json(param): Json<MiConvertByTemplateParam>) -> ApiResult<()> {
-  let mi_dev = MiotDeviceEntity::find_by_id(param.did.as_str())
+    let mi_dev = MiotDeviceEntity::find_by_id(param.did.as_str())
         .one(state.conn())
         .await?
         .ok_or(api_err!("设备不存在"))?;
@@ -216,26 +218,27 @@ pub async fn convert_to_iot_device(state: State<AppState>, Json(param): Json<MiC
         .one(state.conn())
         .await?
         .ok_or(api_err!("设备不存在"))?;
-    let dev_params = match param.device_type {
-        IotDeviceType::MiWifiDevice => {
+    let dev_type = MiotDeviceType::from_str(param.device_type.as_str())?;
+    let dev_params = match dev_type {
+        MiotDeviceType::Wifi => {
             if mi_dev.localip.is_none() {
                 return err_msg("该设备无ip");
             }
             WifiDeviceParam
         }
-        IotDeviceType::MiGatewayDevice => {
+        MiotDeviceType::MqttGateway => {
             if mi_dev.localip.is_none() {
                 return err_msg("该设备无ip");
             }
             MiGatewayParam
         }
-        IotDeviceType::MiMeshDevice => {
+        MiotDeviceType::Mesh => {
             if param.gateway_id.is_none() {
                 return err_msg("网关id不能为空");
             }
             DeviceParam::MeshParam
         }
-        IotDeviceType::MiCloudDevice => {
+        MiotDeviceType::Cloud => {
             DeviceParam::MiCloudParam
         }
         _ => {
@@ -252,7 +255,7 @@ pub async fn convert_to_iot_device(state: State<AppState>, Json(param): Json<MiC
         name: Set(param.name),
         memo: Default::default(),
         disabled: Set(false),
-        source_platform: Set(SourcePlatform::MiHome),
+        source_platform: Set(SourcePlatform::Mijia.as_ref().to_string()),
         source_id: Set(Some(param.did.clone())),
         ..Default::default()
     };

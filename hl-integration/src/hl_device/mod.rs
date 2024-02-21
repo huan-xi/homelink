@@ -1,5 +1,6 @@
 pub mod manager;
 
+use std::cmp::{max, min};
 use tokio::sync::Mutex;
 use crate::error::DeviceExitError;
 use crate::event::HlDeviceListenable;
@@ -33,7 +34,7 @@ impl Default for RetryInfo {
     fn default() -> Self {
         Self {
             retry_count: Mutex::new(0),
-            max_interval: 60_1000,
+            max_interval: 60_0000,
         }
     }
 }
@@ -52,6 +53,7 @@ impl RetryInfo {
         let read = self.retry_count.lock().await;
         // 产生1-1000 随机数
         let rand = rand::random::<u32>() % 1000 + 1;
-        2u32.pow(*read - 1) * 1000 + rand
+        let t = 2u32.pow(*read - 1) * 1000;
+        min(t, self.max_interval) + rand
     }
 }

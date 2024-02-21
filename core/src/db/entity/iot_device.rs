@@ -4,6 +4,7 @@ use std::str::FromStr;
 use sea_orm::entity::prelude::*;
 use sea_orm::{FromJsonQueryResult, JsonValue};
 use serde::{Deserialize, Serialize};
+use strum_macros::{AsRefStr, EnumString};
 
 use miot_proto::device::miot_spec_device::DeviceInfo;
 use miot_proto::proto::miio_proto::MiotSpecId;
@@ -56,25 +57,27 @@ impl IotDeviceType {
 }
 
 /// 来源设备平台
-#[derive(EnumIter, DeriveActiveEnum, Copy, Clone, Hash, Debug, PartialEq, Eq, Serialize, Deserialize, )]
-#[sea_orm(rs_type = "i32", db_type = "Integer")]
+#[derive(Copy, Clone, Hash, Debug, PartialEq, Eq, Serialize, Deserialize, AsRefStr, EnumString)]
+// #[sea_orm(rs_type = "i32", db_type = "Integer")]
 pub enum SourcePlatform {
-    MiHome = 2,
+    #[strum(serialize = "mijia")]
+    Mijia,
     /// 本地蓝牙
-    NativeBle = 3,
+    #[strum(serialize = "ble-native")]
+    BleNative,
 }
 
-impl FromStr for SourcePlatform {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "mihome" => Ok(SourcePlatform::MiHome),
-            "ble-monitor" => Ok(SourcePlatform::NativeBle),
-            _ => Err(anyhow::anyhow!("不支持的平台"))
-        }
-    }
-}
+// impl FromStr for SourcePlatform {
+//     type Err = anyhow::Error;
+//
+//     fn from_str(s: &str) -> Result<Self, Self::Err> {
+//         match s {
+//             "mijia" => Ok(SourcePlatform::Mijia),
+//             "ble-monitor" => Ok(SourcePlatform::NativeBle),
+//             _ => Err(anyhow::anyhow!("不支持的平台"))
+//         }
+//     }
+// }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, FromJsonQueryResult)]
 #[serde(tag = "type")]
@@ -128,14 +131,15 @@ pub struct Model {
     /// 设备tag
     pub tag: Option<String>,
     /// 接入方式
-    pub device_type: IotDeviceType,
+    pub device_type: String,
     ///接入参数
     pub params: JsonValue,
     pub gateway_id: Option<i64>,
     pub name: String,
     pub memo: Option<String>,
     pub disabled: bool,
-    pub source_platform: SourcePlatform,
+
+    pub source_platform: String,
     pub source_id: Option<String>,
 
     // /// 轮询时间
@@ -216,7 +220,7 @@ impl ColumnTrait for Column {
             Self::DeviceId => ColumnType::BigInteger.def(),
             Self::Tag => ColumnType::String(None).def().null(),
             Self::DeviceType => ColumnType::Integer.def(),
-            Self::SourcePlatform => ColumnType::Integer.def(),
+            Self::SourcePlatform => ColumnType::String(Some(64)).def(),
             Self::Params => ColumnType::Json.def().null(),
             Self::GatewayId => ColumnType::BigInteger.def().null(),
             Self::Disabled => ColumnType::Boolean.def(),

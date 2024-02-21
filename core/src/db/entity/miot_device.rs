@@ -21,6 +21,7 @@ pub struct Model {
     pub name: String,
     pub model: String,
     pub localip: Option<String>,
+    pub  beacon_key: Option<String>,
     pub mac: Option<String>,
     #[serde(rename = "isOnline")]
     pub is_online: bool,
@@ -39,6 +40,7 @@ pub enum Column {
     Full,
     UserId,
     UpdateAt,
+    BeaconKey,
     Localip,
     Mac,
 }
@@ -67,6 +69,7 @@ impl ColumnTrait for Column {
             Self::Name => ColumnType::String(None).def().null(),
             Self::Localip => ColumnType::String(None).def().null(),
             Self::Mac => ColumnType::String(None).def().null(),
+            Self::BeaconKey => ColumnType::String(None).def().null(),
             Self::Model => ColumnType::String(None).def().null(),
             Self::IsOnline => ColumnType::Integer.def().null(),
             Self::Full => ColumnType::String(None).def().null(),
@@ -90,6 +93,7 @@ impl ActiveModelBehavior for ActiveModel {
             name: Default::default(),
             model: Default::default(),
             localip: Default::default(),
+            beacon_key: Default::default(),
             mac: Default::default(),
             is_online: Default::default(),
             user_id: Default::default(),

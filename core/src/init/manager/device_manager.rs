@@ -12,7 +12,7 @@ use log::{error, info};
 use sea_orm::DatabaseConnection;
 use tokio::sync::oneshot;
 
-use miot_proto::device::common::emitter::EventType;
+use miot_proto::device::common::emitter::MijiaEvent;
 use miot_proto::device::miot_spec_device::MiotSpecDevice;
 
 use crate::config::context::get_app_context;
@@ -162,12 +162,12 @@ impl IotDeviceManager {
             info!("开启js 通道:{did}");
             let did = did.to_string();
 
-            let listener = Box::new(move |event: EventType| {
+            let listener = Box::new(move |event: MijiaEvent| {
                 let did = did.to_string();
                 let sender = sender.clone();
                 async move {
                     //排除掉网关消息
-                    if let EventType::GatewayMsg(_) = event {
+                    if let MijiaEvent::GatewayMsg(_) = event {
                         return Ok(());
                     };
                     let _ = sender.send(ToModuleEvent::OnDeviceEvent(OnDeviceEventParam {

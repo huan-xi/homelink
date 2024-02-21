@@ -10,25 +10,25 @@ use crate::api::output::ApiResp;
 
 #[derive(Debug, Error)]
 pub enum ApiError {
-    #[error("DbErr")]
-    DbErr(DbErr),
+    #[error("strum error {0}")]
+    ParseError(#[from] strum::ParseError),
+    #[error("DbErr {0}")]
+    DbErr(#[from] DbErr),
     #[error("{0}")]
     Msg(String),
     #[error("{0}")]
     StrMsg(&'static str),
     #[error("json 序列化错误")]
     SerdeJsonError(#[from] serde_json::Error),
-}
-
-impl From<btleplug::Error> for ApiError {
-    fn from(value: btleplug::Error) -> Self {
-        ApiError::Msg(format!("btleplug error: {}", value))
-    }
+    #[error("{0}")]
+    MiotDeviceError(NotSupportMiotDeviceError),
+    #[error("btleplug error {0}")]
+    BtlePlugError(#[from] btleplug::Error),
 }
 
 impl From<NotSupportMiotDeviceError> for ApiError {
     fn from(value: NotSupportMiotDeviceError) -> Self {
-        ApiError::Msg("该设备不是米家设备类型".to_string())
+        ApiError::MiotDeviceError(value)
     }
 }
 
@@ -63,8 +63,3 @@ impl From<std::io::Error> for ApiError {
     }
 }
 
-impl From<DbErr> for ApiError {
-    fn from(d: DbErr) -> Self {
-        ApiError::DbErr(d)
-    }
-}

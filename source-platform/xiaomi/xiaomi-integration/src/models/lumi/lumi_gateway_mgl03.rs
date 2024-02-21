@@ -1,6 +1,5 @@
 use std::sync::Arc;
 use anyhow::anyhow;
-use bimap::BiMap;
 use log::{debug, info, warn};
 use hl_integration::JsonValue;
 use miot_proto::device::miot_spec_device::{AsMiotDevice, MiotDeviceArc};
@@ -8,9 +7,6 @@ use miot_proto::proto::miio_proto::{MiotSpecDTO, MiotSpecId};
 use target_hap::delegate::{CharReadParam, CharReadResult, CharUpdateParam, CharUpdateResult};
 use target_hap::delegate::model::{AccessoryModelExtConstructor, ContextPointer, HapModelExt, HapModelExtPointer, ReadValueResult, UpdateValueResult};
 use target_hap::hap::HapType;
-use target_hap::hap_type_wrapper::HapTypeWrapper;
-use target_hap::iot::characteristic_value::CharacteristicValue;
-use target_hap::types::CharIdentifier;
 
 
 pub struct ModelExt {
@@ -32,6 +28,13 @@ impl AccessoryModelExtConstructor for ModelExt {
 
 
 /// todo 4状态
+///
+///homekit 米家
+///  0 在家  1.
+///  1 离家  2
+///  2 睡眠  3
+///  3 停用  0
+///
 #[async_trait::async_trait]
 impl HapModelExt for ModelExt {
     //[CharReadParam { sid: 13, stag: None, cid: 15, ctag: SecuritySystemTargetState },

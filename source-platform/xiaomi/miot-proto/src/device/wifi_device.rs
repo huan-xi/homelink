@@ -1,15 +1,18 @@
+use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
 
 use hex::FromHex;
 use log::{error, info};
+use serde::{Deserialize, Serialize};
 use tap::TapFallible;
 use tokio::select;
 use tokio::sync::RwLock;
+use hl_integration::JsonValue;
 
 use crate::device::common::utils::get_poll_func;
 use crate::device::miot_spec_device::{BaseMiotSpecDevice, DeviceInfo, MiotDeviceType, MiotSpecDevice, MiotSpecDeviceWrapper};
-use crate::proto::miio_proto::MiotSpecProtocolPointer;
+use crate::proto::miio_proto::{MiotSpecId, MiotSpecProtocolPointer};
 use crate::proto::protocol::ExitError;
 use crate::proto::protocol::ExitError::ConnectErr;
 use crate::proto::transport::udp_iot_spec_proto::UdpMiotSpecProtocol;
@@ -27,7 +30,6 @@ pub struct WifiDeviceInner {
     /// udp 协议并发高可能不会返回数据
     timeout: Duration,
 }
-
 
 
 #[async_trait::async_trait]
@@ -93,16 +95,29 @@ impl WifiDeviceInner {
     }
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct WifiParam {
+    pub interval: Option<u64>,
+    pub timeout: Option<u64>,
+    pub poll_properties: Vec<MiotSpecId>,
+}
+
 impl WifiDevice {
-    pub fn new_wifi_device(info: DeviceInfo) -> anyhow::Result<Self> {
+    pub fn new_wifi_device(info: DeviceInfo, params: JsonValue) -> anyhow::Result<Self> {
+        let wifi_param: WifiParam = serde_json::from_value(params)
+            .tap_err(|e| error!("wifi 参数错误:{}", e))?;
+        let poll_properties = wifi_param.poll_properties
+            .into_iter()
+            .collect::<HashSet<MiotSpecId>>();
         let inner = WifiDeviceInner {
             base: BaseMiotSpecDevice {
+                poll_properties: Arc::new(RwLock::new(poll_properties)),
                 ..std::default::Default::default()
             },
             info,
             proto: Arc::new(RwLock::new(None)),
-            interval: Duration::from_secs(120),
-            timeout: Duration::from_millis(2000),
+            interval: Duration::from_secs(wifi_param.interval.unwrap_or(120)),
+            timeout: Duration::from_millis(wifi_param.timeout.unwrap_or(2000)),
         };
         Ok(MiotSpecDeviceWrapper(Box::new(inner), MiotDeviceType::Wifi))
     }

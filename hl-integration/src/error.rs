@@ -6,6 +6,8 @@ pub enum HlDeviceError {
     /// 事件执行错误
     #[error("EventError")]
     EventError,
+    #[error("UnitConversionError {0}")]
+    UnitConversionError(String),
 }
 
 pub trait DeviceExitError: Debug + Send + Sync {

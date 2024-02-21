@@ -3,8 +3,10 @@ use std::time::Duration;
 
 use futures_util::future::{BoxFuture, join_all};
 use serde::Serialize;
+use strum_macros::EnumString;
 
 use tokio::time::timeout;
+use hl_integration::event::events::DeviceEvent;
 
 use crate::proto::miio_proto::MiotSpecDTO;
 use crate::proto::protocol::JsonMessage;
@@ -18,16 +20,18 @@ pub struct DeviceEvent {
 ///监听数据的类型
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "type")]
-pub enum EventType {
+pub enum MijiaEvent {
     /// 属性更新事件
     UpdateProperty(MiotSpecDTO),
     /// 属性更新事件
-    UpdatePropertyBatch(Vec<MiotSpecDTO>),
+    PropertiesChanged(Vec<MiotSpecDTO>),
     /// 属性设置事件
     SetProperty(MiotSpecDTO),
     /// 网关消息
     GatewayMsg(JsonMessage),
 }
+impl DeviceEvent for MijiaEvent {}
+
 
 pub type DataListener<T> = Box<dyn (Fn(T) -> BoxFuture<'static, anyhow::Result<()>>) + Send + Sync>;
 

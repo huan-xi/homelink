@@ -1,18 +1,20 @@
+use std::sync::Arc;
 use std::time::Duration;
 use futures_util::future::BoxFuture;
 use futures_util::FutureExt;
 use log::error;
 use tokio::time;
+use hl_integration::event::events::DeviceEvent;
 use hl_integration::platform::hap::hap_device;
-use crate::device::common::emitter::EventType;
-use crate::device::miot_spec_device::{MiotSpecDevice};
+use crate::device::common::emitter::MijiaEvent;
+use crate::device::miot_spec_device::{DeviceInfo, MiotSpecDevice};
 use crate::proto::miio_proto::{MiotSpecDTO, MiotSpecId};
 use crate::proto::protocol::ExitError;
 
 
 pub async fn poll0<'a, T: MiotSpecDevice + Sync + Send>(dev: &'a T, did: &'a str) -> Result<(), ExitError> {
     let base = dev.get_base();
-    if base.emitter.read().await.is_empty() {
+    if base.emitter.is_empty() {
         return Ok(());
     };
     let proto = dev.get_proto().await?;
@@ -44,7 +46,7 @@ pub async fn poll0<'a, T: MiotSpecDevice + Sync + Send>(dev: &'a T, did: &'a str
                     } else {
                         base.value_map.write().await.insert(id, val.clone());
                         //发布单次更新事件
-                        base.emitter.write().await.emit(EventType::UpdateProperty(result.clone())).await;
+                        // base.emitter.write().await.emit(EventType::UpdateProperty(result.clone())).await;
                         updates.push(result);
                     }
                 }
@@ -52,7 +54,8 @@ pub async fn poll0<'a, T: MiotSpecDevice + Sync + Send>(dev: &'a T, did: &'a str
         }
         //发布批量更新事件
         if !updates.is_empty() {
-            base.emitter.write().await.emit(EventType::UpdatePropertyBatch(updates)).await;
+            let event = Arc::new(MijiaEvent::PropertiesChanged(updates));
+            base.emitter.emit(event).await;
         }
     }
 
@@ -75,8 +78,8 @@ pub fn get_poll_func<'a, T: MiotSpecDevice + Sync + Send>(dev: &'a T, did: &'a s
     }.boxed()
 }
 
-pub fn get_hap_device_info(dev: &dyn  MiotSpecDevice) -> hap_device::DeviceInfo {
-    let info = dev.get_info();
+pub fn get_hap_device_info(info: &DeviceInfo) -> hap_device::DeviceInfo {
+    // let info = dev.get_info();
 
     let firmware_revision = info
         .extra.as_ref()
