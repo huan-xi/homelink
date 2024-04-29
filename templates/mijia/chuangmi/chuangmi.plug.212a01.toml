@@ -1,0 +1,37 @@
+# https://home.miot-spec.com/s/chuangmi.plug.212a01
+# https://home.miot-spec.com/spec?type=urn:miot-spec-v2:device:outlet:0000A002:chuangmi-212a01:1
+id = "chuangmi.plug.212a01"
+version = "1.0.0"
+model = "chuangmi.plug.212a01"
+model_name = "米家智能插座2 蓝牙网关版"
+fw_version = "2.1.8_0044"
+model_icon = ""
+[[devices]]
+# 设备接入方式
+integration = "xiaomi_wifi"
+desc = "插座"
+display_name = "米家智能插座2 蓝牙网关版"
+[devices.params]
+#轮询间隔
+interval = 60_000
+#轮询属性
+poll_properties = [
+    # on
+    { siid = 2, piid = 1 },
+]
+#调用超时时间
+timeout = 200
+# 配件
+[[devices.accessories]]
+#插座类型
+category = "Outlet"
+hap_delegate.model = "common.miot_spec_prop_mapping"
+hap_delegate.params = [{ ctag = "PowerState", siid = 2, piid = 1 }]
+# 配件下的服务
+[[devices.accessories.services]]
+# 插座服务
+service_type = "Outlet"
+primary = true
+chars = [
+    { name = "on", memo = "开关", char_type = "PowerState" }
+]

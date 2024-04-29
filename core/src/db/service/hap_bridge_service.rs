@@ -9,9 +9,10 @@ use crate::db::init::SeaQuery;
 use crate::db::SNOWFLAKE;
 use crate::hap::rand_utils::{rand_mac_addr, rand_pin_code, rand_setup_id};
 
+/// 创建hap桥接器
 pub async fn create_hap_bridge<C>(conn: &C, pin_code: Option<String>,
-                               category: BridgeCategory,
-                               name: String, single_accessory: bool) -> anyhow::Result<HapBridgeModel>
+                                  category: BridgeCategory,
+                                  name: String, single_accessory: bool) -> anyhow::Result<HapBridgeModel>
     where C: ConnectionTrait {
     let count = HapBridgeEntity::find()
         .filter(HapBridgeColumn::Name.eq(&name))

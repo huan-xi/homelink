@@ -26,7 +26,7 @@ pub struct ServiceDataPacket {
 
 /// 解析数据包
 pub fn parse_advertisement(uuid: &Uuid, data: &[u8]) -> BltResult<Option<ServiceDataPacket>> {
-    let uuid_128 = uuid.as_ref();
+    let uuid_128:&[u8] = uuid.as_ref();
     let uuid_16 = (uuid_128[2] as u16) << 8 | uuid_128[3] as u16;
     match BlePlatform::try_from(uuid_16) {
         Ok(platform) => {

@@ -85,7 +85,8 @@ impl XiaomiParser {
         if data.len() < index + 9 {
             return Err(UnpackDataError("数据长度错误"));
         };
-        todo!();
+        debug!("解密数据v4_v5");
+
         // self.aes_keys.get(&packet.mac)
         //     .ok_or(UnpackDataError("aes key not found"))
         //     .tap_err(|_| debug!("mac:{},aes key not found",hex::encode(packet.mac)))?;

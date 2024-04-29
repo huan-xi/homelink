@@ -15,6 +15,8 @@ pub enum MiAccountStatus {
     NotLogin = 0,
     /// 正常
     Normal = 1,
+    /// 过期
+    Expire = 2,
 }
 
 
@@ -30,7 +32,9 @@ pub struct Model {
     pub account: String,
     pub password: String,
     pub status: MiAccountStatus,
+    /// 更新时间
     pub update_at: DateTimeUtc,
+    pub memo: Option<String>,
     /// 最后登入时间
     pub last_login_at: Option<DateTimeUtc>,
 }
@@ -40,6 +44,7 @@ pub enum Column {
     Account,
     Password,
     Status,
+    Memo,
     UpdateAt,
     LastLoginAt,
 }
@@ -65,6 +70,7 @@ impl ColumnTrait for Column {
         match self {
             Self::Account => ColumnType::String(None).def(),
             Self::Password => ColumnType::String(None).def(),
+            Self::Memo => ColumnType::String(None).def().null(),
             Self::UpdateAt => ColumnType::Timestamp.def(),
             Self::LastLoginAt => ColumnType::Timestamp.def().null(),
             Self::Status => ColumnType::Integer.def(),
@@ -86,6 +92,10 @@ impl ActiveModelBehavior for ActiveModel {
             status: Default::default(),
             update_at: Set(chrono::Utc::now()),
             last_login_at: Default::default(),
+            memo: Default::default(),
         }
     }
 }
+
+#[derive(Copy, Clone, Debug, EnumIter, DeriveRelatedEntity)]
+pub enum RelatedEntity {}

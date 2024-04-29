@@ -3,7 +3,7 @@ use std::sync::Arc;
 use anyhow::anyhow;
 use log::{info, warn};
 use serde_json::json;
-use hl_integration::event::events::DeviceEvent;
+use hl_integration::event::events::{DeviceEvent, DeviceEventPointer};
 use hl_integration::JsonValue;
 use miot_proto::device::miot_spec_device::{AsMiotDevice, MiotDeviceArc};
 use miot_proto::proto::miio_proto::MiotSpecId;
@@ -114,7 +114,7 @@ impl HapModelExt for ModelExt {
                 _ => None,
             };
             result.push(CharReadResult {
-                cid: param.cid,
+                sid: param.sid,cid: param.cid,
                 success: true,
                 value,
             });
@@ -172,13 +172,8 @@ impl HapModelExt for ModelExt {
         Ok(result)
     }
 
-    // async fn on_event(&self, event_type: DeviceEvent) {
-    //     /*if let EventType::UpdatePropertyBatch(values) = event_type {
-    //         for id in values {
-    //             /*if id.siid == self.model.siid && id.piid == self.model.piid {
-    //                 //处理
-    //             };*/
-    //         }
-    //     };*/
-    // }
+
+    async fn on_event(&self, event_type: DeviceEventPointer) {
+        info!("on_event:{:?}", event_type);
+    }
 }

@@ -4,6 +4,7 @@ use anyhow::anyhow;
 use impl_new::New;
 use tokio::sync::broadcast::Receiver;
 use tokio::sync::RwLock;
+use tokio::time::timeout;
 use crate::cloud::MiCloud;
 use crate::proto::miio_proto::{METHOD_GET_PROPERTIES, METHOD_SET_PROPERTIES, MiotSpecDTO, MiotSpecProtocol};
 use crate::proto::protocol::JsonMessage;
@@ -12,6 +13,7 @@ use crate::proto::protocol::JsonMessage;
 #[derive(New)]
 pub struct CloudMiioProto {
     pub cloud_client: Arc<RwLock<MiCloud>>,
+    pub timeout: Duration,
 }
 
 #[async_trait::async_trait]
@@ -36,28 +38,31 @@ impl MiotSpecProtocol for CloudMiioProto {
         todo!("can not start_listen")
     }
 
-    async fn call_rpc(&self, method: &str, params: Vec<MiotSpecDTO>, _timeout: Option<Duration>) -> anyhow::Result<JsonMessage> {
-        let url = match method {
-            METHOD_GET_PROPERTIES => "/miotspec/prop/get",
-            METHOD_SET_PROPERTIES => "/miotspec/prop/set",
-            // /miotspec/action
-            _ => {
-                return Err(anyhow!("不支持的方法:{}", method));
-            }
-        };
+    async fn call_rpc(&self, method: &str, params: Vec<MiotSpecDTO>, duration: Option<Duration>) -> anyhow::Result<JsonMessage> {
+        timeout(duration.unwrap_or(self.timeout), async {
+            let url = match method {
+                METHOD_GET_PROPERTIES => "/miotspec/prop/get",
+                METHOD_SET_PROPERTIES => "/miotspec/prop/set",
+                // /miotspec/action
+                _ => {
+                    return Err(anyhow!("不支持的方法:{}", method));
+                }
+            };
 
-        let str = serde_json::json!({
+            let str = serde_json::json!({
             "params": params,
         }).to_string();
-        // "/miotspec/prop/get",
-        let result = self.cloud_client.read().await.call_api(url, str.as_str()).await?;
-        let mut map = result.as_object().ok_or(anyhow!("返回结果不是json对象"))?.clone();
-        let code = map.remove("code")
-            .and_then(|v| v.as_u64())
-            .ok_or(anyhow!("返回结果没有code"))?;
-        if code != 0 {
-            return Err(anyhow!("返回结果错误"));
-        }
-        return Ok(JsonMessage::new(map));
+            // tokio::time::sleep(Duration::from_secs(1000)).await;
+            // "/miotspec/prop/get",
+            let result = self.cloud_client.read().await.call_api(url, str.as_str()).await?;
+            let mut map = result.as_object().ok_or(anyhow!("返回结果不是json对象"))?.clone();
+            let code = map.remove("code")
+                .and_then(|v| v.as_u64())
+                .ok_or(anyhow!("返回结果没有code"))?;
+            if code != 0 {
+                return Err(anyhow!("返回结果错误"));
+            }
+            return Ok(JsonMessage::new(map));
+        }).await.map_err(|e| anyhow!("超时:{}", e))?
     }
 }

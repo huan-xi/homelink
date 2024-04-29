@@ -27,9 +27,6 @@ pub struct PropMappingParam {
     ctag: HapTypeWrapper,
     siid: i32,
     piid: i32,
-    /// 单位转换器,和单位转换器参数
-    convertor: Option<String>,
-    convertor_params: Option<JsonValue>,
 }
 
 
@@ -80,13 +77,14 @@ impl HapModelExt for ModelExt {
                 None => {
                     warn!("no mapping for stag:{:?},ctag:{:?}",stag, param.ctag);
                     result.push(CharReadResult {
+                        sid: param.sid,
                         cid: param.cid,
                         success: true,
                         value: None,
                     });
                 }
                 Some(aid) => {
-                    cids.push((param.cid, param.format, cid, ));
+                    cids.push((param.cid, param.format, cid, param.sid));
                     ids.push(aid.clone());
                 }
             }
@@ -104,6 +102,7 @@ impl HapModelExt for ModelExt {
                     None => {
                         result.push(CharReadResult {
                             cid: cid.0,
+                            sid: cid.3,
                             success: false,
                             value: None,
                         });
@@ -122,6 +121,7 @@ impl HapModelExt for ModelExt {
                         }
 
                         result.push(CharReadResult {
+                            sid: cid.3,
                             cid: cid.0,
                             success: true,
                             value,
@@ -130,7 +130,7 @@ impl HapModelExt for ModelExt {
                 }
             }
         };
-
+        info!("read_chars_value result:{:?}", result);
         Ok(result)
     }
 

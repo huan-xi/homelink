@@ -1,11 +1,11 @@
 use std::any::{Any, TypeId};
+use std::fmt::Debug;
 use std::sync::Arc;
 use crate::HlSourceDevice;
 
 pub type DeviceEventPointer = Arc<dyn DeviceEvent + Send + Sync + 'static>;
 
-pub trait DeviceEvent: Any {
-}
+pub trait DeviceEvent: Any + Debug {}
 
 impl dyn DeviceEvent {
     pub fn downcast_ref<T: DeviceEvent>(&self) -> Option<&T> {
@@ -16,7 +16,6 @@ impl dyn DeviceEvent {
         }
     }
 }
-
 
 
 //

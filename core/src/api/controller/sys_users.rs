@@ -6,9 +6,14 @@ use crate::api::params::LoginParam;
 use crate::api::results::UserInfoResult;
 use crate::api::state::AppState;
 
+
+
 pub async fn info(state: State<AppState>) -> ApiResult<UserInfoResult> {
     let result = UserInfoResult {
         username: "admin".to_string(),
+        name: "Home link".to_string(),
+        avatar: "https://gw.alipayobjects.com/zos/rmsportal/BiazfanxmamNRoxxVxka.png".to_string(),
+        userid: 001,
         roles: vec!["admin".to_string()],
     };
     ok_data(result)

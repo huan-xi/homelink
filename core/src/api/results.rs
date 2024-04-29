@@ -1,13 +1,21 @@
 use std::net::SocketAddr;
+use anyhow::anyhow;
 use serde::Serialize;
 use serde_json::Value;
+use hap::characteristic::{Format, Unit};
 use hap_metadata::metadata::HapCharacteristic;
+use target_hap::types::HapCharInfo;
 use crate::db::entity::prelude::{HapAccessoryModel, HapBridgeEntity, HapBridgeModel, IotDeviceModel, MiotDeviceModel};
 use crate::init::manager::ble_manager::Status;
+use crate::template::hap::accessory::AccessoryTemplate;
+use crate::template::hl_template::{DeviceTemplate, HlDeviceTemplate, TemplateFormat};
 
 #[derive(Debug, serde::Serialize)]
 pub struct UserInfoResult {
     pub(crate) username: String,
+    pub(crate) name: String,
+    pub(crate) avatar: String,
+    pub(crate) userid: i64,
     pub(crate) roles: Vec<String>,
 }
 
@@ -27,7 +35,6 @@ pub struct HapBridgeResult {
 pub struct IotDeviceResult {
     #[serde(flatten)]
     pub model: IotDeviceModel,
-
     pub running: bool,
     pub source: Option<MiotDeviceResult>,
 }
@@ -36,8 +43,21 @@ pub struct IotDeviceResult {
 pub struct HapAccessoryResult {
     #[serde(flatten)]
     pub model: HapAccessoryModel,
+    pub running: bool,
     pub bridge: Option<HapBridgeModel>,
     pub device: Option<IotDeviceModel>,
+}
+
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
+pub struct CheckTemplateResult {
+    pub new_devices: Vec<DeviceTemplate>,
+    pub new_accessories: Vec<AccessoryTemplate>,
+}
+
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
+pub struct TemplateResult {
+    pub(crate) text: String,
+    pub(crate) format: TemplateFormat,
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -48,33 +68,49 @@ pub struct ServiceMetaResult {
     pub optional: Vec<CharacteristicMetaResult>,
 }
 
+
 #[derive(Debug, serde::Serialize)]
 pub struct CharacteristicMetaResult {
-    // pub name: String,
-    pub format: String,
-    pub name: String,
     pub characteristic_type: String,
-    pub min_value: Option<Value>,
-    pub max_value: Option<Value>,
-    pub step_value: Option<Value>,
-    pub max_length: Option<Value>,
-    pub units: Option<String>,
-    // pub properties: usize,
+    pub info: HapCharInfo,
+    pub name: String,
+    pub memo: Option<String>,
+
 }
 
 impl CharacteristicMetaResult {
-    pub(crate) fn from_ch(c: &HapCharacteristic, name: &str) -> Self {
+    pub(crate) fn from_ch(c: &HapCharacteristic, name: &str) -> anyhow::Result<Self> {
         let characteristic_type = hap_metadata::utils::pascal_case(c.name.as_str());
-        Self {
-            format: c.format.clone(),
-            name: name.to_string(),
+
+        let format: Format = serde_json::from_str(format!("\"{}\"", c.format.as_str()).as_str())
+            .map_err(|e| anyhow!("格式转换错误:{:?}", e))?;
+
+        let unit: Option<Unit> = c.units.clone().map(|u| {
+            let unit: anyhow::Result<Unit> = serde_json::from_str(format!("\"{}\"", u.as_str()).as_str())
+                .map_err(|e| anyhow!("单位转换错误:{:?}", e));
+            unit
+        }).transpose()?;
+
+        Ok(Self {
             characteristic_type,
-            min_value: c.min_value.clone(),
-            max_value: c.max_value.clone(),
-            step_value: c.step_value.clone(),
-            max_length: c.max_length.clone(),
-            units: c.units.clone(),
-        }
+            info: HapCharInfo {
+                format,
+                min_value: c.min_value.clone(),
+                max_value: c.max_value.clone(),
+                step_value: c.step_value.clone(),
+                max_data_len: None,
+                valid_values: None,
+                valid_values_range: None,
+                ttl: None,
+                perms: vec![],
+                max_len: c.max_length.clone()
+                    .and_then(|i| i.as_u64().and_then(|i| Some(i as u16))),
+                unit,
+                pid: None,
+            },
+            name: "".to_string(),
+            memo: None,
+        })
     }
 }
 
@@ -101,14 +137,14 @@ pub struct MiotDeviceResult {
 
 
 #[derive(Debug, serde::Serialize)]
-pub struct NativeBleDeviceResult {
+pub struct NativeBleStatus {
     pub(crate) status: Status,
-    pub(crate) peripherals: Vec<NativeBleDevice>,
 }
 
 #[derive(Debug, serde::Serialize)]
 pub struct NativeBleDevice {
     pub mac: String,
+    pub id: String,
     pub name: Option<String>,
     pub rssi: Option<i16>,
 }

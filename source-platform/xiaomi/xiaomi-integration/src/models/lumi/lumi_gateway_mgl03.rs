@@ -55,11 +55,7 @@ impl HapModelExt for ModelExt {
             .map(|v| JsonValue::from(v));
         let mut result = vec![];
         for param in params.into_iter() {
-            result.push(CharReadResult {
-                cid: param.cid,
-                success: true,
-                value: value.clone(),
-            });
+            result.push(CharReadResult::success(&param, value.clone()));
         }
         Ok(result)
     }

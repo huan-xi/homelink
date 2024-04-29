@@ -69,11 +69,11 @@ pub fn get_poll_func<'a, T: MiotSpecDevice + Sync + Send>(dev: &'a T, did: &'a s
 
     async move {
         loop {
+            interval.tick().await;
             if let Err(e) = poll0(dev, did).await {
-                error!("获取协议失败:{:?}",e);
+                error!("轮询数据失败:{:?}",e);
                 break;
             }
-            interval.tick().await;
         }
     }.boxed()
 }

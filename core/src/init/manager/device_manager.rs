@@ -7,14 +7,12 @@ use std::sync::Arc;
 use axum::body::HttpBody;
 use dashmap::DashMap;
 use dashmap::mapref::entry::Entry;
-use futures_util::FutureExt;
 use log::{error, info};
 use sea_orm::DatabaseConnection;
 use tokio::sync::oneshot;
 
 use miot_proto::device::common::emitter::MijiaEvent;
 use miot_proto::device::miot_spec_device::MiotSpecDevice;
-
 use crate::config::context::get_app_context;
 use crate::init::DevicePointer;
 use crate::init::manager::ble_manager::BleManager;
@@ -39,6 +37,7 @@ pub struct IotDeviceManagerInner {
 
 
 impl IotDeviceManagerInner {
+
     pub fn push_device(&self, device_id: i64, device: DevicePointer) {
         let dev_c = device.clone();
         let (close_sender, recv) = oneshot::channel();
@@ -77,28 +76,18 @@ impl IotDeviceManagerInner {
         self.device_map.get(&device_id).map(|i| i.value().dev.clone())
     }
 
-    /// 关闭设备之前要移除 所有hap 设备，hap设备会有arc 的应用
+    /// 关闭设备之前要移除 所有hap 设备，hap设备会有arc 的引用
     pub async fn remove_device(&self, device_id: i64) -> anyhow::Result<()> {
 
         // 发送移除指令
-        match self.device_map.remove(&device_id) {
-            None => {
-                return Err(anyhow::anyhow!("设备不存在"));
-            }
-            Some((id, task)) => {
-                let res = task.close_sender.send(true);
-                //移除hap 设备
-
-                /*let sender = task.value().sender.clone();
-                sender.send(true).await?;
-                self.device_map.remove(&device_id);*/
-            }
-        };
-        Ok(())
+        if let Some((id, task)) = self.device_map.remove(&device_id) {
+            let _ = task.close_sender.send(true);
+        }
         // 等待设备停止成功
+        Ok(())
     }
 
-    /// 关闭
+    /// 关闭管理器
     pub async fn close(&self) {
         /*let device_handlers: Vec<BoxFuture<()>> = self.device_map
             .iter()

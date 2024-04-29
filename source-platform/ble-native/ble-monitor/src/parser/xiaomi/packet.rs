@@ -16,8 +16,9 @@ pub enum XiaomiType {
     M1sT500 = 0x0489,
     /// 米家夜灯 "yeelink.light.nl1"
     MJYD02YL = 0x07F6,
-
-    U1 = 0x799,
+    //0x2809
+    Unknown1 = 0x799,
+    Unknown2 = 0x2809,
 }
 
 #[derive(Debug)]
@@ -68,7 +69,7 @@ impl Packet {
         };
         let device_type = XiaomiType::try_from(device_id)
             .map_err(|_e| NotSupportedDeviceType(device_id))
-            .tap_err(|_e| debug!("不支持设备类型,mac:{:?}",mac))?;
+            .tap_err(|_e| debug!("不支持设备类型,did:{device_id},mac:{:?}",mac))?;
 
 
         //todo packet id 去重

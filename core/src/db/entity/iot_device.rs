@@ -15,6 +15,7 @@ use crate::db::entity::common::PropertyVec;
 #[derive(Copy, Clone, Default, Debug, DeriveEntity)]
 pub struct Entity;
 
+
 impl EntityName for Entity {
     fn table_name(&self) -> &str {
         "iot_device"
@@ -67,17 +68,6 @@ pub enum SourcePlatform {
     BleNative,
 }
 
-// impl FromStr for SourcePlatform {
-//     type Err = anyhow::Error;
-//
-//     fn from_str(s: &str) -> Result<Self, Self::Err> {
-//         match s {
-//             "mijia" => Ok(SourcePlatform::Mijia),
-//             "ble-monitor" => Ok(SourcePlatform::NativeBle),
-//             _ => Err(anyhow::anyhow!("不支持的平台"))
-//         }
-//     }
-// }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, FromJsonQueryResult)]
 #[serde(tag = "type")]
@@ -87,6 +77,21 @@ pub enum DeviceParam {
     MiCloudParam,
     BleParam(BleParam),
     MeshParam,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, DeriveActiveEnum, EnumIter)]
+#[sea_orm(rs_type = "i32", db_type = "Integer")]
+pub enum DeviceType {
+    Normal = 1,
+    Gateway = 2,
+    /// 子设备
+    Child = 3,
+}
+
+impl Default for DeviceType {
+    fn default() -> Self {
+        DeviceType::Normal
+    }
 }
 
 
@@ -116,14 +121,6 @@ impl BleParam {
     }
 }
 
-#[test]
-fn test_ble_param() {
-    let str = r#"
-    {"did":"blt.3.1g8f9gmps4o02","firmware_revision":null,"localip":null,"mac":"","manufacturer":null,"model":"miaomiaoce.sensor_ht.t1","name":"温湿度传感器","serial_number":null,"software_revision":null,"token":"","type":"BleParam","mapping":[{"siid":2,"piid":1,"type":"Temperature"}]}
-    "#;
-    let a = serde_json::from_str::<DeviceParam>(str);
-    println!("{:?}", a);
-}
 
 #[derive(Clone, Debug, PartialEq, DeriveModel, DeriveActiveModel, Eq, Serialize, Deserialize)]
 pub struct Model {
@@ -131,30 +128,17 @@ pub struct Model {
     /// 设备tag
     pub tag: Option<String>,
     /// 接入方式
-    pub device_type: String,
+    pub integration: String,
     ///接入参数
     pub params: JsonValue,
     pub gateway_id: Option<i64>,
     pub name: String,
     pub memo: Option<String>,
     pub disabled: bool,
-
+    pub device_type: DeviceType,
     pub source_platform: String,
     pub source_id: Option<String>,
 
-    // /// 轮询时间
-    // pub poll_interval: i32,
-    // /// 读写超时时间
-    // pub timeout: i32,
-    // pub poll_properties: PropertyVec,
-
-    // /// 定义属性
-    // pub props: Option<String>,
-    // /// 定义服务
-    // pub services: Option<String>,
-    // /// 定义事件
-    // pub events: Option<String>,
-    //
     ///使用的模板id
     pub temp_id: Option<String>,
     pub temp_version: Option<String>,
@@ -170,12 +154,13 @@ pub enum Column {
     DeviceType,
     Params,
     GatewayId,
+    IsGateway,
     Disabled,
     Name,
     Memo,
     SourcePlatform,
     SourceId,
-
+    Integration,
     // PollInterval,
     // Timeout,
     // PollProperties,
@@ -201,6 +186,12 @@ impl PrimaryKeyTrait for PrimaryKey {
     }
 }
 
+#[derive(Copy, Clone, Debug, EnumIter, DeriveRelatedEntity)]
+pub enum RelatedEntity {
+    #[sea_orm(entity = "super::hap_accessory::Entity")]
+    HapAccessory,
+}
+
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
     #[sea_orm(has_many = "super::hap_accessory::Entity")]
@@ -219,29 +210,33 @@ impl ColumnTrait for Column {
         match self {
             Self::DeviceId => ColumnType::BigInteger.def(),
             Self::Tag => ColumnType::String(None).def().null(),
-            Self::DeviceType => ColumnType::Integer.def(),
+            Self::DeviceType => DeviceType::db_type().def(),
             Self::SourcePlatform => ColumnType::String(Some(64)).def(),
+            Self::Integration => ColumnType::String(Some(64)).def(),
             Self::Params => ColumnType::Json.def().null(),
             Self::GatewayId => ColumnType::BigInteger.def().null(),
             Self::Disabled => ColumnType::Boolean.def(),
             Self::Name => ColumnType::String(None).def().null(),
             Self::Memo => ColumnType::String(None).def().null(),
             Self::SourceId => ColumnType::String(None).def().null(),
-
+            Self::IsGateway => ColumnType::Boolean.def().null().default_value(false),
             Self::TempId => ColumnType::BigInteger.def().null(),
             Self::TempVersion => ColumnType::String(None).def().null(),
             Self::UpdateAt => ColumnType::Timestamp.def(),
-            Self::TempBatchId => ColumnType::BigInteger.def(),
-
-            // Self::PollInterval => ColumnType::Integer.def(),
-            // Self::Timeout => ColumnType::Integer.def(),
-            // Self::PollProperties => ColumnType::String(None).def(),
-            // Self::Props => ColumnType::String(None).def().null(),
-            // Self::Services => ColumnType::String(None).def().null(),
-            // Self::Events => ColumnType::String(None).def().null(),
+            Self::TempBatchId => ColumnType::BigInteger.def().null(),
         }
     }
 }
 
 
 impl ActiveModelBehavior for ActiveModel {}
+
+
+#[test]
+fn test_ble_param() {
+    let str = r#"
+    {"did":"blt.3.1g8f9gmps4o02","firmware_revision":null,"localip":null,"mac":"","manufacturer":null,"model":"miaomiaoce.sensor_ht.t1","name":"温湿度传感器","serial_number":null,"software_revision":null,"token":"","type":"BleParam","mapping":[{"siid":2,"piid":1,"type":"Temperature"}]}
+    "#;
+    let a = serde_json::from_str::<DeviceParam>(str);
+    println!("{:?}", a);
+}

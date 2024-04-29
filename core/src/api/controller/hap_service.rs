@@ -1,16 +1,19 @@
+use std::str::FromStr;
 use axum::extract::{Path, Query, State};
 use axum::Json;
-use log::info;
+use sea_orm::PaginatorTrait;
 use sea_orm::ActiveValue::Set;
-use sea_orm::{ActiveModelTrait, EntityTrait, TransactionTrait};
+use sea_orm::{ActiveModelTrait, EntityTrait, TransactionTrait, TryIntoModel};
 use crate::api::output::{ApiResp, ApiResult, err_msg};
 use crate::api::state::AppState;
 use crate::db::entity::prelude::{HapCharacteristicColumn, HapCharacteristicEntity, HapServiceActiveModel, HapServiceColumn, HapServiceEntity, HapServiceModel};
 use sea_orm::QueryFilter;
 use sea_orm::ColumnTrait;
+use target_hap::hap_type_wrapper::HapTypeWrapper;
 use crate::api::params::{AddServiceParam, DisableParam};
 use crate::db::SNOWFLAKE;
 use crate::{api_err, err_msg};
+use crate::api::params::power::power_add_param::PowerAddParam;
 
 
 /// 返回 配件服务列表
@@ -24,52 +27,25 @@ pub async fn list(state: State<AppState>, Path(id): Path<i64>) -> ApiResult<Vec<
 
 /// 添加服务 add_service
 /// ///修改服务
-pub async fn add_service(state: State<AppState>, Json(param): Json<AddServiceParam>) -> ApiResult<()> {
-    let type_str = format!("{:?}", param.service_type);
-    info!("param:{:?}", param);
-    let meta = state.hap_metadata
-        .services
-        .get(type_str.as_str())
-        .ok_or(api_err!("未找到服务类型:{}",type_str))?;
-    let mut names = vec![];
-    for x in param.characteristics.iter() {
-        names.push(x.name
-            .clone()
-            .ok_or(api_err!("特征:{:?}名称不能为空", x.characteristic_type))?
-        );
+pub async fn add_service(state: State<AppState>, Json(param): Json<PowerAddParam>) -> ApiResult<()> {
+    let mut active_model = param.to_active_model::<HapServiceEntity, HapServiceActiveModel>()?;
+    active_model.id = Set(SNOWFLAKE.next_id());
+    active_model.disabled = Set(false);
+    let svc_type = active_model.service_type.clone().take()
+        .ok_or(api_err!("服务类型不能为空"))?;
+    HapTypeWrapper::from_str(svc_type.as_str())?;
+    let tag = active_model.tag.clone().take().ok_or(api_err!("tag不能为空"))?;
+    let accessory_id = active_model.accessory_id.clone().take().ok_or(api_err!("配件id不能为空"))?;
+    //检测tag是否重复
+    let count = HapServiceEntity::find()
+        .filter(HapServiceColumn::Tag.eq(tag.clone())
+            .and(HapServiceColumn::AccessoryId.eq(accessory_id)))
+        .count(state.conn())
+        .await?;
+    if count > 0 {
+        return Err(api_err!("tag:{:?}已存在", tag));
     }
-    let mut list = vec![];
-    meta.characteristics.required_characteristics
-        .iter()
-        .for_each(|c| {
-            if !names.iter().any(|c1| c1.as_str() == c.as_str()) {
-                list.push(c.to_string());
-            }
-        });
-    if list.len() > 0 {
-        return err_msg!("必填特征 [{}] 未设置", list.join(","));
-    }
-    let service_id = SNOWFLAKE.next_id();
-    let mut chs = vec![];
-    for i in param.characteristics.into_iter() {
-        let mut model = i.into_model(service_id)?;
-        model.cid = Set(SNOWFLAKE.next_id());
-        chs.push(model);
-    }
-    let model = HapServiceActiveModel {
-        id: Set(service_id),
-        accessory_id: Set(param.accessory_id),
-        configured_name: Set(param.configured_name),
-        tag: Default::default(),
-        memo: Set(param.memo),
-        service_type: Set(param.service_type.to_string()),
-        disabled: Set(false),
-        primary: Set(false),
-    };
-    let txn = state.conn().begin().await?;
-    HapServiceEntity::insert(model).exec(&txn).await?;
-    HapCharacteristicEntity::insert_many(chs).exec(&txn).await?;
-    txn.commit().await?;
+    active_model.insert(state.conn()).await?;
 
     Ok(ApiResp::with_data(()))
 }

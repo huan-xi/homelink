@@ -1,4 +1,5 @@
 use std::ops::Deref;
+use std::pin::Pin;
 use std::sync::Arc;
 use btleplug::api::{Central, CentralEvent, Manager as _, Peripheral, ScanFilter};
 use btleplug::platform::{Adapter, Manager};
@@ -6,6 +7,7 @@ use futures_util::StreamExt;
 use log::{error, info};
 use tokio::sync::{broadcast, RwLock};
 use ble_monitor::parse_advertisement::{parse_advertisement, ServiceDataPacket};
+use hap::futures::Stream;
 
 #[derive(Clone)]
 pub struct BleManager {
@@ -90,13 +92,12 @@ impl BleManagerInner {
                         for (uuid, bytes) in &service_data {
                             match parse_advertisement(uuid, bytes.as_slice()) {
                                 Ok(data) => {
-                                    if let Some(data)=data{
+                                    if let Some(data) = data {
                                         // 上报设备事件
                                         //尝试解包获取类型,
 
                                         let _ = sender.send(data);
                                     }
-
                                 }
                                 Err(e) => {
                                     //  info!("parse_advertisement error:{:?}", e);
@@ -112,5 +113,13 @@ impl BleManagerInner {
         Ok(())
     }
 
-    //处理蓝牙数据
+
+    pub async fn adapter_event_listener(&self) -> anyhow::Result<Pin<Box<dyn Stream<Item=CentralEvent> + Send>>> {
+        let read = self.adapter.read().await;
+        if let Some(adapter) = read.as_ref() {
+            let a = adapter.events().await?;
+            return Ok(a);
+        }
+        return Err(anyhow::anyhow!("adapter not found"));
+    }
 }

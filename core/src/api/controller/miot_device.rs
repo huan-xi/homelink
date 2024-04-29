@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::str::FromStr;
 use std::time::Duration;
 
@@ -6,8 +7,9 @@ use axum::body::HttpBody;
 use axum::extract::{Path, Query, State};
 use axum::Json;
 use log::{error, warn};
-use sea_orm::{ActiveModelTrait, EntityTrait, PaginatorTrait};
+use sea_orm::{ActiveModelTrait, Condition, EntityTrait, JsonValue, PaginatorTrait, QueryFilter};
 use sea_orm::ActiveValue::Set;
+use sea_orm::prelude::DateTimeUtc;
 use tap::TapFallible;
 use tokio::net::UdpSocket;
 use miot_proto::device::miot_spec_device::MiotDeviceType;
@@ -16,33 +18,26 @@ use miot_proto::proto::transport::udp_iot_spec_proto::UdpMiotSpecProtocol;
 
 use crate::api::output::{ApiResult, err_msg, ok_data};
 use crate::api::params::{AccountParam, DidParam, MiConvertByTemplateParam, MiConvertToIotParam};
-use crate::api::results::{MiotDeviceModelResult, MiotDeviceResult};
+use crate::api::params::power::power_query_param::PowerQueryParam;
+use crate::api::params::power::power_update_param::PowerUpdateParam;
+use crate::api::results::{MiotDeviceModelResult, MiotDeviceResult, TemplateResult};
 use crate::api::state::AppState;
 use crate::api_err;
-use crate::db::entity::iot_device::{DeviceParam, IotDeviceType, SourcePlatform};
+use crate::db::entity::iot_device::{DeviceParam, DeviceType, IotDeviceType, SourcePlatform};
 use crate::db::entity::iot_device::DeviceParam::{MiGatewayParam, WifiDeviceParam};
 use crate::db::entity::mi_account::MiAccountStatus;
-use crate::db::entity::prelude::{IotDeviceActiveModel, IotDeviceEntity, MiAccountActiveModel, MiAccountEntity, MiAccountModel, MiotDeviceActiveModel, MiotDeviceEntity, MiotDeviceModel};
+use crate::db::entity::prelude::{IotDeviceActiveModel, IotDeviceEntity, MiAccountActiveModel, MiAccountColumn, MiAccountEntity, MiAccountModel, MiotDeviceActiveModel, MiotDeviceEntity, MiotDeviceModel};
 use crate::db::SNOWFLAKE;
 use crate::init::manager::template_manager::{ApplyTemplateOptions, SourcePlatformModel};
-use crate::template::miot_template::HlDeviceTemplate;
+use crate::template::hl_template::HlDeviceTemplate;
 // use crate::template::miot_template::HlDeviceTemplate;
 // use crate::init::manager::template_manager::{ApplyTemplateOptions, BridgeMode, SourcePlatformModel};
 
 // accounts
-pub async fn update_account(state: State<AppState>, Json(param): Json<AccountParam>) -> ApiResult<()> {
-    let count = MiAccountEntity::find_by_id(param.account.clone())
-        .count(state.conn())
-        .await?;
-    if count > 0 {
-        return err_msg("账号不存在");
-    };
-    let account = MiAccountActiveModel {
-        account: Set(param.account),
-        password: Set(param.password.ok_or(api_err!("密码不能为空"))?),
-        ..Default::default()
-    };
-    MiAccountEntity::insert(account)
+pub async fn update_account(state: State<AppState>, Json(param): Json<PowerUpdateParam>) -> ApiResult<()> {
+    let mut model = param.to_active_model::<MiAccountEntity, MiAccountActiveModel>()?;
+    model.update_at = Set(DateTimeUtc::from(chrono::Local::now()));
+    MiAccountEntity::update(model)
         .exec(state.conn())
         .await?;
 
@@ -169,8 +164,11 @@ pub async fn handshake(state: State<AppState>, Json(param): Json<DidParam>) -> A
     ok_data(())
 }
 
-pub async fn list(state: State<AppState>) -> ApiResult<Vec<MiotDeviceModelResult>> {
+pub async fn list(state: State<AppState>, Query(param): Query<PowerQueryParam>) -> ApiResult<Vec<MiotDeviceModelResult>> {
+    let condition = param.get_condition::<MiotDeviceEntity>()?;
+
     let list = MiotDeviceEntity::find()
+        .filter(condition)
         .all(state.conn())
         .await?;
     let mut results = vec![];
@@ -185,9 +183,11 @@ pub async fn list(state: State<AppState>) -> ApiResult<Vec<MiotDeviceModelResult
     ok_data(results)
 }
 
+
+
 pub async fn templates(state: State<AppState>, Path(model): Path<String>) -> ApiResult<Vec<HlDeviceTemplate>> {
     let list = state.template_manager
-        .mihome_templates
+        .templates
         .iter()
         .filter(|v| v.model.as_str() == model.as_str())
         .map(|v| v.clone())
@@ -213,50 +213,24 @@ pub async fn convert_by_template(state: State<AppState>, Json(param): Json<MiCon
 }
 
 /// 转换
-pub async fn convert_to_iot_device(state: State<AppState>, Json(param): Json<MiConvertToIotParam>) -> ApiResult<()> {
+pub async fn access(state: State<AppState>, Json(param): Json<MiConvertToIotParam>) -> ApiResult<()> {
     let mi_dev = MiotDeviceEntity::find_by_id(param.did.as_str())
         .one(state.conn())
         .await?
         .ok_or(api_err!("设备不存在"))?;
-    let dev_type = MiotDeviceType::from_str(param.device_type.as_str())?;
-    let dev_params = match dev_type {
-        MiotDeviceType::Wifi => {
-            if mi_dev.localip.is_none() {
-                return err_msg("该设备无ip");
-            }
-            WifiDeviceParam
-        }
-        MiotDeviceType::MqttGateway => {
-            if mi_dev.localip.is_none() {
-                return err_msg("该设备无ip");
-            }
-            MiGatewayParam
-        }
-        MiotDeviceType::Mesh => {
-            if param.gateway_id.is_none() {
-                return err_msg("网关id不能为空");
-            }
-            DeviceParam::MeshParam
-        }
-        MiotDeviceType::Cloud => {
-            DeviceParam::MiCloudParam
-        }
-        _ => {
-            return err_msg("暂不支持该设备类型");
-        }
-    };
 
     //创建iot设备
     let model = IotDeviceActiveModel {
         device_id: Set(SNOWFLAKE.next_id()),
-        device_type: Set(param.device_type),
-        // params: Set(Some(dev_params)),
-        gateway_id: Set(param.gateway_id),
+        integration: Set(param.integration),
         name: Set(param.name),
-        memo: Default::default(),
-        disabled: Set(false),
+        memo: Set(param.memo),
+        disabled: Set(true),
         source_platform: Set(SourcePlatform::Mijia.as_ref().to_string()),
         source_id: Set(Some(param.did.clone())),
+        device_type: Set(DeviceType::Normal),
+        params: Set(JsonValue::Object(Default::default())),
+        update_at: Set(DateTimeUtc::from(chrono::Local::now())),
         ..Default::default()
     };
 
@@ -267,25 +241,3 @@ pub async fn convert_to_iot_device(state: State<AppState>, Json(param): Json<MiC
 }
 
 
-//删除账号
-
-/*pub async fn delete_account(state: State<AppState>, Path(account): Path<String>) -> ApiResult<()> {
-    MiAccountEntity::delete()
-        .filter(MiAccountEntity::Account.eq(account))
-        .exec(state.conn())
-        .await?;
-    ok_data(())
-}*/
-
-/*
-
-
-
-
-/// 更新转换
-pub fn update_iot_device() {}
-
-/// 登入账号
-pub async fn login_mi_account() {}
-
-pub fn delete_device() {}*/

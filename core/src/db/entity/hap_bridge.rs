@@ -143,6 +143,7 @@ impl PrimaryKeyTrait for PrimaryKey {
 pub enum Relation {
     #[sea_orm(has_many = "super::hap_accessory::Entity")]
     HapAccessory,
+
 }
 
 // `Related` trait has to be implemented by hand
@@ -188,3 +189,5 @@ impl ActiveModelBehavior for ActiveModel {
         }
     }
 }
+#[derive(Copy, Clone, Debug, EnumIter, DeriveRelatedEntity)]
+pub enum RelatedEntity {}

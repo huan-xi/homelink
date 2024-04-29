@@ -1,14 +1,30 @@
 use std::ops::Deref;
-use std::sync::{Arc, Mutex};
-use dashmap::DashMap;
+use std::sync::{Arc};
 use sea_orm::DatabaseConnection;
-use crate::init::manager::template_manager::TemplateManager;
+use tokio::sync::{Mutex, oneshot, RwLock};
 use crate::init::Managers;
 
+#[derive(Default, Clone)]
+pub struct ServerShutdownSignal(pub Arc<Mutex<Option<oneshot::Sender<()>>>>);
+
+pub struct ServerShutdownSignal1{
+
+}
+
+impl ServerShutdownSignal {
+    pub async fn shutdown(&self) {
+        if let Some(sender) = self.0.lock().await.take() {
+            let _ = sender.send(());
+        } else {
+            log::warn!("ServerShutdownSignal::shutdown: already shutdown");
+        }
+    }
+}
 
 pub struct AppStateInner {
     conn: DatabaseConnection,
     managers: Managers,
+    pub server_shutdown_signal: Mutex<Option<ServerShutdownSignal>>,
 
 }
 
@@ -19,6 +35,7 @@ impl AppStateInner {
         Self {
             conn,
             managers,
+            server_shutdown_signal: Default::default(),
         }
     }
 

@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use axum::extract::{Path, State};
 /// hap_platform 元数据
 use hap_metadata::{convert_to_kebab_case, hap_metadata};
-use hap_metadata::metadata::HapService;
 use crate::api::output::{ApiResp, ApiResult, err_msg, ok_data};
 use crate::api::results::{CharacteristicMetaResult, ServiceMetaResult};
 use crate::api::state::AppState;
@@ -24,7 +23,7 @@ pub async fn get_characteristic_meta(state: State<AppState>, Path(hap_type): Pat
             err_msg("characteristic not found")
         }
         Some(c) => {
-            ok_data(CharacteristicMetaResult::from_ch(c, ""))
+            ok_data(CharacteristicMetaResult::from_ch(c, "")?)
         }
     }
 }
@@ -38,18 +37,19 @@ pub async fn get_service_meta(state: State<AppState>, Path(hap_type): Path<Strin
         Some(svc) => {
             let mut svc = svc.clone();
             let req = svc.characteristics.required_characteristics;
-            let required = req.iter()
-                .map(|c| {
+            let mut required = vec![];
+            for c in req.iter() {
+                let ch = state.hap_metadata.characteristics.get(c).unwrap();
+                required.push(CharacteristicMetaResult::from_ch(ch, c.as_str())?);
+            }
+            let mut optional = vec![];
+            if let Some(optional_characteristics) = svc.characteristics.optional_characteristics {
+                for c in optional_characteristics.iter() {
                     let ch = state.hap_metadata.characteristics.get(c).unwrap();
-                    CharacteristicMetaResult::from_ch(ch, c.as_str())
-                }).collect();
-            let optional = svc.characteristics.optional_characteristics
-                .unwrap_or(vec![])
-                .iter()
-                .map(|c| {
-                    let ch = state.hap_metadata.characteristics.get(c).unwrap();
-                    CharacteristicMetaResult::from_ch(ch, c.as_str())
-                }).collect();
+                    optional.push(CharacteristicMetaResult::from_ch(ch, c.as_str())?);
+                }
+            }
+
             ok_data(ServiceMetaResult { required, optional })
         }
     }
@@ -90,7 +90,7 @@ pub fn test_service() -> anyhow::Result<()> {
              v.name
          })
  */
-    let required = req.iter().map(|c| {
+/*    let required = req.iter().map(|c| {
         let ch = metadata.characteristics.get(c).unwrap();
         CharacteristicMetaResult::from_ch(ch, c.as_str())
         //svc.characteristics.required_characteristics_meta.push(c.clone());
@@ -98,7 +98,7 @@ pub fn test_service() -> anyhow::Result<()> {
     let res = ServiceMetaResult { required, optional: vec![] };
     // a.name = a.name.replace(" ", "").to_string();
     let str = serde_json::to_string(&a)?;
-    println!("{}", str);
+    println!("{}", str);*/
 
 
     Ok(())

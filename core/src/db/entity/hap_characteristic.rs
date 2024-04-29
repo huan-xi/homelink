@@ -189,3 +189,7 @@ impl Related<super::hap_service::Entity> for Entity {
 }
 
 impl ActiveModelBehavior for ActiveModel {}
+
+
+#[derive(Copy, Clone, Debug, EnumIter, DeriveRelatedEntity)]
+pub enum RelatedEntity {}

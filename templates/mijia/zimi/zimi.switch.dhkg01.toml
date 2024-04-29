@@ -1,0 +1,24 @@
+# https://home.miot-spec.com/s/zimi.switch.dhkg01
+# https://home.miot-spec.com/spec?type=urn:miot-spec-v2:device:outlet:0000A002:chuangmi-212a01:1
+id = "zimi.switch.dhkg01"
+version = "1.0.0"
+model = "zimi.switch.dhkg01"
+model_name = "小米米家智能开关（单开单控）"
+[[devices]]
+# 设备接入方式
+integration = "xiaomi_gw_mesh"
+memo = "开关"
+[devices.params]
+#调用超时时间
+timeout = 200
+# 配件
+[[devices.accessories]]
+category = "Switch"
+hap_delegate.model = "common.miot_spec_prop_mapping"
+hap_delegate.params = [{ ctag = "PowerState", siid = 2, piid = 1 }]
+# 配件下的服务
+[[devices.accessories.services]]
+# 插座服务
+service_type = "Switch"
+primary = true
+chars = [{ name = "on", char_type = "PowerState", memo = "开关" }]

@@ -1,10 +1,12 @@
+use std::collections::HashMap;
 use std::ops::Deref;
 use std::sync::{Arc};
+use std::time::Duration;
 use anyhow::anyhow;
 use dashmap::DashMap;
 use dashmap::mapref::entry::Entry;
 use impl_new::New;
-use log::error;
+use log::{error, info};
 use sea_orm::{DatabaseConnection, EntityTrait};
 use sea_orm::ActiveValue::Set;
 use tap::TapFallible;
@@ -21,8 +23,8 @@ use crate::db::entity::prelude::{MiAccountActiveModel, MiAccountEntity};
 /// 米家账号管理器
 /// todo 启动任务自动登入
 pub struct MiAccountManagerInner {
-    pub mi_cloud_map: DashMap<String, Arc<RwLock<MiCloud>>>,
-    proto_map: DashMap<String, Arc<CloudMiioProto>>,
+    pub mi_cloud_map: RwLock<HashMap<String, Arc<RwLock<MiCloud>>>>,
+    proto_map: RwLock<HashMap<String, Arc<CloudMiioProto>>>,
     conn: DatabaseConnection,
 }
 
@@ -30,7 +32,7 @@ pub struct MiAccountManagerInner {
 impl MiAccountManagerInner {
     pub async fn add_account(&self, username: String, password: String) -> anyhow::Result<()> {
         let cloud = Self::new_cloud(username.clone(), password).await?;
-        self.mi_cloud_map.insert(username, Arc::new(RwLock::new(cloud)));
+        self.mi_cloud_map.write().await.insert(username, Arc::new(RwLock::new(cloud)));
         Ok(())
     }
 
@@ -41,18 +43,23 @@ impl MiAccountManagerInner {
     }
     /// 获取cloud
     pub async fn get_cloud(&self, account: &str) -> anyhow::Result<Arc<RwLock<MiCloud>>> {
-        Ok(match self.mi_cloud_map.entry(account.to_string()) {
-            Entry::Occupied(v) => {
-                v.get().clone()
+        let cloud = self.mi_cloud_map.read().await.get(account).cloned();
+        Ok(match cloud {
+            Some(s) => {
+                s
             }
-            Entry::Vacant(entry) => {
-                let model = MiAccountEntity::find_by_id(entry.key())
+            None => {
+                let mut write = self.mi_cloud_map.write().await;
+                if let Some(s) = write.get(account) {
+                    return Ok(s.clone());
+                };
+                let model = MiAccountEntity::find_by_id(account)
                     .one(&self.conn)
                     .await?
-                    .ok_or(anyhow!("账号:{}不存在",account))?;
+                    .ok_or(anyhow!("账号:{}不存在", account))?;
                 let cloud = Self::new_cloud(model.account, model.password).await?;
                 let cloud = Arc::new(RwLock::new(cloud));
-                entry.insert(cloud.clone());
+                write.insert(account.to_string(), cloud.clone());
                 cloud
             }
         })
@@ -75,17 +82,21 @@ impl MiAccountManagerInner {
 
     /// 获取米家协议给设备
     pub async fn get_proto(&self, account: &str) -> Result<MiotSpecProtocolPointer, ExitError> {
-        Ok(match self.proto_map.entry(account.to_string()) {
-            Entry::Occupied(v) => {
-                v.get().clone()
+        let proto = self.proto_map.read().await.get(account).cloned();
+        Ok(match proto {
+            Some(s) => {
+                s.clone()
             }
-            Entry::Vacant(entry) => {
+            None => {
+                let mut write = self.proto_map.write().await;
+                if let Some(s) = write.get(account) {
+                    return Ok(s.clone());
+                };
                 let cloud = self.get_cloud(account).await
-                    .tap_err(|e| error!("获取米家云端失败:{}",e))
                     .map_err(|_| ExitError::CloudError)?;
-                let proto = CloudMiioProto::new(cloud.clone());
+                let proto = CloudMiioProto::new(cloud.clone(), Duration::from_secs(1));
                 let proto = Arc::new(proto);
-                entry.insert(proto.clone());
+                write.insert(account.to_string(), proto.clone());
                 proto
             }
         })
@@ -118,7 +129,7 @@ impl MiAccountManager {
     pub fn new(conn: DatabaseConnection) -> Self {
         Self {
             inner: Arc::new(MiAccountManagerInner {
-                mi_cloud_map: DashMap::new(),
+                mi_cloud_map: Default::default(),
                 proto_map: Default::default(),
                 conn,
             }),

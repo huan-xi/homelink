@@ -11,7 +11,7 @@ use tokio::select;
 use crate::proto::protocol::{ExitError};
 use tokio::sync::RwLock;
 use crate::device::common::emitter::MijiaEvent;
-use crate::device::miot_spec_device::{ BaseMiotSpecDevice, DeviceInfo, MiotDeviceType, MiotSpecDevice, MiotSpecDeviceWrapper};
+use crate::device::miot_spec_device::{BaseMiotSpecDevice, DeviceInfo, MiotDeviceType, MiotSpecDevice, MiotSpecDeviceWrapper};
 use crate::device::common::utils::get_poll_func;
 use crate::proto::miio_proto::{MiotSpecProtocolPointer};
 use crate::proto::transport::open_miio_mqtt_proto::OpenMiIOMqttSpecProtocol;
@@ -65,6 +65,7 @@ impl MiotSpecDevice for OpenMiioGatewayDeviceInner {
             while let Ok(msg) = p_arc.recv().recv().await {
                 let _ = self.base.tx.send(MijiaEvent::GatewayMsg(msg));
             };
+            error!("网关消息监听结束");
         };
 
         let poll = get_poll_func(self, self.info.did.as_str(), self.interval);
@@ -94,13 +95,13 @@ impl OpenMiioGatewayDeviceInner {
             .map_err(|_| ExitError::ConnectErr)?;
         let p_arc = Arc::new(proto);
         write.replace(p_arc.clone());
-        info!("连接网关 mqtt: {} 成功", ip);
+        info!("连接mqtt网关:{ip}成功");
         Ok(p_arc)
     }
 }
 
 impl OpenMiioGatewayDevice {
-    pub  fn new_open_gateway(info: DeviceInfo) -> anyhow::Result<Self> {
+    pub fn new_open_gateway(info: DeviceInfo) -> anyhow::Result<Self> {
         let _ = info.localip.clone()
             .ok_or(anyhow!("网关设备ip不能为空"))?;
         let base: BaseMiotSpecDevice = Default::default();

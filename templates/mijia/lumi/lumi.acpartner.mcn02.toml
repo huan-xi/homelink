@@ -1,0 +1,32 @@
+# https://home.miot-spec.com/s/lumi.acpartner.mcn02
+# https://home.miot-spec.com/spec?type=urn:miot-spec-v2:device:gateway:0000A019:lumi-mgl03:1
+id = "lumi.acpartner.mcn02"
+version = "1.0.0"
+model = "lumi.acpartner.mcn02"
+model_name = "米家空调伴侣2"
+model_icon = ""
+[[devices]]
+integration = "xiaomi_cloud"
+desc = "空调"
+[devices.params]
+timeout = 1000
+
+
+#配件
+[[devices.accessories]]
+#插座类型
+category = "AirConditioner"
+hap_delegate.model = "lumi.acpartner.mcn02"
+
+[[devices.accessories.services]]
+# 插座服务
+service_type = "Thermostat"
+primary = true
+chars = [
+    { char_type = "CurrentHeatingCoolingState" },
+    { char_type = "TargetHeatingCoolingState" },
+    { char_type = "CurrentTemperature", info = { min_value = 16, max_value = 30 } },
+    { char_type = "TargetTemperature", info = { min_value = 16, max_value = 30 } },
+    { char_type = "TemperatureDisplayUnits" },
+]
+

@@ -51,7 +51,7 @@ impl MiBleValueType {
             }
             _ => {
                 let bytes: [u8; 2] = edata.try_into()
-                    .map_err(|e| UnpackDataError("数据转换错误:{e}"))?;
+                    .map_err(|e| UnpackDataError(format!("数据转换错误:{e}")))?;
                 BleValue::I16(ValueLsbI16::unpack(&bytes)?.value)
             }
         })

@@ -24,7 +24,7 @@ impl IotDeviceManagerInner {
         //查米家设备
         let source_id = dev.source_id.ok_or(anyhow!("设备来源id不存在"))?;
         let (_, dev_info) = get_device_info(&self.conn, source_id.as_str()).await?;
-        let device_type = MiotDeviceType::from_str(dev.device_type.as_str())?;
+        let device_type = MiotDeviceType::from_str(dev.integration.as_str())?;
         return match device_type {
             MiotDeviceType::Ble => {
                 let ble_dev = BleDevice::new(dev_info, gw);
@@ -44,7 +44,7 @@ impl IotDeviceManagerInner {
     pub(crate) async fn init_mi_device_no_gw(&self, dev: IotDeviceModel) -> anyhow::Result<DevicePointer> {
         let source_id = dev.source_id.ok_or(anyhow!("米家设备来源id不存在"))?;
         let (account_id, param) = get_device_info(&self.conn, source_id.as_str()).await?;
-        let device_type = MiotDeviceType::from_str(dev.device_type.as_str())?;
+        let device_type = MiotDeviceType::from_str(dev.integration.as_str())?;
         return match device_type {
             MiotDeviceType::Wifi => {
                 return Ok(Arc::new(WifiDevice::new_wifi_device(param, dev.params)?));

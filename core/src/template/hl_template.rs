@@ -1,15 +1,53 @@
 use std::str::FromStr;
+use anyhow::anyhow;
 use sea_orm::{FromJsonQueryResult, JsonValue};
 use serde::{Deserialize, Serialize};
+use serde::de::DeserializeOwned;
+use strum_macros::EnumString;
 use hap::characteristic::{Format, Perm, Unit};
 use hap::HapType;
 use miot_proto::proto::miio_proto::MiotSpecId;
 use target_hap::hap_type_wrapper::HapTypeWrapper;
-use target_hap::types::CharIdentifier;
+use target_hap::types::{CharIdentifier, HapCharInfo, ModelDelegateParam};
 use crate::db::entity::hap_bridge::BridgeCategory;
+use crate::db::entity::iot_device::DeviceType;
+use crate::db::entity::prelude::HapCharacteristicModel;
+use crate::template::hap::accessory::AccessoryTemplate;
 use crate::unit_convertor::{UnitConvertor, UnitConvertorType};
 
-fn default_text() -> String {
+#[derive(serde::Deserialize, serde::Serialize, Debug)]
+pub enum TemplateFormat {
+    #[serde(rename = "yaml")]
+    Yaml,
+    #[serde(rename = "toml")]
+    Toml,
+}
+
+impl TemplateFormat {
+    pub fn parse<'a, T: DeserializeOwned>(&'a self, text: &'a str) -> anyhow::Result<T> {
+        Ok(match self {
+            TemplateFormat::Yaml => {
+                serde_yaml::from_str(text)?
+            }
+            TemplateFormat::Toml => {
+                toml::from_str(text)?
+            }
+        })
+    }
+    pub fn format_to_str<T: Serialize>(&self, value: &T) -> anyhow::Result<String> {
+        Ok(match self {
+            TemplateFormat::Yaml => serde_yaml::to_string(value)?,
+            TemplateFormat::Toml => toml::to_string(value)?,
+        })
+    }
+}
+
+pub(crate) fn default_text(str: &'static str) -> String {
+    str.to_string()
+}
+
+
+pub(crate) fn default_str() -> String {
     "default".to_string()
 }
 
@@ -50,13 +88,14 @@ impl FromStr for HlDeviceTemplate {
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct DeviceTemplate {
-    pub device_type: String,
-    #[serde(default = "default_text")]
+    pub integration: String,
+    #[serde(default = "default_str")]
     pub tag: String,
     pub interval: Option<u64>,
     /// 展示名称
-    #[serde(default)]
     pub display_name: Option<String>,
+    pub device_type: Option<DeviceType>,
+    pub disabled: Option<bool>,
     pub timeout: Option<u64>,
     #[serde(default)]
     pub poll_properties: Vec<MiotSpecId>,
@@ -66,84 +105,6 @@ pub struct DeviceTemplate {
     /// 配件
     #[serde(default)]
     pub accessories: Vec<AccessoryTemplate>,
-}
-
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct ModelDelegateParamTemplate {
-    /// 为空则设置所有的chars
-    pub chars: Option<Vec<CharIdentifier>>,
-    ///配件模型 接管读写事件
-    pub model: String,
-    ///unit convert 设置,stag,ctag-> convertor
-    /// 模型 运行时参数
-    pub params: Option<JsonValue>,
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct AccessoryTemplate {
-    /// 配件的类型
-    pub category: BridgeCategory,
-    #[serde(default = "default_text")]
-    pub tag: String,
-    #[serde(default)]
-    pub memo: Option<String>,
-    /// 配件的名称,默认取上一级
-    #[serde(default)]
-    pub name: Option<String>,
-    #[serde(default)]
-    pub hap_delegates: Vec<ModelDelegateParamTemplate>,
-
-    pub hap_delegate: Option<ModelDelegateParamTemplate>,
-
-    pub services: Vec<ServiceTemplate>,
-
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct ServiceTemplate {
-    /// 配件的类型
-    pub service_type: HapTypeWrapper,
-    pub chars: Vec<CharacteristicTemplate>,
-    #[serde(default = "default_text")]
-    pub tag: String,
-    #[serde(default)]
-    pub configured_name: Option<String>,
-    #[serde(default)]
-    pub memo: Option<String>,
-    #[serde(default = "default_false")]
-    pub primary: bool,
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct CharacteristicTemplate {
-    pub char_type: HapTypeWrapper,
-    #[serde(default)]
-    pub info: HapCharInfoTemp,
-    #[serde(default)]
-    pub name: Option<String>,
-    #[serde(default)]
-    pub memo: Option<String>,
-    /// 单位转换
-    pub convertor: Option<String>,
-    pub convertor_param: Option<JsonValue>,
-}
-
-
-#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize, Default)]
-pub struct HapCharInfoTemp {
-    pub format: Option<Format>,
-    pub unit: Option<Unit>,
-    pub min_value: Option<JsonValue>,
-    pub max_value: Option<JsonValue>,
-    pub step_value: Option<JsonValue>,
-    pub max_len: Option<u16>,
-    pub max_data_len: Option<u32>,
-    pub valid_values: Option<Vec<JsonValue>>,
-    pub valid_values_range: Option<Vec<JsonValue>>,
-    pub ttl: Option<u64>,
-    pub perms: Option<Vec<Perm>>,
-    pub pid: Option<u64>,
 }
 
 
@@ -157,7 +118,7 @@ pub mod test {
     use crate::db::entity::hap_accessory::Column::Category;
     use crate::hap::hap_type::MappingHapType;
     use crate::hap::hap_type::MappingHapType::SecuritySystemTargetState;
-    use crate::template::miot_template::HlDeviceTemplate;
+    use crate::template::hl_template::HlDeviceTemplate;
 
     #[tokio::test]
     pub async fn test() -> anyhow::Result<()> {

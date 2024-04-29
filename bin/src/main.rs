@@ -1,14 +1,13 @@
 #![allow(unused_variables)]
 
 use std::sync::Arc;
-use axum::Router;
+use axum::{Extension, Router};
 use log::{error, info};
-use tokio::select;
-use tokio::sync::oneshot;
+use tokio::sync::{Mutex, oneshot};
 use tower_http::services::ServeDir;
 use hl_integration::integration::HlSourceIntegrator;
 use lib::api::router;
-use lib::api::state::AppState;
+use lib::api::state::{AppState, ServerShutdownSignal};
 use lib::config::cfgs::Configs;
 use lib::config::context::{APP_CONTEXT, ApplicationContext, get_app_context};
 use lib::db::init::{db_conn, migrator_up};
@@ -21,6 +20,7 @@ use lib::init::{logger_init, Managers};
 use hap_metadata::hap_metadata;
 use lib::init::hap_init::init_hap_list;
 use lib::init::manager::ble_manager::BleManager;
+use lib::socketio::socket_io_layer;
 use target_hap::hap_manager::HapManage;
 use xiaomi_integration::integration::XiaomiIntegration;
 
@@ -31,13 +31,13 @@ use xiaomi_integration::integration::XiaomiIntegration;
 /// 映射米家设备到homekit设备
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    if let Err(e) = log4rs::init_file("log4rs.yaml", Default::default()) {
-        // 初始化默认日志
-        logger_init::init_logger();
-    }
+    // 初始化默认日志
+    logger_init::init_logger();
+
     //读取配置
     let config = Configs::init();
-    let addr = config.server.address.parse().expect("监听地址解析失败");
+    let addr = config.server.address.clone();
+
     // let addr = SocketAddr::new([0, 0, 0, 0].into(), 5514);
     let conn = db_conn(&config.server).await;
     //数据库版本迁移
@@ -65,22 +65,17 @@ async fn main() -> anyhow::Result<()> {
         template_manager: template_manager.clone(),
         ble_manager: ble_manager.clone(),
     });
+    // let schema = schema(conn.clone(), None, None)?;
+
+
 
     let app = Router::new()
+        // .route("/playground", get(graphql_playground))
+        // .route("/graphql", post(graphql_handler))
         .nest_service("/", ServeDir::new("dist/"))
         .nest("/api", router::api())
-        .with_state(app_state.clone());
-
-    //初始化js 引擎
-    /*    let js_engine = init_js_engine(config.server.data_dir.clone(), EnvContext {
-            info: "home gateway".to_string(),
-            version: "v1.0.0".to_string(),
-            #[cfg(feature = "deno")]
-            main_recv: None,
-            conn: conn.clone(),
-            dev_manager: device_manager.clone(),
-            hap_manager: hap_manager.clone(),
-        }).await?;*/
+        .with_state(app_state.clone())
+        .layer(socket_io_layer(app_state.clone()));
 
 
     let res = APP_CONTEXT.set(ApplicationContext {
@@ -95,67 +90,38 @@ async fn main() -> anyhow::Result<()> {
         panic!("APP_CONTEXT 初始化失败");
     }
     let context = get_app_context();
-    
+
     //初始化集成
     init_integration().await?;
-    
     init_hap_list(&conn, hap_manager.clone(), device_manager.clone()).await?;
-
-    let api_server =
-        axum::Server::bind(&addr)
-            .serve(app.into_make_service());
-    info!("api_server start at :{:?}", addr);
-    let (api_server_ch_send, api_server_ch) = oneshot::channel::<bool>();
-    tokio::spawn(async move {
-        if let Err(e) = api_server.await {
-            error!("api_server error:{:?}", e);
-        }
-        // 发送到通道
-        let _ = api_server_ch_send.send(false);
-    });
-
-
     // 初始化hap设备
     // 初始化模板
-
     template_manager.init().await?;
+    info!("api_server start at :{:?}", addr);
+    let (api_server_ch_send, api_server_ch) = oneshot::channel::<()>();
+    let shutdown_signal = ServerShutdownSignal(Arc::new(Mutex::new(Some(api_server_ch_send))));
+    app_state.server_shutdown_signal.lock().await.replace(shutdown_signal.clone());
+    let listener = tokio::net::TcpListener::bind(&addr)
+        .await?;
 
-    // init_iot_device_manager(&conn, device_manager.clone(), mi_account_manager.clone()).await?;
-    // 初始化hap 设备
-    // init::hap_init::init_hap_list(&conn, hap_manager.clone(), device_manager.clone()).await?;
+    let api_server =
+        axum::serve(listener, app.into_make_service())
+            .with_graceful_shutdown(async move {
+                let _ = api_server_ch.await;
+            });
 
-    // 等待引擎退出
-    // let recv = context.js_engine.resp_recv.subscribe();
-    /* let engin_statue = async {
-         while let Ok(event_type) = recv.recv().await {
-             if let EngineEventResp::Exit(str) = event_type {
-                 error!("js engine exit:{:?}", str);
-                 break;
-             }
-         }
-     };*/
-
-    loop {
-        select! {
-            // _ = engin_statue=> break,
-            _ = api_server_ch => {
-                info!("api server recv resp");
-                break;
-            }
-        }
+    if let Err(e) = api_server.await {
+        error!("api_server error:{:?}", e);
     }
-
-    // api_server_ch.await?;
     // context.js_engine.close().await;
     // 服务停止
     drop(app_state);
-    // let _ = js_tx.send(0);
     device_manager.close().await;
     hap_manager.close().await;
     Ok(())
 }
 
-async fn init_integration() ->anyhow::Result<()>{
+async fn init_integration() -> anyhow::Result<()> {
     let integration = XiaomiIntegration {};
     integration.init()?;
     Ok(())

@@ -17,7 +17,7 @@ use crate::types::HapCharInfo;
 
 pub struct HapTask {
     sender: tokio::sync::oneshot::Sender<bool>,
-    server: IpServer,
+    pub server: IpServer,
 }
 
 pub struct AccessoryRelation {
@@ -45,10 +45,10 @@ pub struct AccessoryInfo {
 /// 移除device 必须移除其对应的hap 设备
 
 pub struct HapManageInner{
-    hap_mata: Arc<HapMetadata>,
-    server_map: dashmap::DashMap<i64, HapTask>,
+    pub hap_mata: Arc<HapMetadata>,
+    pub server_map: dashmap::DashMap<i64, HapTask>,
     // 配件id关系
-    accessory_map: dashmap::DashMap<u64, AccessoryInfo>,
+    pub accessory_map: dashmap::DashMap<u64, AccessoryInfo>,
     // 每个配件同时只能运行一个
     // aid_ch_map: dashmap::DashMap<u64, ChannelInfo>,
     /// 配件与设备的关系

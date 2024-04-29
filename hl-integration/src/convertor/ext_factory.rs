@@ -1,17 +1,13 @@
 use std::collections::HashMap;
-use std::sync::Arc;
 use anyhow::anyhow;
 use once_cell::sync::OnceCell;
 use crate::convertor::buildin::kelvin_to_mired_convertor::KelvinToMiredConvertor;
-use crate::convertor::ext::{ConvertorExt, ConvertorExtConstructor, ConvertorExtPointer};
+use crate::convertor::ext::{ConvertorExtConstructor, ConvertorExtPointer};
 use crate::JsonValue;
 
 pub static CONVERTOR_FACTORY: OnceCell<UnitConvertorFactory> = OnceCell::new();
 
-// fn new(param: JsonValue) -> anyhow::Result<ConvertorExtPointer>
 pub type ConvertorConstructorFunc = fn(param: JsonValue) -> anyhow::Result<ConvertorExtPointer>;
-
-// pub type AccessoryModelExtConstructorFunc = fn(ContextPointer, Option<serde_json::Value>) -> anyhow::Result<HapModelExtPointer>;
 /// 单位转换器工厂
 
 pub struct UnitConvertorFactory {

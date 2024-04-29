@@ -50,10 +50,12 @@ impl RetryInfo {
         *write = 0;
     }
     pub async fn get(&self) -> u32 {
-        let read = self.retry_count.lock().await;
+        let count_read = self.retry_count.lock().await;
         // 产生1-1000 随机数
         let rand = rand::random::<u32>() % 1000 + 1;
-        let t = 2u32.pow(*read - 1) * 1000;
+        let t = 2u32.checked_pow(*count_read - 1)
+            .and_then(|x| x.checked_mul(1000))
+            .unwrap_or(self.max_interval);
         min(t, self.max_interval) + rand
     }
 }

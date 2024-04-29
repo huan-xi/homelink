@@ -1,12 +1,19 @@
 use anyhow::Error;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
+use impl_new::New;
 use log::error;
 use sea_orm::DbErr;
 use strum_macros::Display;
 use thiserror::Error;
 use miot_proto::device::miot_spec_device::NotSupportMiotDeviceError;
 use crate::api::output::ApiResp;
+
+#[derive(Debug,New)]
+pub struct ApiErrorInner {
+    pub code: i32,
+    pub msg: String,
+}
 
 #[derive(Debug, Error)]
 pub enum ApiError {
@@ -24,6 +31,10 @@ pub enum ApiError {
     MiotDeviceError(NotSupportMiotDeviceError),
     #[error("btleplug error {0}")]
     BtlePlugError(#[from] btleplug::Error),
+    #[error("{0}")]
+    BadRequest(String),
+    #[error("ApiErrorInner")]
+    ApiErrorInner(ApiErrorInner),
 }
 
 impl From<NotSupportMiotDeviceError> for ApiError {
@@ -43,6 +54,21 @@ impl IntoResponse for ApiError {
         match self {
             ApiError::Msg(msg) => ApiResp::<()>::with_err(msg.as_str()).into_response(),
             ApiError::StrMsg(msg) => ApiResp::<()>::with_err(msg).into_response(),
+            ApiError::BadRequest(msg) => ApiResp::<()>::with_err(msg.as_str()).into_response(),
+            ApiError::ApiErrorInner(inner) => {
+                ApiResp::<()>::with_code(inner.code,inner.msg).into_response()
+            }
+            ApiError::DbErr(err) => {
+                match err {
+                    DbErr::RecordNotUpdated => {
+                        ApiResp::<()>::with_err("记录未更新,可能数据不存在").into_response()
+                    }
+                    _ => {
+                        error!("数据库错误:{:?}", err);
+                        ApiResp::<()>::with_err("数据库错误").into_response()
+                    }
+                }
+            }
             _ => {
                 error!("服务器异常:{:?}", self);
                 ApiResp::<()>::with_err("服务器异常").into_response()

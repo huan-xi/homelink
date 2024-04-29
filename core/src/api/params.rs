@@ -1,20 +1,22 @@
+pub mod power;
+pub mod template;
+
 use std::str::FromStr;
-use anyhow::anyhow;
 use sea_orm::ActiveValue::Set;
-use sea_orm::{ActiveValue, JsonValue, NotSet};
+use sea_orm::JsonValue;
+use serde::Serialize;
 use crate::hap::hap_type::MappingHapType;
 use serde_aux::prelude::deserialize_number_from_string;
-use crate::db::entity::hap_characteristic::{BleToSensorParam, DbBleValueType, MappingMethod, MappingParam, PropMappingParam};
+use crate::db::entity::hap_characteristic::HapCharInfoQueryResult;
 use serde_aux::prelude::deserialize_option_number_from_string;
-use hap::characteristic::Format;
-use hap::HapType;
 use target_hap::hap_type_wrapper::HapTypeWrapper;
-use crate::db::entity::common::{Property, PropertyVec};
+use target_hap::types::HapCharInfo;
+use crate::db::entity::common::PropertyVec;
 use crate::db::entity::hap_bridge::BridgeCategory;
-use crate::db::entity::iot_device::IotDeviceType;
+use crate::db::entity::iot_device::SourcePlatform;
 use crate::db::entity::prelude::{HapAccessoryActiveModel, HapCharacteristicActiveModel};
 use crate::init::manager::template_manager::BridgeMode;
-// use crate::init::manager::template_manager::BridgeMode;
+use crate::template::hl_template::TemplateFormat;
 
 #[derive(serde::Deserialize, Debug)]
 pub struct LoginParam {
@@ -63,18 +65,28 @@ pub struct MiConvertByTemplateParam {
 #[derive(serde::Deserialize, Debug)]
 pub struct MiConvertToIotParam {
     /// did
-    pub id: String,
     pub did: String,
-    pub device_type: String,
     pub name: String,
-    #[serde(default, deserialize_with = "deserialize_option_number_from_string")]
-    pub gateway_id: Option<i64>,
+    pub integration: String,
+    pub memo: Option<String>,
 }
 
 
 #[derive(serde::Deserialize, Debug)]
 pub struct QueryIotDeviceParam {
-    pub device_type: Option<IotDeviceType>,
+    pub device_type: Option<Vec<String>>,
+    pub is_gateway: Option<bool>,
+    pub source_platform: Option<SourcePlatform>,
+}
+
+#[derive(serde::Deserialize, Debug)]
+pub struct EditDeviceParam {
+    pub device_type: Option<String>,
+    #[serde(deserialize_with = "deserialize_option_number_from_string")]
+    pub gateway_id: Option<i64>,
+    pub name: Option<String>,
+    pub is_gateway: Option<bool>,
+    pub memo: Option<String>,
 }
 
 #[derive(serde::Deserialize, Debug)]
@@ -84,6 +96,13 @@ pub struct TestPropParam {
     #[serde(deserialize_with = "deserialize_number_from_string")]
     pub piid: i32,
     pub value: Option<JsonValue>,
+}
+
+
+
+#[derive(serde::Deserialize, Debug)]
+pub struct GetTemplateParam {
+    pub format: TemplateFormat,
 }
 
 #[derive(serde::Deserialize, Debug)]
@@ -97,33 +116,7 @@ pub struct AddServiceParam {
     pub characteristics: Vec<CharacteristicParam>,
 }
 
-#[derive(serde::Deserialize, Debug)]
-pub struct AddHapAccessoryParam {
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    device_id: i64,
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    bridge_id: i64,
-    name: String,
-    memo: Option<String>,
-    disabled: Option<bool>,
-    category: BridgeCategory,
-    listening_props: PropertyVec,
-}
 
-impl AddHapAccessoryParam {
-    pub fn into_model(self) -> anyhow::Result<HapAccessoryActiveModel> {
-        Ok(HapAccessoryActiveModel {
-            device_id: Set(self.device_id),
-            bridge_id: Set(self.bridge_id),
-            name: Set(self.name),
-            memo: Set(self.memo),
-            disabled: Set(self.disabled.unwrap_or(false)),
-            category: Set(self.category),
-            update_at: Set(chrono::Local::now().naive_local()),
-            ..Default::default()
-        })
-    }
-}
 
 
 #[derive(serde::Deserialize, Debug)]
@@ -131,42 +124,21 @@ pub struct CharacteristicParam {
     #[serde(default, deserialize_with = "deserialize_option_number_from_string")]
     pub cid: Option<i64>,
     pub characteristic_type: String,
-    pub mapping_method: MappingMethod,
-    pub mapping_property: Option<PropMappingParam>,
+    pub info: HapCharInfo,
     pub name: Option<String>,
-    pub ble_value_type: Option<DbBleValueType>,
-    pub format: String,
-    pub unit: Option<String>,
-    pub min_value: Option<JsonValue>,
-    pub max_value: Option<JsonValue>,
-    pub max_len: Option<JsonValue>,
-    // pub unit_convertor: Option<UnitConvertor>,
-    // pub convertor_param: Option<ConvertorParamType>,
+    pub convertor: Option<String>,
 }
 
 impl CharacteristicParam {
     pub fn into_model(self, service_id: i64) -> anyhow::Result<HapCharacteristicActiveModel> {
-        let mapping_param = match &self.mapping_method {
-            MappingMethod::PropMapping => {
-                Some(match self.mapping_property.clone() {
-                    None => {
-                        return Err(anyhow!("mapping_property 不能为空"));
-                    }
-                    Some(s) => {
-                        MappingParam::PropMapping(s)
-                    }
-                })
-            }
-            _ => None,
-        };
-        let format: Format = serde_json::from_str(format!("\"{}\"", self.format.as_str()).as_str())
-            .map_err(|e| anyhow!("格式转换错误:{:?}", e))?;
+        // let format: Format = serde_json::from_str(format!("\"{}\"", self.format.as_str()).as_str()).map_err(|e| anyhow!("格式转换错误:{:?}", e))?;
         let model = HapCharacteristicActiveModel {
             cid: Default::default(),
             characteristic_type: Set(self.characteristic_type.clone()),
-            name: Set(self.name),
             service_id: Set(service_id),
             disabled: Set(false),
+            convertor: Set(self.convertor),
+            info: Set(HapCharInfoQueryResult(self.info)),
             ..Default::default()
         };
 
@@ -176,43 +148,14 @@ impl CharacteristicParam {
 }
 
 
-#[derive(serde::Deserialize, Debug)]
-pub struct HapBridgeListParam {
-    #[serde(default)]
-    pub single_accessory: Option<bool>,
-}
+
 
 #[derive(serde::Deserialize, Debug)]
 pub struct DisableParam {
     pub disabled: bool,
 }
 
-#[derive(serde::Deserialize, Debug)]
-pub struct UpdateHapAccessoryParam {
-    pub name: String,
-    pub memo: Option<String>,
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub bridge_id: i64,
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub device_id: i64,
-    pub category: BridgeCategory,
-    // pub script: Option<String>,
-    // pub register_props: PropertyVec,
-}
 
-impl UpdateHapAccessoryParam {
-    pub fn into_model(self, id: i64) -> anyhow::Result<HapAccessoryActiveModel> {
-        Ok(HapAccessoryActiveModel {
-            aid: Set(id),
-            name: Set(self.name),
-            memo: Set(self.memo),
-            category: Set(self.category),
-            bridge_id: Set(self.bridge_id),
-            device_id: Set(self.device_id),
-            ..Default::default()
-        })
-    }
-}
 
 
 #[derive(serde::Deserialize, Debug)]

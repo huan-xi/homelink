@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use anyhow::anyhow;
 
-use log::{info};
+use log::{debug, info};
 use serde_json::json;
 use hl_integration::{JsonValue, SourceDevicePointer};
 use miot_proto::device::ble::ble_device::BleDevice;
@@ -43,22 +43,25 @@ impl AccessoryModelExtConstructor for ModelExt {
 
 #[async_trait::async_trait]
 impl HapModelExt for ModelExt {
+    fn is_subscribe_event(&self) -> bool { false }
     async fn read_chars_value(&self, params: Vec<CharReadParam>) -> ReadValueResult {
         let types: Vec<HapType> = params.iter()
             .map(|i| i.ctag.clone())
             .collect();
-        info!("read_chars_value:{:?}", types);
+        debug!("read_chars_value:{:?}", types);
         let mut result = vec![];
+        let dev = self.dev.as_ble_device()?;
+
         for param in params.into_iter() {
             let value = match param.ctag {
                 HapType::CurrentTemperature => {
-                    let value = self.dev.as_ble_device()?
+                    let value = dev
                         .get_value(MiBleValueType::Temperature)
                         .await;
                     value.map(|v| json!(v.as_u64() as f32/ 10.0))
                 }
                 HapType::CurrentRelativeHumidity => {
-                    let value = self.dev.as_ble_device()?
+                    let value = dev
                         .get_value(MiBleValueType::Humidity)
                         .await;
                     value.map(|v| json!(v.as_u64() as f32/ 10.0))
@@ -66,11 +69,13 @@ impl HapModelExt for ModelExt {
                 _ => None,
             };
             result.push(CharReadResult {
+                sid: param.sid,
                 cid: param.cid,
-                success: true,
+                success: value.is_some(),
                 value,
             });
         }
+        debug!("ble_value_mapping read_chars_value result:{:?}", result);
         Ok(result)
     }
 

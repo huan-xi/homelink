@@ -1,0 +1,18 @@
+version: "3"
+services:
+  homelink:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: registry.cn-zhangjiakou.aliyuncs.com/hp-proxy/homelink:latest
+    network_mode: host
+    privileged: true
+    volumes:
+      - ./data:/data   # 冒号左边请修改为你想保存配置的路径
+      - ./docker_log4rs.yaml:/app/log4rs.yaml
+    environment:
+      - PUID=0    # 想切换为哪个用户来运行程序，该用户的uid
+      - PGID=0    # 想切换为哪个用户来运行程序，该用户的gid
+      - UMASK=000 # 掩码权限，默认000，可以考虑设置为022
+    restart: always
+    container_name: homelink

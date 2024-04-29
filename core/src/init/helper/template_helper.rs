@@ -1,12 +1,16 @@
 use anyhow::anyhow;
 use sea_orm::ActiveValue::Set;
+use sea_orm::NotSet;
 use target_hap::types::{CharIdentifier, HapCharInfo, ModelDelegateParam};
 use crate::db::entity::hap_accessory::ModelDelegateParamVec;
 use crate::db::entity::hap_characteristic::HapCharInfoQueryResult;
-use crate::db::entity::iot_device::SourcePlatform;
+use crate::db::entity::iot_device::{DeviceType, SourcePlatform};
 use crate::db::entity::prelude::{HapAccessoryActiveModel, HapCharacteristicActiveModel, HapServiceActiveModel, IotDeviceActiveModel, IotDeviceModel, MiotDeviceModel};
 use crate::db::SNOWFLAKE;
-use crate::template::miot_template::{AccessoryTemplate, CharacteristicTemplate,  DeviceTemplate, ServiceTemplate};
+use crate::template::hap::accessory::AccessoryTemplate;
+use crate::template::hap::chars::HapCharacteristicTemplate;
+use crate::template::hap::service::ServiceTemplate;
+use crate::template::hl_template::{  DeviceTemplate};
 
 #[derive(Clone)]
 pub struct AccessoryCtx {
@@ -16,7 +20,8 @@ pub struct AccessoryCtx {
 }
 
 pub fn to_service_model(aid: i64, sid: i64, svc: &ServiceTemplate) -> anyhow::Result<HapServiceActiveModel> {
-    Ok(HapServiceActiveModel {
+    todo!();
+  /*  Ok(HapServiceActiveModel {
         id: Set(sid),
         tag: Set(Some(svc.tag.clone())),
         accessory_id: Set(aid),
@@ -24,11 +29,11 @@ pub fn to_service_model(aid: i64, sid: i64, svc: &ServiceTemplate) -> anyhow::Re
         configured_name: Set(svc.configured_name.clone()),
         service_type: Set(svc.service_type.to_string()),
         memo: Set(svc.memo.clone()),
-        primary: Set(svc.primary),
-    })
+        primary: Set(svc.primary.unwrap_or(false)),
+    })*/
 }
 
-pub fn to_char_model(sid: i64, char: &CharacteristicTemplate, default: HapCharInfo) -> anyhow::Result<HapCharacteristicActiveModel> {
+pub fn to_char_model(sid: i64, char: &HapCharacteristicTemplate, default: HapCharInfo) -> anyhow::Result<HapCharacteristicActiveModel> {
     let info_temp = char.info.clone();
     let info = HapCharInfo {
         format: info_temp.format.unwrap_or(default.format),
@@ -62,9 +67,10 @@ pub fn to_char_model(sid: i64, char: &CharacteristicTemplate, default: HapCharIn
 }
 
 pub fn to_accessory_model(ctx: AccessoryCtx, accessory: &AccessoryTemplate) -> anyhow::Result<HapAccessoryActiveModel> {
-    //Vec<ModelDelegateParam>
+    todo!();
+    /*//Vec<ModelDelegateParam>
     let mut delegates = accessory.hap_delegates.clone();
-    if let Some(s)=accessory.hap_delegate.clone() {
+    if let Some(s) = accessory.hap_delegate.clone() {
         delegates.push(s);
     }
     if delegates.len() > 1 && delegates.get(0).as_ref().unwrap().chars.is_none() {
@@ -113,7 +119,7 @@ pub fn to_accessory_model(ctx: AccessoryCtx, accessory: &AccessoryTemplate) -> a
         create_at: Set(chrono::Local::now().naive_local()),
         update_at: Set(chrono::Local::now().naive_local()),
         ..Default::default()
-    })
+    })*/
 }
 
 
@@ -131,12 +137,13 @@ pub fn to_device_model(ctx: DeviceModelCtx, device: &DeviceTemplate) -> anyhow::
     Ok(IotDeviceActiveModel {
         device_id: Set(ctx.device_id),
         tag: Set(Some(device.tag.clone())),
-        device_type: Set(device.device_type.clone()),
+        integration: Set(device.integration.clone()),
         params: Set(device.params.clone()),
         gateway_id: Default::default(),
         name: Set(ctx.name),
         memo: Set(device.memo.clone()),
-        disabled: Set(false),
+        disabled: Set(device.disabled.unwrap_or(false)),
+        device_type: Set(device.device_type.clone().unwrap_or(DeviceType::Normal)),
         source_platform: Set(SourcePlatform::Mijia.as_ref().to_string()),
         source_id: Set(Some(ctx.did.clone())),
         temp_id: Set(Some(ctx.id)),

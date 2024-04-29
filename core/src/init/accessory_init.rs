@@ -3,7 +3,9 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use anyhow::anyhow;
+use log::{error, info};
 use sea_orm::*;
+use tap::TapFallible;
 use tokio::sync::RwLock;
 
 use hap::accessory::{AccessoryInformation, HapAccessory};
@@ -74,13 +76,16 @@ pub(crate) async fn init_hap_accessory<'a, C: ConnectionTrait>(conn: &C, hap_man
         for char in chars.iter() {
             if let Some(conv) = char.convertor.clone() {
                 let conv = get_unit_convertor_factory()
-                    .get_convertor(conv.as_str(), char.convertor_param.clone())?;
+                    .get_convertor(conv.as_str(), char.convertor_param.clone())
+                    .tap_err(|_| error!("单位转换器:{conv}不存在"))?;
                 let t = HapTypeWrapper::from_str(&char.characteristic_type)?;
                 let cid = CharIdentifier::new(svc.tag.clone().unwrap_or("default".to_string()), t);
                 convertor_map.insert(cid, UnitConvertor::new(conv));
             };
         }
     }
+    info!("aid:{aid}:convertor_map:{:?}",convertor_map.keys());
+
 
     // 初始化配件 委托 model
     let model = init_hap_delegate(aid, hap_accessory.clone(), &device, hap_manage.clone(), convertor_map).await?;
@@ -94,16 +99,33 @@ pub(crate) async fn init_hap_accessory<'a, C: ConnectionTrait>(conn: &C, hap_man
 
 
     // 设置读写值,监听器
-    for service in services.into_iter() {
+    for svc_chs in services.into_iter() {
         let ctx = InitServiceContext {
             aid,
             sid: cid,
-            stag: service.0.tag.clone(),
+            stag: svc_chs.0.tag.clone(),
             device: device.clone(),
             accessory: accessory.clone(),
             hap_manage: hap_manage.clone(),
         };
-        let len = crate::init::hap_init::add_service(ctx, service).await?;
+        //检测是否存在未填的特征
+        let required_characteristics = hap_manage.hap_mata.services
+            .get(svc_chs.0.service_type.as_str())
+            .ok_or(anyhow!("服务类型:{}不存在",svc_chs.0.service_type))?
+            .characteristics.required_characteristics
+            .clone();
+
+        for char_type in required_characteristics {
+            if !svc_chs.1.iter().any(|ch| ch.characteristic_type == char_type) {
+                return Err(anyhow!("配件:{},服务:{}未找到必填特征:{}",name,svc_chs.0.service_type,char_type));
+            }
+        }
+
+
+        // let req = svc_meta.characteristics.required_characteristics;
+
+
+        let len = crate::init::hap_init::add_service(ctx, svc_chs).await?;
         cid += len as u64 + 1;
         // 转成服务, 服务需要服务类型和服务的必填特征
     }

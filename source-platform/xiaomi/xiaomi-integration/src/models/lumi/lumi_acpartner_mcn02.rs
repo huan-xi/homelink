@@ -80,11 +80,8 @@ impl HapModelExt for ModelExt {
                     None
                 }
             };
-            result.push(CharReadResult {
-                cid: param.cid,
-                success: true,
-                value,
-            });
+
+            result.push(CharReadResult::success(&param, value));
         }
         info!("read result:{:?}", result);
 
@@ -97,7 +94,7 @@ impl HapModelExt for ModelExt {
             .map(|i| (i.ctag.clone(), i.old_value.clone(), i.new_value.clone()))
             .collect();
         info!("update value:{:?}", types);
-        let results = vec![];
+        let mut results = vec![];
         for param in params {
             match param.ctag {
                 HapType::TargetHeatingCoolingState => {
@@ -117,9 +114,17 @@ impl HapModelExt for ModelExt {
                     self.dev.set_property(self.target_temperature, param.new_value.clone()).await?;
                     self.ctx.hap_manager.update_char_value_by_id(self.ctx.aid, param.sid, HapType::CurrentTemperature, param.new_value).await?;
                 }
-                _ => {}
+                _ => {
+                    warn!("未处理的更新类型:{:?}", param.ctag);
+                }
             };
+            results.push(CharUpdateResult {
+                cid: param.cid,
+                success: true,
+            });
         }
+
+
         Ok(results)
     }
 }

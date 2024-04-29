@@ -8,8 +8,10 @@ RUN apt update && apt install -y ca-certificates
 #USER myuser
 WORKDIR /app
 COPY ./dist /app/dist
-COPY ./log4rs.yaml /app/log4rs.yaml
+COPY ./templates /templates
 COPY ./docker_config.toml /app/config.toml
-COPY ./target/release/bin /app/homelink
+COPY ./target/x86_64-unknown-linux-musl/release/homelink /app/homelink
+
+
 
 CMD ["/app/homelink"]

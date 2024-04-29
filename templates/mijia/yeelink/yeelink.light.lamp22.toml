@@ -1,0 +1,143 @@
+# https://home.miot-spec.com/s/yeelink.light.lamp22
+# https://home.miot-spec.com/spec?type=urn:miot-spec-v2:device:outlet:0000A002:chuangmi-212a01:1
+id = "yeelink.light.lamp22"
+version = "1.0.0"
+model = "yeelink.light.lamp22"
+model_name = "米家智能显示器挂灯1S"
+fw_version = ""
+model_icon = ""
+[[devices]]
+# 设备接入方式
+integration = "xiaomi_wifi"
+desc = "显示器挂灯"
+[devices.params]
+#轮询间隔
+interval = 60_000
+#轮询属性
+poll_properties = [
+    # on
+    { siid = 2, piid = 1 },
+    # brightness
+    { siid = 2, piid = 2 },
+    # color temperature
+    { siid = 2, piid = 3 },
+    # 24   Default Power On State
+    #mode
+    { siid = 2, piid = 5 },
+]
+#调用超时时间
+timeout = 200
+
+# 配件
+[[devices.accessories]]
+#插座类型
+category = "Lightbulb"
+hap_delegate.model = "common.miot_spec_prop_mapping"
+hap_delegate.params = [
+    { stag = "Light0", ctag = "PowerState", siid = 2, piid = 1 },
+    { stag = "Light0", ctag = "Brightness", siid = 2, piid = 2 },
+    #2700-6500
+    { stag = "Light0", ctag = "ColorTemperature", siid = 2, piid = 3 },
+]
+# 配件下的服务
+[[devices.accessories.services]]
+service_type = "Lightbulb"
+primary = true
+tag = "Light0"
+# 配件下的服务的特征
+[[devices.accessories.services.chars]]
+memo = "电源"
+char_type = "PowerState"
+[[devices.accessories.services.chars]]
+memo = "亮度"
+char_type = "Brightness"
+[[devices.accessories.services.chars]]
+memo = "色温"
+name = "color-temperature"
+char_type = "ColorTemperature"
+convertor = "kelvin_to_mired"
+info = { min_value = 15, max_value = 370 }
+# ---------------- 模式按钮 ------------------------------------------------
+#5 - Reading
+#6 - Office
+#7 - Leisure
+#8 - Warmth
+#9 - Computer
+[[devices.accessories]]
+#插座类型
+category = "Switch"
+desc = "显示器挂灯-模式"
+name = "显示器挂灯-模式"
+tag = "mode"
+
+[[devices.accessories.hap_delegates]]
+model = "common.mode_switch"
+#模型 参数
+params.on = { siid = 2, piid = 1 }
+params.mode = { siid = 2, piid = 5 }
+params.mode_map = { "Reading" = 5, "Office" = 6, "Leisure" = 7, "Warmth" = 8, "Computer" = 9 }
+
+
+# 将模式配置成多个开关,
+[[devices.accessories.services]]
+# 插座服务
+service_type = "Switch"
+configured_name = "阅读模式"
+tag = "Reading"
+# 配件下的服务的特征
+chars = [
+    { name = "on", memo = "开关", char_type = "PowerState" }
+]
+
+#--------------------------------------------------------------------------------
+[[devices.accessories.services]]
+# 插座服务
+service_type = "Switch"
+configured_name = "办公模式"
+tag = "Office"
+# 配件下的服务的特征
+chars = [
+    { name = "on", memo = "开关", char_type = "PowerState" }
+]
+
+#--------------------------------------------------------------------------------
+[[devices.accessories.services]]
+# 插座服务
+service_type = "Switch"
+configured_name = "休闲模式"
+tag = "Leisure"
+# 配件下的服务的特征
+chars = [
+    { name = "on", memo = "开关", char_type = "PowerState" }
+]
+#--------------------------------------------------------------------------------
+
+[[devices.accessories.services]]
+# 插座服务
+service_type = "Switch"
+configured_name = "温馨模式"
+tag = "Warmth"
+# 配件下的服务的特征
+chars = [
+    { name = "on", memo = "开关", char_type = "PowerState" }
+]
+#--------------------------------------------------------------------------------
+
+[[devices.accessories.services]]
+# 插座服务
+service_type = "Switch"
+configured_name = "电脑模式"
+tag = "Computer"
+chars = [
+    { name = "on", memo = "开关", char_type = "PowerState" }
+]
+
+[[devices.accessories.services]]
+# 插座服务
+service_type = "Switch"
+configured_name = "闪烁模式"
+tag = "Flash"
+# 配件下的服务的特征
+chars = [
+    { name = "on", memo = "开关", char_type = "PowerState" }
+]

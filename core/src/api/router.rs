@@ -25,13 +25,15 @@ pub fn api() -> Router<AppState> {
             "/hap_characteristic",
             Router::new()
                 .route("/", post(controller::hap_characteristic::add))
-                .route("/:id", put(controller::hap_characteristic::update))
+                .route("/", put(controller::hap_characteristic::update))
                 .route("/:id", delete(controller::hap_characteristic::delete))
                 .route("/list/:id", get(controller::hap_characteristic::list))
                 .route("/disable/:id", put(controller::hap_characteristic::disable))
 
             ,
         )
+        .nest("/source_device", Router::new()
+            .route("/list", get(controller::source_device::list)))
         .nest("/iot_device",
               Router::new()
                   .route("/list", get(controller::iot_device::list))
@@ -40,23 +42,31 @@ pub fn api() -> Router<AppState> {
                   .route("/:id", delete(controller::iot_device::delete))
                   .route("/set_property/:id", post(controller::iot_device::set_property))
                   .route("/read_property/:id", post(controller::iot_device::read_property))
-              // .route("/", post(controller::iot_device::add_device))
+                  .route("/", put(controller::iot_device::edit_device))
               ,
         )
         .nest("/hap_bridge",
               Router::new()
+                  .route("/:id", get(controller::hap_bridge::get_detail))
+                  .route("/template/:id", get(controller::hap_bridge::get_template))
+                  .route("/template", post(controller::hap_bridge::add_by_template))
+                  .route("/template", put(controller::hap_bridge::update_by_template))
                   .route("/list", get(controller::hap_bridge::list))
                   .route("/disable/:id", put(controller::hap_bridge::disable))
                   .route("/restart/:id", put(controller::hap_bridge::restart))
                   .route("/reset/:id", put(controller::hap_bridge::reset))
                   .route("/:id", delete(controller::hap_bridge::delete))
                   .route("/", post(controller::hap_bridge::add))
+                  .route("/", put(controller::hap_bridge::update))
               ,
         )
         .nest("/hap_accessory",
               Router::new()
                   .route("/list", get(controller::hap_accessory::list))
                   .route("/", post(controller::hap_accessory::add))
+                  .route("/", put(controller::hap_accessory::update))
+                  .route("/template/:id", get(controller::hap_accessory::get_template))
+                  .route("/template", put(controller::hap_accessory::update_by_template))
                   .route("/:id", get(controller::hap_accessory::detail))
                   .route("/disable/:id", put(controller::hap_accessory::disable))
                   .route("/:id", delete(controller::hap_accessory::delete))
@@ -68,10 +78,9 @@ pub fn api() -> Router<AppState> {
             ))
         .nest("/miot_device",
               Router::new()
-
                   .route("/list", get(controller::miot_device::list))
                   .route("/templates/:model", get(controller::miot_device::templates))
-                  .route("/convert", post(controller::miot_device::convert_to_iot_device))
+                  .route("/access", post(controller::miot_device::access))
                   .route("/convert_by_template", post(controller::miot_device::convert_by_template))
                   .route("/handshake", post(controller::miot_device::handshake))
                   .route("/accounts", get(controller::miot_device::accounts))
@@ -92,11 +101,19 @@ pub fn api() -> Router<AppState> {
                   .route("/characteristic_meta/:hap_type", get(controller::hap_metadata::get_characteristic_meta))
                   .route("/service_meta/:hap_type", get(controller::hap_metadata::get_service_meta))
               ,
-        ).nest("/native_ble_device",
+        )
+        .nest("/template",
               Router::new()
-                  .route("/list", get(controller::native_ble_device::list))
+                  .route("/:id", get(controller::template::get))
+                  .route("/check_update", post(controller::template::check_template_update))
+                  .route("/check_add", post(controller::template::check_template_add))
+                  .route("/text/:id", get(controller::template::get_text))
               ,
         )
-
-
+        .nest("/native_ble",
+              Router::new()
+                  .route("/list", get(controller::native_ble_device::list))
+                  .route("/status", get(controller::native_ble_device::status))
+              ,
+        )
 }

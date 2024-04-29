@@ -8,34 +8,39 @@ use crate::api::state::AppState;
 use crate::db::entity::prelude::{HapAccessoryActiveModel, HapAccessoryEntity, HapCharacteristicActiveModel, HapCharacteristicColumn, HapCharacteristicEntity, HapCharacteristicModel, HapServiceColumn, HapServiceEntity, HapServiceModel};
 use sea_orm::{ActiveModelTrait, EntityTrait, PaginatorTrait, QueryFilter};
 use crate::api::params::{CharacteristicParam, AddServiceParam, DisableParam};
+use crate::api::params::power::power_add_param::PowerAddParam;
+use crate::api::params::power::power_update_param::PowerUpdateParam;
 use crate::api_err;
 use crate::db::SNOWFLAKE;
 
 
-pub async fn update(state: State<AppState>, Path(id): Path<i64>, Json(param): Json<CharacteristicParam>) -> ApiResult<()> {
-    let cid = param.cid.ok_or(api_err!("cid不能为空"))?;
-    let mut model = param.into_model(id)?;
-    model.cid = Set(cid);
+pub async fn update(state: State<AppState>, Json(param): Json<PowerUpdateParam>) -> ApiResult<()> {
+    let mut model = param.to_active_model::<HapCharacteristicEntity, HapCharacteristicActiveModel>()?;
     model.not_set(HapCharacteristicColumn::ServiceId);
     model.update(state.conn()).await?;
     Ok(ApiResp::with_data(()))
 }
 
-pub async fn add(state: State<AppState>, Path(id): Path<i64>, Json(param): Json<CharacteristicParam>) -> ApiResult<()> {
-    let service_id = id;
+pub async fn add(state: State<AppState>, Json(param): Json<PowerAddParam>) -> ApiResult<()> {
+    let mut active_model = param.to_active_model::<HapCharacteristicEntity, HapCharacteristicActiveModel>()?;
+
+    let service_id = active_model.service_id.clone().take().ok_or(api_err!("服务id不能为空"))?;
+    let characteristic_type = active_model.characteristic_type.clone().take().ok_or(api_err!("特征类型不能为空"))?;
+
     let count = HapCharacteristicEntity::find()
         .filter(HapCharacteristicColumn::ServiceId.eq(service_id)
-            .and(HapCharacteristicColumn::CharacteristicType.eq(param.characteristic_type.clone())))
-        .count(state.conn()).await?;
+            .and(HapCharacteristicColumn::CharacteristicType.eq(characteristic_type.clone())))
+        .count(state.conn())
+        .await?;
     if count > 0 {
-        return err_msg_string(format!("服务已存在特征类型:{:?}", param.characteristic_type));
+        return err_msg_string(format!("服务已存在特征类型:{:?}", characteristic_type.as_str()));
     }
 
     // SwitchService::new();
     info!("param:{:?}", param);
-    let mut model = param.into_model(service_id)?;
-    model.cid = Set(SNOWFLAKE.next_id());
-    HapCharacteristicEntity::insert(model).exec(state.conn()).await?;
+    active_model.cid = Set(SNOWFLAKE.next_id());
+    active_model.disabled = Set(false);
+    HapCharacteristicEntity::insert(active_model).exec(state.conn()).await?;
     return Ok(ApiResp::with_data(()));
 }
 

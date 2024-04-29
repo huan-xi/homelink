@@ -14,7 +14,6 @@ pub type NewCharacteristicFunc = fn(u64, u64) -> IotCharacteristic;
 
 
 impl IotCharacteristic {
-
     pub fn new(id: u64, accessory_id: u64, hap_type: HapType) -> Self {
         Self(Characteristic::<CharacteristicValue> {
             id,
@@ -53,7 +52,9 @@ impl HapCharacteristic for IotCharacteristic {
     fn set_description(&mut self, description: Option<String>) {
         HapCharacteristic::set_description(&mut self.0, description)
     }
-
+    fn set_raw_value(&mut self, value: serde_json::Value) -> hap::Result<()> {
+        HapCharacteristic::set_raw_value(&mut self.0, value)
+    }
     fn get_event_notifications(&self) -> Option<bool> { HapCharacteristic::get_event_notifications(&self.0) }
 
     fn set_event_notifications(&mut self, event_notifications: Option<bool>) {

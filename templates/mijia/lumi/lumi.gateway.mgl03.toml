@@ -1,0 +1,71 @@
+# https://home.miot-spec.com/s/lumi.gateway.mgl03
+# https://home.miot-spec.com/spec?type=urn:miot-spec-v2:device:gateway:0000A019:lumi-mgl03:1
+id = "lumi.gateway.mgl03"
+version = "1.0.0"
+model = "lumi.gateway.mgl03"
+model_name = "小米智能多模网关"
+model_icon = ""
+[[devices]]
+integration = "xiaomi_gw_mqtt"
+desc = "网关"
+tag = "gateway"
+[devices.params]
+timeout = 500
+
+# ------------------------- 安防系统 -------------------------
+
+[[devices]]
+# 设备接入方式
+integration = "xiaomi_wifi"
+name = "安防系统"
+tag = "security_system"
+[devices.params]
+#轮询间隔
+interval = 60_000
+#轮询属性
+poll_properties = [
+    # on
+    { siid = 3, piid = 1 },
+    # alarm
+    { siid = 3, piid = 22 },
+]
+#调用超时时间
+timeout = 200
+# 配件
+[[devices.accessories]]
+#插座类型
+category = "SecuritySystem"
+hap_delegate.model = "lumi.gateway.mgl03"
+#hap_delegates = [{ model = "lumi.gateway.mgl03" }]
+# 配件下的服务
+[[devices.accessories.services]]
+# 插座服务
+service_type = "SecuritySystem"
+primary = true
+# 配件下的服务的特征
+[[devices.accessories.services.chars]]
+name = "security-system-state.current"
+memo = "安防系统当前状态"
+char_type = "SecuritySystemCurrentState"
+[devices.accessories.services.chars.info]
+format = "uint8"
+# 读写权限
+perms = ["ev", "pr"]
+min_value = 0
+max_value = 4
+step_value = 4
+valid_values = [0, 1, 2, 3, 4]
+[[devices.accessories.services.chars]]
+
+mapping_method = "AccessoryModel"
+name = "security-system-state.target"
+memo = "安防系统target状态"
+char_type = "SecuritySystemTargetState"
+[devices.accessories.services.chars.info]
+format = "uint8"
+# 读写权限
+perms = ["ev", "pr", "pw"]
+min_value = 0
+max_value = 4
+step_value = 4
+valid_values = [0, 1, 2, 3, 4]

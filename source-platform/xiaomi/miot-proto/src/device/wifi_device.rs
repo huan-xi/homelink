@@ -1,3 +1,4 @@
+use std::cmp::{max, min};
 use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
@@ -116,8 +117,11 @@ impl WifiDevice {
             },
             info,
             proto: Arc::new(RwLock::new(None)),
-            interval: Duration::from_secs(wifi_param.interval.unwrap_or(120)),
-            timeout: Duration::from_millis(wifi_param.timeout.unwrap_or(2000)),
+            interval: Duration::from_secs(wifi_param.interval
+                .map(|i| max(i, 1))
+                .unwrap_or(120)),
+
+            timeout: Duration::from_millis(wifi_param.timeout.unwrap_or(2_000)),
         };
         Ok(MiotSpecDeviceWrapper(Box::new(inner), MiotDeviceType::Wifi))
     }

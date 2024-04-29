@@ -1,13 +1,15 @@
+use std::fmt::format;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
 use anyhow::anyhow;
 
-use log::{debug, error};
+use log::{debug, error, trace};
+use rand::Rng;
 // use paho_mqtt::{AsyncClient, Message};
 // use paho_mqtt as mqtt;
 // pub use paho_mqtt::Message as MqttMessage;
-use rumqttc::{AsyncClient, Event, EventLoop, Incoming, MqttOptions, QoS};
+use rumqttc::{AsyncClient, ConnectionError, Event, EventLoop, Incoming, MqttOptions, QoS};
 use serde_json::{Map, Value};
 use tokio::sync::broadcast::{Receiver, Sender};
 use tokio::sync::Mutex;
@@ -23,14 +25,21 @@ pub struct OpenMiIOMqttSpecProtocol {
     // pub receiver: Arc<RwLock<async_channel::Receiver<Option<Message>>>>,
     msg_sender: Sender<JsonMessage>,
     id: AtomicU64,
-    /// Device token
+    /// 等待数据超时时间
     timeout: Duration,
+
 }
 
 impl OpenMiIOMqttSpecProtocol {
     pub async fn new(ip: &str, port: u32) -> anyhow::Result<Self> {
-        let mut mqttoptions = MqttOptions::new("homelink", ip, port as u16);
+        // mqtt_timeout: Duration,
+        let random_number: u32 = {
+            let mut rng = rand::thread_rng();
+            rng.gen_range(10000..99999)
+        };
+        let mut mqttoptions = MqttOptions::new(format!("homelink-{random_number}"), ip, port as u16);
         mqttoptions
+            // mqtt 超时时间
             .set_keep_alive(Duration::from_secs(5))
             .set_manual_acks(false);
 
@@ -85,82 +94,55 @@ impl MiotSpecProtocol for OpenMiIOMqttSpecProtocol {
     async fn start_listen(&self) {
         match self.event_loop.try_lock() {
             Ok(mut event_loop) => {
-                while let Ok(notification) = event_loop.poll().await {
-                    match notification {
-                        Event::Incoming(incoming) => {
-                            if let Incoming::Publish(msg) = incoming {
-                                let topic = msg.topic.as_str();
-                                // debug!("Received topic:{} message: {}",topic, msg.payload.len());
-                                match String::from_utf8(msg.payload.to_vec()) {
-                                    Ok(str) => {
-                                        match topic {
-                                            "central/report" | "miio/command_ack" => {
-                                                match serde_json::from_str::<Map<String, Value>>(str.as_str()) {
-                                                    Ok(data) => {
-                                                        let _ = self.msg_sender.send(
-                                                            JsonMessage {
-                                                                data,
+                loop {
+                    match event_loop.poll().await {
+                        Ok(notification) => {
+                            match notification {
+                                Event::Incoming(incoming) => {
+                                    if let Incoming::Publish(msg) = incoming {
+                                        let topic = msg.topic.as_str();
+                                        trace!("Received topic:{} message: {}",topic, msg.payload.len());
+                                        match String::from_utf8(msg.payload.to_vec()) {
+                                            Ok(str) => {
+                                                match topic {
+                                                    "central/report" | "miio/command_ack" | "miio/report" => {
+                                                        trace!("Received topic:{} message str: {}",topic, str.as_str());
+                                                        match serde_json::from_str::<Map<String, Value>>(str.as_str()) {
+                                                            Ok(data) => {
+                                                                let _ = self.msg_sender.send(
+                                                                    JsonMessage {
+                                                                        data,
+                                                                    }
+                                                                );
                                                             }
-                                                        );
+                                                            Err(err) => {
+                                                                error!("解析数据失败: {:?},str:{}", err,str);
+                                                            }
+                                                        }
                                                     }
-                                                    Err(err) => {
-                                                        error!("解析数据失败: {:?},str:{}", err,str);
-                                                    }
-                                                }
+                                                    _ => {}
+                                                };
                                             }
-                                            _ => {}
-                                        };
-                                    }
-                                    Err(e) => {
-                                        error!("解析数据失败: {:?}", e);
-                                    }
+                                            Err(e) => {
+                                                error!("解析数据失败: {:?}", e);
+                                            }
+                                        }
+                                    };
                                 }
-                            };
+                                Event::Outgoing(_) => {}
+                            }
                         }
-                        Event::Outgoing(_) => {}
+                        Err(e) => {
+                            error!("mqtt读取数据失败{},客户端断开", e);
+                            break;
+                        }
                     }
-
                 }
             }
             Err(_e) => {
                 error!("获取event_loop 失败");
             }
         }
-
-
-        // let receiver = self.receiver.clone();
-        // let sender = &self.msg_sender;
-        // let mut write = receiver.write().await;
-    /*    while let Some(msg) = write.next().await {
-            if let Some(msg) = msg {
-                //命令确定
-                //"central/report"
-                // "miio/command_ack"
-                //转到sender
-                let str = msg.payload_str().to_string();
-                debug!("Received topic:{} message: {}", msg.topic(), msg.payload_str());
-                match msg.topic() {
-                    "central/report" | "miio/command_ack" => {
-                        match serde_json::from_str::<Map<String, Value>>(str.as_str()) {
-                            Ok(data) => {
-                                let _ = self.msg_sender.send(
-                                    JsonMessage {
-                                        data,
-                                    }
-                                );
-                            }
-                            Err(err) => {
-                                error!("解析数据失败: {:?},str:{}", err,str);
-                            }
-                        }
-                    }
-                    _ => {}
-                };
-
-                // if msg.topic().eq("central/report") || msg.topic().eq("miio/command_ack") {}
-            }
-        }*/
-        error!("读取数据失败,mqtt 客户端断开");
     }
 }
 
@@ -181,15 +163,15 @@ mod test {
         let mut mqttoptions = MqttOptions::new("rumqtt-async", "192.168.68.24", 1883);
         mqttoptions.set_keep_alive(Duration::from_secs(5));
 
-        let (mut client, mut eventloop) = AsyncClient::new(mqttoptions, 10);
+        let (mut client, mut eventloop) = AsyncClient::new(mqttoptions, 1024);
         client.subscribe("#", QoS::AtMostOnce).await.unwrap();
 
-        task::spawn(async move {
-            for i in 0..10 {
-                client.publish("hello/rumqtt", QoS::AtLeastOnce, false, vec![i; i as usize]).await.unwrap();
-                time::sleep(Duration::from_millis(100)).await;
-            }
-        });
+        /*  task::spawn(async move {
+              for i in 0..10 {
+                  client.publish("hello/rumqtt", QoS::AtLeastOnce, false, vec![i; i as usize]).await.unwrap();
+                  time::sleep(Duration::from_millis(100)).await;
+              }
+          });*/
 
         while let Ok(notification) = eventloop.poll().await {
             info!("Received = {:?}", notification);

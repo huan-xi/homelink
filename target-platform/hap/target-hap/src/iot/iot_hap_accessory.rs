@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use impl_new::New;
+use log::info;
 
 use serde::{Serialize, Serializer};
 use serde::ser::SerializeStruct;
@@ -46,6 +47,12 @@ pub struct IotHapAccessory {
     pub model_ext: Option<HapAccessoryDelegateModel>,
     reads_map: HashMap<Vec<u64>, Arc<OnReadsFn>>,
     updates_map: HashMap<Vec<u64>, Arc<OnUpdatesFn>>,
+}
+
+impl Drop for IotHapAccessory {
+    fn drop(&mut self) {
+        info!("IotHapAccessory drop");
+    }
 }
 
 impl IotHapAccessory {

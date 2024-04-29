@@ -106,7 +106,7 @@ impl AccessoryModelExt for ModelExt {
                         .tap_err(|e| warn!("蓝牙数据 unpack value error:{:?}", e))
                         .ok();
                     result.push(CharReadResult {
-                        cid: param.cid,
+                        sid: param.sid,cid: param.cid,
                         success: true,
                         value,
                     });
@@ -131,7 +131,7 @@ impl AccessoryModelExt for ModelExt {
                 _ => {}
             }
             result.push(CharUpdateResult {
-                cid: param.cid,
+                sid: param.sid,cid: param.cid,
                 success: true,
             })
         }

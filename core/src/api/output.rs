@@ -1,5 +1,5 @@
 use std::fmt::Debug;
-use axum::body::{Body, BoxBody};
+use axum::body::{Body};
 use axum::http::{header, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Response};
 use serde::Serialize;
@@ -55,14 +55,13 @@ impl<T> IntoResponse for ApiResp<T>
         let json_string = match to_json_string(&data) {
             Ok(v) => v,
             Err(e) => {
-
                 let body = Body::from(e.to_string());
-                let box_body = axum::body::boxed(body);
+                // let box_body = axum::body::boxed(body);
                 // let body = Body::from(e.to_string());
                 return Response::builder()
                     .status(StatusCode::INTERNAL_SERVER_ERROR)
                     .header("content-type", "application/json")
-                    .body(box_body)
+                    .body(body)
                     .unwrap();
             }
         };
@@ -90,7 +89,14 @@ pub fn err_msg<T>(str: &'static str) -> ApiResult<T> {
     Err(ApiError::StrMsg(str))
 }
 
-
+pub fn output_data<T>(data: T, code: i32) -> ApiResult<T> {
+    Ok(ApiResp {
+        code,
+        data: Some(data),
+        total: None,
+        msg: "success".to_string(),
+    })
+}
 
 pub fn ok_data<T>(data: T) -> ApiResult<T> {
     Ok(ApiResp {
@@ -102,6 +108,14 @@ pub fn ok_data<T>(data: T) -> ApiResult<T> {
 }
 
 impl ApiResp<()> {
+    pub fn with_code(code: i32, msg: String) -> Self {
+        Self {
+            code,
+            data: None,
+            total: None,
+            msg,
+        }
+    }
     pub fn with_err(err: &str) -> Self {
         Self {
             code: -1,

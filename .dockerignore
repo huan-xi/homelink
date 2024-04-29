@@ -1,7 +1,4 @@
-/target/debug
-/target/expend
-/target/release/build
-/target/release/deps
+/target
 /core/examples
 #/target
 /.idea

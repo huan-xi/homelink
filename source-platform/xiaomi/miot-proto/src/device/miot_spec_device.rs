@@ -73,6 +73,7 @@ pub struct BaseMiotSpecDevice {
     pub tx: broadcast::Sender<MijiaEvent>,
     // Arc<RwLock<DataEmitter<EventType>>>
     pub(crate) emitter: DeviceEventEmitter,
+
     pub retry_info: RetryInfo,
 }
 
@@ -192,13 +193,6 @@ pub trait MiotSpecDevice: Sync + Send {
         &self.get_base().emitter
     }
 
-    // 添加指定格式的数据监听器
-    // async fn emit(&self, event: EventType) {
-    //     self.get_base().emitter.write().await.emit(event).await
-    // }
-    // async fn add_listener(&self, listener: DataListener<EventType>) {
-    //     self.get_base().emitter.write().await.add_listener(listener)
-    // }
 }
 
 

@@ -16,7 +16,7 @@ hap = { path = "../target-platform/hap/hap-rs" }
 xiaomi-ble-packet = { path = "../source-platform/xiaomi/xiaomi-ble-packet" }
 hex = "0.4.3"
 anyhow = "1.0.76"
-tokio = { workspace = true }
+tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros"] }
 md5 = { version = "0.7.0", features = [] }
 aes = { version = "0.7.5", features = [] }
 log = { workspace = true }
@@ -32,17 +32,14 @@ lazy_static.workspace = true
 strum.workspace = true
 strum_macros.workspace = true
 axum.workspace = true
-toml = "0.8.8"
 log4rs = { version = "1.2.0", features = ["default"] }
 
-
-
-
+toml = "0.8.8"
 #axum = "0.7.3"
 #axum-extra = "0.9.0"
 #axum-server = "0.4.6"
 dashmap = "5.5.3"
-sea-orm = { version = "0.12.10", features = ["macros", "runtime-tokio-native-tls", "with-chrono"] }
+
 rand = "0.7.3"
 futures-util = "0.3.30"
 
@@ -57,7 +54,7 @@ num_enum = "0.7.2"
 bimap = { version = "0.6.3", features = ["serde"] }
 uuid = { version = "0.8", features = ["v4", "serde"] }
 #deno_runtime = { workspace = true}
-deno_runtime = { workspace = true, optional = true }
+#deno_runtime = { workspace = true, optional = true }
 once_cell = { workspace = true }
 derive_builder = "0.12.0"
 rust-embed.workspace = true
@@ -67,9 +64,26 @@ thiserror = "1.0.56"
 tower-http.workspace = true
 url = "2.4.1"
 async-recursion = "1.0.5"
-btleplug = "0.11.5"
+btleplug = {version = "0.11.5",features = ["serde"]}
+jsonwebtoken = "9.2.0"
+#async-graphql-axum = "6.0.11"
+#async-graphql = { version = "6.0.11", features = ["decimal", "chrono", "dataloader", "dynamic-schema"] }
+#seaography = { version = "1.0.0-rc.2", features = ["with-decimal", "with-chrono"] }
+#seaography = { path = "../seaography" ,features = ["default","with-json","with-chrono","with-decimal"] }
+socketioxide.workspace = true
+
+
+sea-orm = { version = "0.12.10", features = ["macros", "runtime-tokio-native-tls", "with-chrono"] }
+tracing = "0.1.40"
+serde_yaml = "0.9.32"
 #dirs = "5.0.1"
 #url = "2.1"
+# 仓库中的bug
+#[dependencies.seaography]
+#git = "https://github.com/SeaQL/seaography.git"
+#branch = "main"
+#features = ["with-decimal", "with-chrono"]
+
 [dev-dependencies]
 
 [features]
@@ -78,5 +92,5 @@ default = ["sqlite", ]
 #mysql = ["sea-orm/sqlx-mysql"]
 #postgres = ["sea-orm/sqlx-postgres"]
 sqlite = ["sea-orm/sqlx-sqlite"]
-deno = ["deno_runtime"]
-#deno = []
+#deno = ["deno_runtime"]
+deno = []

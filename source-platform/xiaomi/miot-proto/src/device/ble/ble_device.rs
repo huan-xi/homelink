@@ -1,6 +1,6 @@
 use anyhow::anyhow;
 use hex::FromHex;
-use log::error;
+use log::{error, info, trace};
 use packed_struct::PackedStruct;
 use serde_json::{json, Value};
 use tokio::sync::RwLock;
@@ -56,6 +56,7 @@ impl<T: AsMiotDevice> HlDevice for BleDevice<T> {
 
         while let Ok(MijiaEvent::GatewayMsg(msg)) = recv.recv().await {
             /// 收到数据
+            trace!("收到网关数据:{:?}", msg);
             let data = msg.get_json_data();
             if let Some(method) = data.get("method") {
                 //异步蓝牙事件
@@ -142,23 +143,6 @@ impl<T: AsMiotDevice> BleDevice<T> {
             }
             //  数据提交
             self.values.write().await.extend(ble_value.clone());
-            /*          for (tp, value) in ble_value.value_map.into_iter() {
-                          match self.spec_map.get_by_right(&tp) {
-                              None => {
-                                  debug!("emit empty:{:?}", tp);
-                              }
-                              Some(ps) => {
-                                  let event = EventType::UpdateProperty(MiotSpecDTO {
-                                      did: self.info.did.clone(),
-                                      siid: ps.siid,
-                                      piid: ps.piid,
-                                      value: Some(value),
-                                  });
-
-                                  self.emit(event).await;
-                              }
-                          };
-                      }*/
         }
     }
 

@@ -79,7 +79,7 @@ impl HapModelExt for ModelExt {
                 }
             };
             result.push(CharReadResult {
-                cid: param.cid,
+                sid: param.sid,cid: param.cid,
                 success: true,
                 value,
             })

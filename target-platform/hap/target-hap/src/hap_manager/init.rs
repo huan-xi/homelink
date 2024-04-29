@@ -11,6 +11,20 @@ use crate::HapAccessoryPointer;
 use crate::types::HapCharInfo;
 
 impl HapManageInner {
+    /// 移除配件
+    pub async fn remove_accessory(&self, aid: u64) ->anyhow::Result<()>{
+        let info = self.accessory_map.remove(&aid);
+        if let Some((_, info)) = info {
+            let bid = info.bid;
+            if let Some(server) = self.server_map.get_mut(&bid) {
+                server.server.remove_accessory(aid).await?;
+            };
+            info!("移除配件:{},bid:{}", aid, bid);
+        };
+        Ok(())
+    }
+
+    /// 获取连接
     pub fn get_bridge_server_peer(&self, bid: i64) -> Option<pointer::Peers> {
         self.server_map.get(&bid)
             .map(|i| i.server.peers_pointer().clone())
@@ -58,9 +72,7 @@ impl HapManageInner {
                         }
                         Some(c) => {
                             match c.set_value(value).await {
-                                Ok(_) => {
-                                    info!("设置特征值成功");
-                                }
+                                Ok(_) => {}
                                 Err(e) => {
                                     warn!("设置特征值失败:{:?}",e);
                                 }
@@ -79,7 +91,7 @@ impl HapManageInner {
             .tap_err(|e| error!("{}",e))?
             .accessory.clone();
 
-        tokio::spawn(async move{
+        tokio::spawn(async move {
             // let services = &accessory.service_tag_map;
             // let mut char_ids = HashMap::new();
             let mut lock = accessory.write().await;
@@ -106,7 +118,6 @@ impl HapManageInner {
     //         .map(|i| i.ch_id)
     //         .ok_or(anyhow!("未运行js脚本"))
     // }
-
 
 
     pub fn push_server(&self, bid: i64, server: IpServer, accessories: Vec<AccessoryRelation>) {
