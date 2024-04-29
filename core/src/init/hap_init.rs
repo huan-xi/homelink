@@ -58,8 +58,9 @@ pub async fn add_hap_bridge(conn: &DatabaseConnection, bridge: HapBridgeModel, m
     hap_config.redetermine_local_ip();
     storage.save_config(&hap_config).await?;
 
+    let mdns = manage.get_mdns().await?;
 
-    let server = IpServer::new(hap_config, storage).await?;
+    let server = IpServer::new(hap_config, storage, mdns).await?;
     if is_single_accessory {
         //取设备上的属性覆盖
         let accessories = HapAccessoryEntity::find()

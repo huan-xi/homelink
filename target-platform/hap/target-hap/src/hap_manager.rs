@@ -5,12 +5,13 @@ mod default_char_info;
 use std::collections::HashMap;
 use std::ops::Deref;
 use std::sync::Arc;
-use hap::HapType;
+use tokio::sync::Mutex;
+use hap::{HapType, MdnsResponder, pointer, RawMdnsResponder};
+use hap::pointer::MdnsResponderPtr;
 use hap::server::IpServer;
 use hap_metadata::hap_metadata;
 use hap_metadata::metadata::HapMetadata;
 use hl_integration::hl_device::manager::ISourceDeviceManager;
-// use hl_integration::hl_device::manager::IDeviceManager;
 use crate::hap_manager::default_char_info::get_default_type_info_map;
 use crate::HapAccessoryPointer;
 use crate::types::HapCharInfo;
@@ -44,7 +45,7 @@ pub struct AccessoryInfo {
 /// hap_platform 设备管理器
 /// 移除device 必须移除其对应的hap 设备
 
-pub struct HapManageInner{
+pub struct HapManageInner {
     pub hap_mata: Arc<HapMetadata>,
     pub server_map: dashmap::DashMap<i64, HapTask>,
     // 配件id关系
@@ -54,12 +55,32 @@ pub struct HapManageInner{
     /// 配件与设备的关系
     dev_aid_map: dashmap::DashMap<i64, u64>,
     default_type_info_map: HashMap<HapType, HapCharInfo>,
+
+    mdns_responder: Mutex<Option<Arc<Mutex<RawMdnsResponder>>>>,
 }
 
 
 #[derive(Clone)]
-pub struct HapManage{
+pub struct HapManage {
     inner: Arc<HapManageInner>,
+}
+
+impl HapManage {
+    pub async fn get_mdns(&self) -> anyhow::Result<Arc<Mutex<RawMdnsResponder>>> {
+        let mut prt = self.mdns_responder.lock().await;
+        let raw = match prt.as_ref() {
+            Some(s) => {
+                s.clone()
+            }
+            None => {
+                let raw = hap::RawMdnsResponder::new()?;
+                let arc = Arc::new(Mutex::new(raw));
+                *prt = Some(arc.clone());
+                arc
+            }
+        };
+        Ok(raw)
+    }
 }
 
 impl HapManage {
@@ -74,6 +95,7 @@ impl HapManage {
                 accessory_map: Default::default(),
                 dev_aid_map: Default::default(),
                 default_type_info_map,
+                mdns_responder: Default::default(),
             })
         }
     }
