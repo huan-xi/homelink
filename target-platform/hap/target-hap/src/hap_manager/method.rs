@@ -3,7 +3,6 @@ use hap::server::Server;
 use crate::hap_manager::HapManageInner;
 
 impl HapManageInner {
-
     pub async fn close(&self) {}
     pub async fn stop_server(&self, bid: i64) -> anyhow::Result<()> {
         if let Some((_, task)) = self.server_map.remove(&bid) {

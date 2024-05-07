@@ -12,6 +12,7 @@ use dashmap::DashMap;
 use log::error;
 use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, DatabaseTransaction, EntityTrait, IntoActiveModel, NotSet, QueryFilter, TransactionTrait, TryIntoModel};
 use sea_orm::ActiveValue::Set;
+use serde::{Deserialize, Serialize};
 use target_hap::hap_manager::HapManage;
 
 use crate::config::context::get_data_dir;
@@ -33,9 +34,11 @@ pub struct TemplateManagerInner {
     // platform_templates: DashMap<SourcePlatform, u8>,
     ///model 和模板的映射
     pub templates: DashMap<String, HlDeviceTemplate>,
+    hap_manager: HapManage,
+    conn: DatabaseConnection,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SourcePlatformModel {
     ///米家模型
     MiHome(MiotDeviceModel),
@@ -55,13 +58,16 @@ pub enum BridgeMode {
 
 #[derive(Clone)]
 pub struct ApplyTemplateOptions {
+    pub(crate) template: HlDeviceTemplate,
+    pub(crate) bridge_id: Option<i64>,
     pub(crate) platform: SourcePlatformModel,
+    /*
     pub(crate) id: String,
     pub hap_manager: HapManage,
     //米家模型
     pub bridge_mode: BridgeMode,
     pub bridge_id: Option<i64>,
-    pub gateway_id: Option<i64>,
+    pub gateway_id: Option<i64>,*/
 }
 
 impl TemplateManagerInner {
@@ -145,28 +151,26 @@ impl TemplateManagerInner {
     }
 
     /// 应用模板
-    pub async fn apply_template(&self, conn: &DatabaseConnection, options: &ApplyTemplateOptions) -> anyhow::Result<()> {
+    pub async fn apply_template(&self, options: ApplyTemplateOptions) -> anyhow::Result<Vec<i64>> {
         // self.mihome_templates.get(model).map(|v| v.clone())
 
-        match &options.platform {
+        Ok(match &options.platform {
             SourcePlatformModel::MiHome(model) => {
-                self.apply_mihome_template(conn, model, &options).await?;
+                self.apply_mihome_template(model, &options).await?
             }
-        }
-        Ok(())
+        })
     }
     /// 应用米家模板
-    pub async fn apply_mihome_template(&self, conn: &DatabaseConnection, model: &MiotDeviceModel, option: &ApplyTemplateOptions) -> anyhow::Result<()> {
-        let temp = self.templates
-            .get(option.id.as_str())
-            .ok_or(anyhow!("模板不存在"))?
-            .clone();
+    pub async fn apply_mihome_template(&self, model: &MiotDeviceModel, option: &ApplyTemplateOptions) -> anyhow::Result<Vec<i64>> {
+        let temp = &option.template;
         //开启事务
-        let txn = conn.begin().await?;
+        let txn = self.conn.begin().await?;
         let batch_id = SNOWFLAKE.next_id();
+        let mut dev_ids = vec![];
         for device in temp.devices.iter() {
             let device_id = SNOWFLAKE.next_id();
-            let name = device.display_name.clone().unwrap_or(model.name.clone());
+            //去设备名称
+            let name = device.name.clone().unwrap_or(model.name.clone());
             let mut dev_ctx = DeviceModelCtx {
                 device_id,
                 name: name.clone(),
@@ -177,23 +181,25 @@ impl TemplateManagerInner {
             };
             let dev_model = to_device_model(dev_ctx.clone(), device)?;
             //判断是否更新
-            dev_ctx.device_id = save_or_update_device_model(&txn, temp.id.as_str(), dev_model).await?;
 
+            dev_ctx.device_id = save_or_update_device_model(&txn, temp.id.as_str(), dev_model).await?;
+            dev_ids.push(dev_ctx.device_id);
             //创建配件
             for accessory in device.accessories.iter() {
                 let mut aid = SNOWFLAKE.next_id();
                 //桥接器
-                let bridge_id = match option.bridge_mode {
-                    BridgeMode::Parent => {
-                        option.bridge_id
-                            .ok_or(anyhow!("未设置桥接器"))?
-                    }
-                    BridgeMode::Singer => {
-                        //创建桥接器
-                        let model = create_hap_bridge(&txn, None, accessory.category, name.clone(), true).await?;
-                        model.bridge_id
-                    }
-                };
+                let bridge_id = option.bridge_id.ok_or(anyhow!("未设置桥接器"))?;
+                /*  let bridge_id = match option.bridge_mode {
+                      BridgeMode::Parent => {
+                          option.bridge_id
+                              .ok_or(anyhow!("未设置桥接器"))?
+                      }
+                      BridgeMode::Singer => {
+                          //创建桥接器
+                          let model = create_hap_bridge(&txn, None, accessory.category, name.clone(), true).await?;
+                          model.bridge_id
+                      }
+                  };*/
                 let ctx = AccessoryCtx {
                     aid,
                     bridge_id,
@@ -210,7 +216,7 @@ impl TemplateManagerInner {
                     sid = save_or_update_service(&txn, model).await?;
                     //.insert(&txn).await?;
                     for char in service.chars.iter() {
-                        let default = option.hap_manager.get_hap_default_info(char.char_type.into())
+                        let default = self.hap_manager.get_hap_default_info(char.char_type.into())
                             .ok_or(anyhow!("未找到hap默认信息"))?;
                         let char_model = to_char_model(sid, char, default)?;
                         save_or_update_char(&txn, char_model).await?;
@@ -224,7 +230,7 @@ impl TemplateManagerInner {
         //转设备
 
 
-        Ok(())
+        Ok(dev_ids)
     }
 
 
@@ -247,8 +253,6 @@ impl TemplateManagerInner {
         txn.commit().await?;
         Ok(())
     }
-
-
 }
 
 //ActiveModelTrait
@@ -401,10 +405,12 @@ impl Deref for TemplateManager {
 }
 
 impl TemplateManager {
-    pub fn new() -> Self {
+    pub fn new(conn: DatabaseConnection, hap_manager: HapManage) -> Self {
         Self {
             inner: Arc::new(TemplateManagerInner {
                 templates: Default::default(),
+                conn,
+                hap_manager,
             }),
         }
     }

@@ -20,7 +20,11 @@ pub fn api() -> Router<AppState> {
                 .route("/login", post(controller::sys_users::login))
                 .route("/info", get(controller::sys_users::info)),
         )
-
+        .nest(
+            "/system",
+            Router::new()
+                .route("/restart", post(controller::system::restart)),
+        )
         .nest(
             "/hap_characteristic",
             Router::new()
@@ -56,6 +60,7 @@ pub fn api() -> Router<AppState> {
                   .route("/restart/:id", put(controller::hap_bridge::restart))
                   .route("/reset/:id", put(controller::hap_bridge::reset))
                   .route("/:id", delete(controller::hap_bridge::delete))
+                  .route("/accessories_json/:id", get(controller::hap_bridge::accessories_json))
                   .route("/", post(controller::hap_bridge::add))
                   .route("/", put(controller::hap_bridge::update))
               ,
@@ -108,6 +113,7 @@ pub fn api() -> Router<AppState> {
                   .route("/check_update", post(controller::template::check_template_update))
                   .route("/check_add", post(controller::template::check_template_add))
                   .route("/text/:id", get(controller::template::get_text))
+                  .route("/apply_mijia", post(controller::template::apply_mijia))
               ,
         )
         .nest("/native_ble",

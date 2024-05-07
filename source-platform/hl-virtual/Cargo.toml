@@ -1,0 +1,18 @@
+[package]
+name = "hl-virtual"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+hl-integration = { path = "../../hl-integration" }
+tokio.workspace = true
+async-trait.workspace = true
+log.workspace = true
+futures-util.workspace = true
+tap.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+num_enum.workspace = true
+impl_new.workspace = true

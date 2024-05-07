@@ -335,6 +335,8 @@ impl MiCloud {
         Ok(())
     }
     pub async fn login(&mut self) -> anyhow::Result<()> {
+        self.state.cookie_store.lock().unwrap().clear();
+
         let sign = self.login_step1().await?;
         info!("start login step1");
         self.info = None;

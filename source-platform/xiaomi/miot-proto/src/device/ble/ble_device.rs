@@ -79,6 +79,10 @@ impl<T: AsMiotDevice> HlDevice for BleDevice<T> {
         Ok(())
     }
 
+    async fn enabled(&self) -> bool {
+        todo!()
+    }
+
     fn retry_info(&self) -> &RetryInfo {
         &self.retry_info
     }

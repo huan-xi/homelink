@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use anyhow::anyhow;
-use log::{info, warn};
+use log::{debug, info, warn};
 use serde_json::json;
 use hl_integration::event::events::{DeviceEvent, DeviceEventPointer};
 use hl_integration::JsonValue;
@@ -25,7 +25,7 @@ pub struct Params {
     /// 关闭
     pub on: MiotSpecId,
     pub mode: MiotSpecId,
-    /// 模式值映射 tagRead->5
+    /// 模式值映射 tagRead->cid
     pub mode_map: HashMap<String, u64>,
 }
 
@@ -46,7 +46,7 @@ impl AccessoryModelExtConstructor for ModelExt {
 
 #[async_trait::async_trait]
 impl HapModelExt for ModelExt {
-    /// 读取属性
+    /// 读取属性,读模式
 
     async fn read_chars_value(&self, params: Vec<CharReadParam>) -> ReadValueResult {
         let types: Vec<HapType> = params.iter()
@@ -66,10 +66,10 @@ impl HapModelExt for ModelExt {
             .and_then(|v| v.as_u64())
             .ok_or(anyhow!("mode is none"))?;
 
-        info!("read_chars_value:{:?}", types);
+        debug!("read_chars_value:{:?}", types);
         let mut result = vec![];
         for param in params.into_iter() {
-            let value = match (param.ctag, param.stag.clone()) {
+            let resp = match (param.ctag, param.stag.clone()) {
                 (HapType::PowerState, stag) => {
                     //如果on=false,模式全部为false
                     match (on, self.params.mode_map.get(stag.as_str())) {
@@ -77,7 +77,6 @@ impl HapModelExt for ModelExt {
                             Some(JsonValue::Bool(false))
                         }
                         (true, Some(v)) if *v == mode => {
-                            //todo 将其余全部设为false
                             Some(JsonValue::Bool(true))
                         }
                         (true, Some(_)) => {
@@ -94,8 +93,7 @@ impl HapModelExt for ModelExt {
                     None
                 }
             };
-
-
+            resp.ok_or(anyhow!("mode switch 读取失败"))?;
             let value = match param.ctag {
                 HapType::PowerState => {
                     //如果on=false,模式全部为false
@@ -114,7 +112,8 @@ impl HapModelExt for ModelExt {
                 _ => None,
             };
             result.push(CharReadResult {
-                sid: param.sid,cid: param.cid,
+                sid: param.sid,
+                cid: param.cid,
                 success: true,
                 value,
             });
@@ -133,7 +132,8 @@ impl HapModelExt for ModelExt {
             match (param.ctag, param.stag) {
                 (HapType::PowerState, stag) => {
                     let value = CharacteristicValue::try_format(Format::Bool, param.new_value)?
-                        .value.as_bool()
+                        .value
+                        .as_bool()
                         .ok_or(anyhow!("power state value is none"))?;
                     if value {
 
@@ -144,12 +144,19 @@ impl HapModelExt for ModelExt {
                                 .as_u64()
                                 .ok_or(anyhow!("mode value is none"))?;*/
                         // let mode = mode.to_string();
-                        let mode = self.params.mode_map.get(stag.as_str())
+                        let mode = self.params.mode_map
+                            .get(stag.as_str())
                             .ok_or(anyhow!("mode value is none"))?;
                         //todo 其余开关全部设置成false
                         let result = self.dev
                             .as_miot_device()?
                             .set_property(self.params.mode, json!(mode)).await?;
+                        // for x in self.params.mode_map {
+                        //     if x.0 != stag.as_str() && x.1 != *mode {
+                        //
+                        //     }
+                        // }
+
                         info!("update_chars_value:{:?}", result);
                     } else {
                         ///直接设置成false

@@ -46,15 +46,14 @@ async fn main() -> anyhow::Result<()> {
     ble_manager.init().await;
     let hap_metadata = Arc::new(hap_metadata()?);
     let mi_account_manager = MiAccountManager::new(conn.clone());
-    let template_manager = TemplateManager::new();
+    let hap_manager = HapManage::new();
+    let template_manager = TemplateManager::new(conn.clone(), hap_manager.clone());
     // 初始化hap 服务器
     let device_manager = IotDeviceManager::new(conn.clone(),
                                                mi_account_manager.clone(),
                                                ble_manager.clone());
     // 初始化iot设备
     device_manager.init().await?;
-
-    let hap_manager = HapManage::new();
 
 
     let app_state = AppState::new(conn.clone(), Managers {
@@ -66,7 +65,6 @@ async fn main() -> anyhow::Result<()> {
         ble_manager: ble_manager.clone(),
     });
     // let schema = schema(conn.clone(), None, None)?;
-
 
 
     let app = Router::new()

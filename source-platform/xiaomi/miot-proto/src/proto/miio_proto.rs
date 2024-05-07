@@ -15,6 +15,7 @@ pub type MsgCallback = Box<dyn Fn(JsonMessage) + Send + Sync>;
 
 pub const METHOD_GET_PROPERTIES: &str = "get_properties";
 pub const METHOD_SET_PROPERTIES: &str = "set_properties";
+
 /// 米家协议 发送和接收miio 指令
 #[async_trait::async_trait]
 pub trait MiotSpecProtocol {
@@ -62,6 +63,7 @@ pub trait MiotSpecProtocol {
         debug!("call_rpc:{}", str);
         let sender = self.send(str.as_str());
         let recv = self.await_result(id, timeout);
+        //同时进行
         let (r1, r2) = join(recv, sender).await;
         r2?;
         r1
@@ -89,7 +91,7 @@ pub trait MiotSpecProtocol {
     }
 }
 
-#[derive(Debug,Copy, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, New)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, New)]
 pub struct MiotSpecId {
     pub siid: i32,
     pub piid: i32,

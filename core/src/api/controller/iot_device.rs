@@ -110,7 +110,7 @@ pub async fn restart(state: State<AppState>, Path(id): Path<i64>) -> ApiResult<(
     state.device_manager.stop_device(id)?;
     let model = IotDeviceEntity::find_by_id(id).one(state.conn()).await?;
     let iot_device = model.ok_or(api_err!("设备不存在"))?;
-    state.device_manager.init_devices(Some(vec![id]))
+    state.device_manager.start_devices(Some(vec![id]))
         .await
         .map_err(|e| api_err!("启动失败{e}"))?;
 

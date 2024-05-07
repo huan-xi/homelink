@@ -184,7 +184,7 @@ pub async fn list(state: State<AppState>, Query(param): Query<PowerQueryParam>) 
 }
 
 
-
+#[deprecated]
 pub async fn templates(state: State<AppState>, Path(model): Path<String>) -> ApiResult<Vec<HlDeviceTemplate>> {
     let list = state.template_manager
         .templates
@@ -195,8 +195,10 @@ pub async fn templates(state: State<AppState>, Path(model): Path<String>) -> Api
     ok_data(list)
 }
 
+#[deprecated]
 pub async fn convert_by_template(state: State<AppState>, Json(param): Json<MiConvertByTemplateParam>) -> ApiResult<()> {
-    let mi_dev = MiotDeviceEntity::find_by_id(param.did.as_str())
+    todo!();
+   /* let mi_dev = MiotDeviceEntity::find_by_id(param.did.as_str())
         .one(state.conn())
         .await?
         .ok_or(api_err!("设备不存在"))?;
@@ -207,7 +209,7 @@ pub async fn convert_by_template(state: State<AppState>, Json(param): Json<MiCon
         bridge_mode: param.bridge_mode,
         bridge_id: param.bridge_id,
         gateway_id: param.gateway_id,
-    }).await.tap_err(|e| error!("转换错误:{:?}",e))?;
+    }).await.tap_err(|e| error!("转换错误:{:?}",e))?;*/
 
     ok_data(())
 }

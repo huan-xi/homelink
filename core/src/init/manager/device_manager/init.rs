@@ -6,17 +6,20 @@ use log::error;
 use sea_orm::*;
 
 use miot_proto::device::miot_spec_device::{AsMiotDevice, MiotDeviceArc};
+use crate::api_err;
 use crate::db::entity::iot_device::DeviceType;
 use crate::db::entity::prelude::{IotDeviceColumn, IotDeviceEntity, IotDeviceModel};
 use crate::init::manager::device_manager::IotDeviceManagerInner;
 
 impl IotDeviceManagerInner {
     pub async fn init(&self) -> anyhow::Result<()> {
-        self.init_devices(None).await?;
+        self.start_devices(None).await?;
         Ok(())
     }
 
-    pub async fn init_devices(&self, filter_ids: Option<Vec<i64>>) -> anyhow::Result<()> {
+
+
+    pub async fn start_devices(&self, filter_ids: Option<Vec<i64>>) -> anyhow::Result<()> {
         let mut condition = Condition::all();
         condition = condition
             .add(IotDeviceColumn::Disabled.eq(false))
@@ -69,6 +72,9 @@ impl IotDeviceManagerInner {
             }
             "ble-native" => {
                 self.init_native_ble(dev).await?
+            }
+            "hl-virtual" => {
+                self.init_hl_virtual(dev).await?
             }
             _ => {
                 return Err(anyhow!("暂不支持:{}类型设备接入",dev.source_platform.as_str()));

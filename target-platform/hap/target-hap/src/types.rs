@@ -38,6 +38,8 @@ pub struct ModelDelegateParam {
     pub model: String,
     /// 模型 运行时参数
     pub params: Option<JsonValue>,
+    /// 超时时间ms
+    pub timeout: Option<u64>,
 }
 
 

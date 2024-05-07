@@ -10,7 +10,7 @@ use crate::db::SNOWFLAKE;
 use crate::template::hap::accessory::AccessoryTemplate;
 use crate::template::hap::chars::HapCharacteristicTemplate;
 use crate::template::hap::service::ServiceTemplate;
-use crate::template::hl_template::{  DeviceTemplate};
+use crate::template::hl_template::{DeviceTemplate};
 
 #[derive(Clone)]
 pub struct AccessoryCtx {
@@ -20,17 +20,17 @@ pub struct AccessoryCtx {
 }
 
 pub fn to_service_model(aid: i64, sid: i64, svc: &ServiceTemplate) -> anyhow::Result<HapServiceActiveModel> {
-    todo!();
-  /*  Ok(HapServiceActiveModel {
-        id: Set(sid),
-        tag: Set(Some(svc.tag.clone())),
-        accessory_id: Set(aid),
-        disabled: Set(false),
-        configured_name: Set(svc.configured_name.clone()),
-        service_type: Set(svc.service_type.to_string()),
-        memo: Set(svc.memo.clone()),
-        primary: Set(svc.primary.unwrap_or(false)),
-    })*/
+
+     Ok(HapServiceActiveModel {
+          id: Set(sid),
+          tag: Set(Some(svc.tag.clone())),
+          accessory_id: Set(aid),
+          disabled: Set(false),
+          configured_name: Set(svc.configured_name.clone()),
+          service_type: Set(svc.service_type.to_string()),
+          memo: Set(svc.memo.clone()),
+          primary: Set(svc.primary.unwrap_or(false)),
+      })
 }
 
 pub fn to_char_model(sid: i64, char: &HapCharacteristicTemplate, default: HapCharInfo) -> anyhow::Result<HapCharacteristicActiveModel> {
@@ -66,9 +66,9 @@ pub fn to_char_model(sid: i64, char: &HapCharacteristicTemplate, default: HapCha
     })
 }
 
+/// 转配件
 pub fn to_accessory_model(ctx: AccessoryCtx, accessory: &AccessoryTemplate) -> anyhow::Result<HapAccessoryActiveModel> {
-    todo!();
-    /*//Vec<ModelDelegateParam>
+    //Vec<ModelDelegateParam>
     let mut delegates = accessory.hap_delegates.clone();
     if let Some(s) = accessory.hap_delegate.clone() {
         delegates.push(s);
@@ -96,6 +96,7 @@ pub fn to_accessory_model(ctx: AccessoryCtx, accessory: &AccessoryTemplate) -> a
                 chars,
                 model: i.model.clone(),
                 params: i.params.clone(),
+                timeout: None,
             }
         }).collect::<Vec<ModelDelegateParam>>();
 
@@ -119,7 +120,7 @@ pub fn to_accessory_model(ctx: AccessoryCtx, accessory: &AccessoryTemplate) -> a
         create_at: Set(chrono::Local::now().naive_local()),
         update_at: Set(chrono::Local::now().naive_local()),
         ..Default::default()
-    })*/
+    })
 }
 
 

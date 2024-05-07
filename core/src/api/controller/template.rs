@@ -7,11 +7,12 @@ use sea_orm::*;
 use crate::api::errors::{ApiError, ApiErrorInner};
 use crate::api::output::{ApiResult, ok_data};
 use crate::api::params::GetTemplateParam;
-use crate::api::params::template::CheckTemplateParam;
+use crate::api::params::template::{ApplyTemplateParam, CheckTemplateParam};
 use crate::api::results::{CheckTemplateResult, TemplateResult};
 use crate::api::state::AppState;
 use crate::api_err;
-use crate::db::entity::prelude::{IotDeviceColumn, IotDeviceEntity};
+use crate::db::entity::prelude::{IotDeviceColumn, IotDeviceEntity, MiotDeviceEntity, MiotDeviceModel};
+use crate::init::manager::template_manager::{ApplyTemplateOptions, SourcePlatformModel};
 use crate::template::hl_template::{HlDeviceTemplate, TemplateFormat};
 
 pub async fn check_template_add(state: State<AppState>, Json(param): Json<TemplateResult>) -> ApiResult<CheckTemplateResult> {
@@ -78,6 +79,23 @@ pub async fn check_template_update(state: State<AppState>, Json(param): Json<Che
     ok_data(())
 }
 
+
+pub async fn apply_mijia(state: State<AppState>, Json(param): Json<ApplyTemplateParam>) -> ApiResult<()> {
+    let template = param.text.as_str();
+    let template: HlDeviceTemplate = param.format.parse(template)
+        .map_err(|e| api_err!("模板格式错误:{:?}", e))?;
+    let model = MiotDeviceEntity::find_by_id(param.device_id.as_str())
+        .one(state.conn())
+        .await?
+        .ok_or(api_err!("设备不存在"))?;
+    let dev_ids=state.template_manager.apply_template(ApplyTemplateOptions {
+        template,
+        bridge_id: Some(param.bridge_id.clone()),
+        platform: SourcePlatformModel::MiHome(model),
+    }).await?;
+    let _ = state.device_manager.start_devices(Some(dev_ids)).await;
+    ok_data(())
+}
 
 pub async fn get_text(state: State<AppState>, Path(id): Path<String>, Query(param): Query<GetTemplateParam>) -> ApiResult<TemplateResult> {
     let temp = match state.template_manager

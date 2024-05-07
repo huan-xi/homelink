@@ -9,7 +9,7 @@ use thiserror::Error;
 use miot_proto::device::miot_spec_device::NotSupportMiotDeviceError;
 use crate::api::output::ApiResp;
 
-#[derive(Debug,New)]
+#[derive(Debug, New)]
 pub struct ApiErrorInner {
     pub code: i32,
     pub msg: String,
@@ -35,6 +35,11 @@ pub enum ApiError {
     BadRequest(String),
     #[error("ApiErrorInner")]
     ApiErrorInner(ApiErrorInner),
+    // hap::Error,
+    #[error("hap error {0}")]
+    HapError(#[from] hap::Error),
+    #[error("FromUtf8Error {0}")]
+    FromUtf8Error(#[from] std::string::FromUtf8Error),
 }
 
 impl From<NotSupportMiotDeviceError> for ApiError {
@@ -56,7 +61,7 @@ impl IntoResponse for ApiError {
             ApiError::StrMsg(msg) => ApiResp::<()>::with_err(msg).into_response(),
             ApiError::BadRequest(msg) => ApiResp::<()>::with_err(msg.as_str()).into_response(),
             ApiError::ApiErrorInner(inner) => {
-                ApiResp::<()>::with_code(inner.code,inner.msg).into_response()
+                ApiResp::<()>::with_code(inner.code, inner.msg).into_response()
             }
             ApiError::DbErr(err) => {
                 match err {

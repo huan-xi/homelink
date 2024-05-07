@@ -16,6 +16,8 @@ pub trait HlDevice: Send + Sync + HlDeviceListenable {
     /// 运行设备
     /// 退出时判断是否可重试
     async fn run(&self) -> Result<(), Box<dyn DeviceExitError>>;
+    /// 是否启用
+    async fn enabled(&self) -> bool;
 
     fn retry_info(&self) -> &RetryInfo;
 }

@@ -16,6 +16,7 @@ root:
     - stdout
     - requests
 loggers:
+
   "miot_proto::device::ble::ble_device":
     level: debug
   "miot_proto::proto::transport::open_miio_mqtt_proto":
@@ -40,7 +41,7 @@ loggers:
   libmdns:
     level: info
   hap:
-    level: info
+    level: debug
   paho_mqtt_c:
     level: info
   paho_mqtt:

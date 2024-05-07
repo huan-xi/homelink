@@ -21,6 +21,8 @@ pub struct ModelDelegateParamTemplate {
     ///unit convert 设置,stag,ctag-> convertor
     /// 模型 运行时参数
     pub params: Option<JsonValue>,
+    /// 单个委托读写属性超时时间ms,默认2s
+    pub timeout: Option<u64>,
 }
 
 impl TryInto<ModelDelegateParam> for ModelDelegateParamTemplate {
@@ -31,6 +33,7 @@ impl TryInto<ModelDelegateParam> for ModelDelegateParamTemplate {
             chars: self.chars.ok_or(anyhow!("delegate param chars is required"))?,
             model: self.model,
             params: self.params,
+            timeout: self.timeout,
         })
     }
 }
@@ -41,6 +44,7 @@ impl From<ModelDelegateParam> for ModelDelegateParamTemplate {
             chars: Some(value.chars),
             model: value.model,
             params: value.params,
+            timeout: value.timeout,
         }
     }
 }

@@ -1,6 +1,7 @@
 mod init;
 mod mijia;
 mod native_ble;
+mod hl_virtual;
 
 use std::ops::Deref;
 use std::sync::Arc;
@@ -52,6 +53,7 @@ impl IotDeviceManagerInner {
         tokio::spawn(async move {
             let task = async move {
                 loop {
+
                     let res = dev_c.run().await;
                     //标记重试次数+1
                     let incr = dev_c.retry_info().incr().await;

@@ -91,6 +91,7 @@ pub struct HapService {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HapServiceCharacteristicRelation {
+    /// 存储的是name,
     #[serde(rename = "Required")]
     pub required_characteristics: Vec<String>,
     #[serde(rename = "Optional")]
@@ -133,6 +134,7 @@ pub struct HapMetadata {
     // pub sorted_categories: Vec<HomeKitCategory>,
     pub characteristics: HashMap<String, HapCharacteristic>,
     // pub sorted_characteristics: Vec<HapCharacteristic>,
+
     pub services: HashMap<String, HapService>,
     // pub sorted_services: Vec<HapService>,
     pub properties: HashMap<String, HapProperty>,
@@ -146,11 +148,11 @@ impl From<SystemMetadata> for HapMetadata {
         let mut m = v.plist_dictionary;
 
         // rename mislabeled services
-        let  accessory_information_service = m.hap.services.get_mut("accessory-information").unwrap();
+        let accessory_information_service = m.hap.services.get_mut("accessory-information").unwrap();
         accessory_information_service.name = "Accessory Information".to_string();
-        let  fan_v2_service = m.hap.services.get_mut("fanv2").unwrap();
+        let fan_v2_service = m.hap.services.get_mut("fanv2").unwrap();
         fan_v2_service.name = "Fan v2".to_string();
-        let  smart_speaker_service = m.hap.services.get_mut("smart-speaker").unwrap();
+        let smart_speaker_service = m.hap.services.get_mut("smart-speaker").unwrap();
         smart_speaker_service.name = "Smart Speaker".to_string();
 
         let mut sorted_categories = m.homekit.categories.values().cloned().collect::<Vec<_>>();
@@ -188,12 +190,12 @@ impl From<SystemMetadata> for HapMetadata {
                 characteristic_in_values.insert(write_name, values);
             }
         }
-     /*   let mut characteristics = HashMap::new();
-        m.hap_platform.characteristics.values().for_each(|c| {
-            //名称
-            let key = utils::pascal_case(c.name.as_str());
-            characteristics.insert(key, c.clone());
-        });*/
+        /*   let mut characteristics = HashMap::new();
+           m.hap_platform.characteristics.values().for_each(|c| {
+               //名称
+               let key = utils::pascal_case(c.name.as_str());
+               characteristics.insert(key, c.clone());
+           });*/
         let mut services = HashMap::new();
         m.hap.services.values().for_each(|c| {
             //名称
@@ -204,7 +206,7 @@ impl From<SystemMetadata> for HapMetadata {
         Self {
             categories: m.homekit.categories,
             // sorted_categories,
-            characteristics:m.hap.characteristics,
+            characteristics: m.hap.characteristics,
             // sorted_characteristics,
             services,
             // sorted_services,

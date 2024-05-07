@@ -13,18 +13,18 @@ use crate::api::results::{HapBridgeResult, TemplateResult};
 use crate::api::state::AppState;
 use crate::db::entity::prelude::{HapAccessoryColumn, HapAccessoryEntity, HapBridgeActiveModel, HapBridgeColumn, HapBridgeEntity, HapBridgeModel};
 use sea_orm::QueryFilter;
+use tokio::time;
 use crate::api::params::power::power_query_param::PowerQueryParam;
 use crate::api::params::power::power_update_param::PowerUpdateParam;
 use crate::db::entity::hap_bridge::{BonjourStatusFlagWrapper, BridgeInfo, Model, PairingsWrapper};
 use crate::db::service::hap_bridge_service::create_hap_bridge;
 use crate::db::SNOWFLAKE;
 use crate::init::hap_init::add_hap_bridge;
-use crate::init::manager::device_manager::IotDeviceManager;
 use crate::service::hap_bridge_service;
 use crate::service::hap_bridge_service::to_model_result;
 use crate::template::hap::bridge::HapBridgeTemplate;
 
-pub async fn update_by_template(state: State<AppState>, Json(param): Json<TemplateResult>) -> ApiResult<()>{
+pub async fn update_by_template(state: State<AppState>, Json(param): Json<TemplateResult>) -> ApiResult<()> {
     let template: HapBridgeTemplate = param.format.parse(param.text.as_str())?;
     let mut model = template.try_into_update_model()?;
     model.update(state.conn()).await?;
@@ -61,6 +61,7 @@ pub async fn update(state: State<AppState>, Json(param): Json<PowerUpdateParam>)
     model.update(state.conn()).await?;
     ok_data(())
 }
+
 pub async fn add(state: State<AppState>, Json(param): Json<AddHapBridgeParam>) -> ApiResult<()> {
     //查询名字是否存在
     let hap_bridge = create_hap_bridge(state.conn(), param.pin_code, param.category, param.name, false).await?;
@@ -71,6 +72,28 @@ pub async fn add(state: State<AppState>, Json(param): Json<AddHapBridgeParam>) -
     ok_data(())
 }
 
+
+pub async fn accessories_json(state: State<AppState>, Path(id): Path<i64>) -> ApiResult<String> {
+    let json = "".to_string();
+    let str = {
+        let database = state.hap_manager.server_map.get(&id)
+            .ok_or(api_err!("桥接器不存在"))?
+            .server
+            .accessory_database.clone();
+        let str = database.read().await.as_serialized_json().await;
+        str
+    };
+
+    /*let str = {
+        state.hap_manager.server_map.get(&id)
+            .ok_or(api_err!("桥接器不存在"))?
+            .server
+            .accessory_database.read().await
+            .as_serialized_json().await?
+    };
+    let json = String::from_utf8(str)?;*/
+    ok_data(json)
+}
 
 pub async fn delete(state: State<AppState>, Path(id): Path<i64>) -> ApiResult<()> {
     //查询配件数量
@@ -102,6 +125,8 @@ pub async fn reset(state: State<AppState>, Path(id): Path<i64>) -> ApiResult<()>
 /// 重启桥接器
 pub async fn restart(state: State<AppState>, Path(id): Path<i64>) -> ApiResult<()> {
     state.hap_manager.stop_server(id).await?;
+    // 等mdns 注销成功
+    time::sleep(time::Duration::from_millis(200)).await;
     let model = HapBridgeEntity::find_by_id(id).one(state.conn()).await?;
     let hap_bridge = model.ok_or(api_err!("桥接器不存在"))?;
     add_hap_bridge(state.conn(), hap_bridge, state.hap_manager.clone(), state.device_manager.clone())

@@ -94,6 +94,9 @@ pub struct DeviceTemplate {
     pub interval: Option<u64>,
     /// 展示名称
     pub display_name: Option<String>,
+    /// 设备名称
+    pub name: Option<String>,
+
     pub device_type: Option<DeviceType>,
     pub disabled: Option<bool>,
     pub timeout: Option<u64>,

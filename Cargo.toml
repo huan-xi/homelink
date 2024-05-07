@@ -6,7 +6,7 @@ members = [ "core",
     "source-platform/xiaomi/xiaomi-ble-packet",
     "source-platform/xiaomi/miot-proto",
     "source-platform/xiaomi/xiaomi-integration",
-    "target-platform/hap/target-hap", "hl-common", "homelink-macro",
+    "target-platform/hap/target-hap", "hl-common", "homelink-macro", "source-platform/hl-virtual",
 ]
 resolver = "2"
 #exclude=["hap_platform-rs/codegen"]

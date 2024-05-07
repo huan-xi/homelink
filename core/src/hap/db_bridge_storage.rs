@@ -54,7 +54,6 @@ impl Storage for DbBridgesStorage {
             configuration_number: Set(config.configuration_number as i64),
             status_flag: Set(BonjourStatusFlagWrapper(config.status_flag)),
             create_at: NotSet,
-
             ..Default::default()
         };
         model.save(&self.conn).await.map_err(|e| Unknown(Box::new(e)))?;

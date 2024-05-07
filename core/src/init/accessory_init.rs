@@ -112,10 +112,20 @@ pub(crate) async fn init_hap_accessory<'a, C: ConnectionTrait>(conn: &C, hap_man
         let required_characteristics = hap_manage.hap_mata.services
             .get(svc_chs.0.service_type.as_str())
             .ok_or(anyhow!("服务类型:{}不存在",svc_chs.0.service_type))?
-            .characteristics.required_characteristics
+            .characteristics
+            .required_characteristics
             .clone();
+        let mut required_types = vec![];
+        for char_name in required_characteristics.into_iter() {
+            let ch = hap_manage.hap_mata.characteristics.get(char_name.as_str());
+            if let Some(c)= ch {
+                let char_type = hap_metadata::utils::pascal_case(c.name.as_str());
+                required_types.push(char_type);
+            }
+        }
 
-        for char_type in required_characteristics {
+
+        for char_type in required_types {
             if !svc_chs.1.iter().any(|ch| ch.characteristic_type == char_type) {
                 return Err(anyhow!("配件:{},服务:{}未找到必填特征:{}",name,svc_chs.0.service_type,char_type));
             }

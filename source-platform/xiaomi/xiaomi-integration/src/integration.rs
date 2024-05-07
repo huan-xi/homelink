@@ -17,6 +17,7 @@ impl HlSourceIntegrator for XiaomiIntegration {
         let database = get_hap_model_ext_database();
 
         database.insert("common.mode_switch".to_string(), models::common::mode_switch::ModelExt::new)?;
+        database.insert("common.virtual".to_string(), models::common::hl_virtual::ModelExt::new)?;
         database.insert("common.miot_spec_prop_mapping".to_string(), models::common::miot_spec_prop_mapping::ModelExt::new)?;
         database.insert("common.ble_value_mapping".to_string(), models::common::ble_value_mapping::ModelExt::new)?;
         // model_map.insert("common.native_ble".to_string(), common::native_ble::ModelExt::new);

@@ -46,6 +46,7 @@ impl CharUpdateDelegate for ModelDelegates {
 pub struct ModelDelegate {
     pub chars: HashSet<CharIdentifier>,
     pub ext: HapModelExtPointer,
+    pub timeout: Duration,
 }
 
 #[async_trait::async_trait]
@@ -56,7 +57,7 @@ impl CharReadsDelegate for ModelDelegate {
 
     async fn reads_value(&self, param: Vec<CharReadParam>) -> ReadCharResults {
         //加上超时时间，防止单个模型卡死
-        let results = timeout(Duration::from_millis(1000), async {
+        let results = timeout(self.timeout, async {
             self.ext.read_chars_value(param)
                 .await
                 .tap_err(|e| log::error!("扩展模型读取特征失败:{:?}", e))

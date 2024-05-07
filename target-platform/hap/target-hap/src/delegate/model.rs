@@ -2,6 +2,7 @@ use std::any::Any;
 use std::collections::HashMap;
 use std::ops::Deref;
 use std::sync::Arc;
+use std::time::Duration;
 use anyhow::anyhow;
 use dashmap::DashMap;
 use log::error;
@@ -87,6 +88,9 @@ impl HapAccessoryDelegateModel {
             delegates: Arc::new(vec![ModelDelegate {
                 chars: delegate_param.chars.into_iter().map(|i| i.into()).collect(),
                 ext: model_ext.clone(),
+                timeout: delegate_param.timeout
+                    .map(|i| Duration::from_millis(i))
+                    .unwrap_or_else(|| Duration::from_secs(2)),
             }]),
         };
 

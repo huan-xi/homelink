@@ -3,8 +3,11 @@ mod method;
 mod default_char_info;
 
 use std::collections::HashMap;
+use std::net::{IpAddr, Ipv4Addr};
 use std::ops::Deref;
 use std::sync::Arc;
+use log::error;
+use tap::TapFallible;
 use tokio::sync::Mutex;
 use hap::{HapType, MdnsResponder, pointer, RawMdnsResponder};
 use hap::pointer::MdnsResponderPtr;
@@ -53,7 +56,7 @@ pub struct HapManageInner {
     // 每个配件同时只能运行一个
     // aid_ch_map: dashmap::DashMap<u64, ChannelInfo>,
     /// 配件与设备的关系
-    dev_aid_map: dashmap::DashMap<i64, u64>,
+    aid_dev_map: dashmap::DashMap<u64, i64>,
     default_type_info_map: HashMap<HapType, HapCharInfo>,
 
     mdns_responder: Mutex<Option<Arc<Mutex<RawMdnsResponder>>>>,
@@ -68,12 +71,17 @@ pub struct HapManage {
 impl HapManage {
     pub async fn get_mdns(&self) -> anyhow::Result<Arc<Mutex<RawMdnsResponder>>> {
         let mut prt = self.mdns_responder.lock().await;
+        if prt.is_some() {
+            return Ok(prt.as_ref().unwrap().clone());
+        }
         let raw = match prt.as_ref() {
             Some(s) => {
                 s.clone()
             }
             None => {
-                let raw = hap::RawMdnsResponder::new()?;
+                let ip = IpAddr::V4(Ipv4Addr::new(192, 168, 3, 180));
+                let raw = RawMdnsResponder::new_with_ip_list(vec![ip])
+                    .tap_err(|e| error!("mdns 启动错误:{e:?}"))?;
                 let arc = Arc::new(Mutex::new(raw));
                 *prt = Some(arc.clone());
                 arc
@@ -93,7 +101,7 @@ impl HapManage {
                 hap_mata: meta,
                 server_map: Default::default(),
                 accessory_map: Default::default(),
-                dev_aid_map: Default::default(),
+                aid_dev_map: Default::default(),
                 default_type_info_map,
                 mdns_responder: Default::default(),
             })

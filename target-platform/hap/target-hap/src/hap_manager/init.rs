@@ -12,7 +12,7 @@ use crate::types::HapCharInfo;
 
 impl HapManageInner {
     /// 移除配件
-    pub async fn remove_accessory(&self, aid: u64) ->anyhow::Result<()>{
+    pub async fn remove_accessory(&self, aid: u64) -> anyhow::Result<()> {
         let info = self.accessory_map.remove(&aid);
         if let Some((_, info)) = info {
             let bid = info.bid;
@@ -134,9 +134,10 @@ impl HapManageInner {
                 bid,
                 accessory: rel.accessory,
             };
-            self.dev_aid_map.insert(rel.device_id, rel.aid);
+            self.aid_dev_map.insert(rel.aid, rel.device_id);
             self.accessory_map.insert(rel.aid, info);
         }
+        //启动服务
         tokio::spawn(async move {
             let task = async move {
                 let res = server_c.run_handle().await;

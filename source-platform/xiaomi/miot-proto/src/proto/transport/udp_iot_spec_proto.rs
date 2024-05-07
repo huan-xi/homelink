@@ -36,7 +36,7 @@ pub struct UdpMiotSpecProtocol {
 }
 
 impl UdpMiotSpecProtocol {
-    pub async fn new(ip: &str, port: u32, token: [u8; 16],timeout: Duration) -> anyhow::Result<Self> {
+    pub async fn new(ip: &str, port: u32, token: [u8; 16], timeout: Duration) -> anyhow::Result<Self> {
         let addr: std::net::SocketAddr = format!("{}:{}", ip, port).parse().unwrap();
         let socket = UdpSocket::bind("0.0.0.0:0").await?;
         socket.connect(addr).await?;
@@ -128,7 +128,7 @@ impl MiotSpecProtocol for UdpMiotSpecProtocol {
                     }
                 };
             }
-        }).await.map_err(|_f| anyhow!("调用接口响应超时,id:{}",id))?;
+        }).await.map_err(|_f| anyhow!("调用接口响应超时,cmd_id:{}",id))?;
         if let Err(e) = &res {
             error!("await_result error:{}", e);
             //将状态改成断开

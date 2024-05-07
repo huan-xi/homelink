@@ -231,6 +231,10 @@ impl HlDevice for MiotSpecDeviceWrapper {
         self.0.run().await.map_err(|e| Box::new(e) as Box<dyn DeviceExitError>)
     }
 
+    async fn enabled(&self) -> bool {
+        true
+    }
+
     fn retry_info(&self) -> &RetryInfo {
         &self.0.get_base().retry_info
     }

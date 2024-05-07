@@ -51,7 +51,7 @@ pub struct IotHapAccessory {
 
 impl Drop for IotHapAccessory {
     fn drop(&mut self) {
-        info!("IotHapAccessory drop");
+        // info!("IotHapAccessory drop");
     }
 }
 

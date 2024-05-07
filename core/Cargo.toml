@@ -9,6 +9,7 @@ edition = "2021"
 hap-metadata = { path = "../target-platform/hap/hap-metadata" }
 miot-proto = { path = "../source-platform/xiaomi/miot-proto" }
 ble-monitor = { path = "../source-platform/ble-native/ble-monitor" }
+hl-virtual = { path = "../source-platform/hl-virtual" }
 hl-integration = { path = "../hl-integration" }
 target-hap = { path = "../target-platform/hap/target-hap" }
 
@@ -76,6 +77,7 @@ socketioxide.workspace = true
 sea-orm = { version = "0.12.10", features = ["macros", "runtime-tokio-native-tls", "with-chrono"] }
 tracing = "0.1.40"
 serde_yaml = "0.9.32"
+
 #dirs = "5.0.1"
 #url = "2.1"
 # 仓库中的bug
@@ -85,6 +87,7 @@ serde_yaml = "0.9.32"
 #features = ["with-decimal", "with-chrono"]
 
 [dev-dependencies]
+tracing-subscriber = "0.3.18"
 
 [features]
 default = ["sqlite", ]
