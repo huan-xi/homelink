@@ -9,6 +9,7 @@ model_icon = ""
 integration = "xiaomi_gw_mqtt"
 desc = "网关"
 tag = "gateway"
+device_type = "Gateway"
 [devices.params]
 timeout = 500
 

@@ -68,12 +68,12 @@ impl MiotSpecDevice for OpenMiioGatewayDeviceInner {
             error!("网关消息监听结束");
         };
 
-        let poll = get_poll_func(self, self.info.did.as_str(), self.interval);
+        // let poll = get_poll_func(self, self.info.did.as_str(), self.interval);
         loop {
             select! {
                     _ = listen =>break,
                     _ = forward =>break,
-                    _ = poll => break
+                    // _ = poll => break
                 }
         }
         self.proto.write().await.take();

@@ -79,9 +79,10 @@ impl HapManage {
                 s.clone()
             }
             None => {
-                let ip = IpAddr::V4(Ipv4Addr::new(192, 168, 3, 180));
-                let raw = RawMdnsResponder::new_with_ip_list(vec![ip])
-                    .tap_err(|e| error!("mdns 启动错误:{e:?}"))?;
+                // let ip = IpAddr::V4(Ipv4Addr::new(192, 168, 3, 180));
+                // let raw = RawMdnsResponder::new_with_ip_list(vec![ip])
+                //     .tap_err(|e| error!("mdns 启动错误:{e:?}"))?;
+                let raw=RawMdnsResponder::new().tap_err(|e| error!("mdns 启动错误:{e:?}"))?;
                 let arc = Arc::new(Mutex::new(raw));
                 *prt = Some(arc.clone());
                 arc

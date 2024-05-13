@@ -1,12 +1,19 @@
 [workspace]
 members = [ "core",
-    "target-platform/hap/hap-metadata", "target-platform/hap/hap-rs",
+    "target-platform/hap/hap-metadata",
+    "target-platform/hap/hap-rs",
     "libmdns",
-    "source-platform/ble-native/ble-monitor", "bin", "hl-integration",
+    "source-platform/ble-native/ble-monitor",
+    "bin",
+    "hl-integration",
     "source-platform/xiaomi/xiaomi-ble-packet",
     "source-platform/xiaomi/miot-proto",
     "source-platform/xiaomi/xiaomi-integration",
-    "target-platform/hap/target-hap", "hl-common", "homelink-macro", "source-platform/hl-virtual",
+    "target-platform/hap/target-hap",
+    "hl-common",
+    "homelink-macro",
+    "source-platform/hl-virtual",
+#    "target-platform/hap/dbus-avahi",
 ]
 resolver = "2"
 #exclude=["hap_platform-rs/codegen"]

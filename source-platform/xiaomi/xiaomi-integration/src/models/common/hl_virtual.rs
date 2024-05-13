@@ -1,6 +1,7 @@
 use std::sync::Arc;
 use async_trait::async_trait;
 use log::info;
+use tokio::time;
 use hl_integration::JsonValue;
 use miot_proto::device::miot_spec_device::MiotDeviceArc;
 use target_hap::delegate::{CharReadParam, CharReadResult, CharUpdateParam, CharUpdateResult};
@@ -23,7 +24,7 @@ impl AccessoryModelExtConstructor for ModelExt {
 impl HapModelExt for ModelExt {
     async fn read_chars_value(&self, params: Vec<CharReadParam>) -> ReadValueResult {
         let mut res = vec![];
-        info!("read_chars_value:{:?}",params);
+        info!("虚拟设备读取数据:{:?}",params);
 
         for c in params.into_iter() {
             match c.ctag {
@@ -39,6 +40,7 @@ impl HapModelExt for ModelExt {
     }
 
     async fn update_chars_value(&self, params: Vec<CharUpdateParam>) -> UpdateValueResult {
+        info!("虚拟设备更新数据:{:?}",params);
         let mut res = vec![];
         for c in params.into_iter() {
             match c.ctag {

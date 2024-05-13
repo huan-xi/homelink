@@ -1,8 +1,11 @@
+use std::collections::HashMap;
 use async_trait::async_trait;
 use impl_new::New;
+use log::info;
 use sea_orm::ActiveValue::Set;
 use sea_orm::{ActiveModelTrait, DatabaseConnection, EntityTrait, NotSet};
 use tap::TapFallible;
+use tokio::sync::RwLock;
 use hap::{Config, Ed25519Keypair};
 use hap::Error::Unknown;
 use hap::pairing::Pairing;
@@ -15,6 +18,7 @@ use crate::hap::rand_utils::{compute_setup_hash, pin_code_from_str};
 pub struct DbBridgesStorage {
     bid: i64,
     conn: DatabaseConnection,
+    pairing_cache: RwLock<Option<HashMap<uuid::Uuid, Pairing>>>,
 }
 
 #[async_trait]
@@ -77,13 +81,29 @@ impl Storage for DbBridgesStorage {
     }
 
     async fn load_pairing(&self, id: &uuid::Uuid) -> hap::Result<Pairing> {
-        let p = self.find_bridge().await?
-            .pairings.0.remove(id)
-            .ok_or(hap::Error::MsgErr("pairing not found"))?;
+        let r = self.pairing_cache.read().await;
+        let p = if let Some(cache) = r.as_ref() {
+            cache.get(id).cloned()
+        } else {
+            drop(r);
+            let mut w = self.pairing_cache.write().await;
+            if let Some(s) = w.as_ref() {
+                s.get(id).cloned()
+            } else {
+                let model = self.find_bridge().await?;
+                let p = model.pairings.0.get(id).cloned();
+                w.replace(model.pairings.0);
+                p
+            }
+        }.ok_or(hap::Error::MsgErr("pairing not found"))?;
+
         Ok(p)
     }
 
     async fn save_pairing(&mut self, pairing: &Pairing) -> hap::Result<()> {
+        if let Some(map) = self.pairing_cache.write().await.as_mut() {
+            map.insert(pairing.id, pairing.clone());
+        }
         let mut bridge = self.find_bridge().await?;
         bridge.pairings.0.insert(pairing.id, pairing.clone());
         let model = HapBridgeActiveModel {

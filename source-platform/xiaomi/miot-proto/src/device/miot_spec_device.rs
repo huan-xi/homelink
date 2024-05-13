@@ -44,9 +44,10 @@ pub struct Extra {
 }
 
 
+#[derive(Eq,PartialEq)]
 pub enum DeviceStatus {
     /// 正常
-    Run,
+    Running,
     /// 断开连接
     Disconnect,
 }
@@ -81,7 +82,7 @@ impl Default for BaseMiotSpecDevice {
     fn default() -> Self {
         let (tx, _) = broadcast::channel(10);
         Self {
-            status: RwLock::new(DeviceStatus::Run),
+            status: RwLock::new(DeviceStatus::Running),
             poll_properties: Arc::new(RwLock::new(HashSet::new())),
             value_map: Arc::new(Default::default()),
             emitter: DeviceEventEmitter::default(),
@@ -127,6 +128,9 @@ mod test {
 
 #[async_trait::async_trait]
 pub trait MiotSpecDevice: Sync + Send {
+    async fn is_running(&self) -> bool {
+        *self.get_base().status.read().await == DeviceStatus::Running
+    }
     fn get_info(&self) -> &DeviceInfo;
     fn get_base(&self) -> &BaseMiotSpecDevice;
 
@@ -192,7 +196,6 @@ pub trait MiotSpecDevice: Sync + Send {
     fn get_emitter(&self) -> &DeviceEventEmitter {
         &self.get_base().emitter
     }
-
 }
 
 
@@ -239,6 +242,7 @@ impl HlDevice for MiotSpecDeviceWrapper {
         &self.0.get_base().retry_info
     }
 }
+
 #[async_trait::async_trait]
 impl HlDeviceListenable for MiotSpecDeviceWrapper {
     async fn add_listener(&self, listener: EventListener) -> i64 {
@@ -290,6 +294,13 @@ pub trait AsMiotDevice: Sync + Send {
 pub struct MiotDeviceArc(pub Arc<dyn HlSourceDevice>);
 
 impl MiotDeviceArc {
+
+    pub async fn is_running(&self) -> anyhow::Result<bool> {
+        Ok(self.as_miot_device()?.is_running().await)
+    }
+    pub async fn read_properties(&self, props: Vec<MiotSpecId>) -> anyhow::Result<Vec<MiotSpecDTO>> {
+        self.as_miot_device()?.read_properties(props).await
+    }
     pub async fn read_property(&self, siid: i32, piid: i32) -> anyhow::Result<Option<Value>> {
         self.as_miot_device()?.read_property(siid, piid).await
     }

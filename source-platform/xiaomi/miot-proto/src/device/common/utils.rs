@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use futures_util::future::BoxFuture;
 use futures_util::FutureExt;
-use log::error;
+use log::{debug, error, info};
 use tokio::time;
 use hl_integration::event::events::DeviceEvent;
 use hl_integration::platform::hap::hap_device;
@@ -13,6 +13,7 @@ use crate::proto::protocol::ExitError;
 
 
 pub async fn poll0<'a, T: MiotSpecDevice + Sync + Send>(dev: &'a T, did: &'a str) -> Result<(), ExitError> {
+    debug!("pool dev:{:?}",did);
     let base = dev.get_base();
     if base.emitter.is_empty() {
         return Ok(());
@@ -65,15 +66,16 @@ pub async fn poll0<'a, T: MiotSpecDevice + Sync + Send>(dev: &'a T, did: &'a str
 
 /// 轮询注册的属性,发送UpdateProperty 事件
 pub fn get_poll_func<'a, T: MiotSpecDevice + Sync + Send>(dev: &'a T, did: &'a str, interval: Duration) -> BoxFuture<'a, ()> {
-    let mut interval = time::interval(interval);
+    // let mut interval = time::interval(interval);
+
 
     async move {
         loop {
-            interval.tick().await;
             if let Err(e) = poll0(dev, did).await {
                 error!("轮询数据失败:{:?}",e);
-                break;
             }
+            // interval.tick().await;
+            time::sleep(interval).await;
         }
     }.boxed()
 }

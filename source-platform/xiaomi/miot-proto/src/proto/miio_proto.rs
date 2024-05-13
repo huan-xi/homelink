@@ -21,11 +21,16 @@ pub const METHOD_SET_PROPERTIES: &str = "set_properties";
 pub trait MiotSpecProtocol {
     /// 获取一个新的指令id
     fn incr_cmd_id(&self) -> u64;
+
+    /// 发送请求,并且等待结果
+    async fn request<'a>(&'a self, id: u64, cmd: &'a str, timeout_val: Option<Duration>) -> anyhow::Result<JsonMessage>;
+
     /// 发送数据
     async fn send<'a>(&'a self, cmd: &'a str) -> anyhow::Result<()>;
     /// 获取一个数据接收器
     fn recv(&self) -> broadcast::Receiver<JsonMessage>;
     /// 等待结果
+    #[deprecated]
     async fn await_result<'a>(&'a self, id: u64, timeout_val: Option<Duration>) -> anyhow::Result<JsonMessage>;
     /// 开始监听
     async fn start_listen(&self);
@@ -61,12 +66,13 @@ pub trait MiotSpecProtocol {
         }];
         let str = param.to_string();
         debug!("call_rpc:{}", str);
-        let sender = self.send(str.as_str());
+        self.request(id, str.as_str(), timeout).await
+        /*let sender = self.send(str.as_str());
         let recv = self.await_result(id, timeout);
         //同时进行
         let (r1, r2) = join(recv, sender).await;
         r2?;
-        r1
+        r1*/
     }
 
     async fn set_properties(&self, params: Vec<MiotSpecDTO>, timeout_val: Option<Duration>) -> anyhow::Result<Vec<MiotSpecDTO>> {

@@ -105,6 +105,28 @@ impl MiotSpecProtocol for UdpMiotSpecProtocol {
         self.id.fetch_add(1, Ordering::SeqCst)
     }
 
+    async fn request<'a>(&'a self, id: u64, cmd: &'a str, timeout_val: Option<Duration>) -> anyhow::Result<JsonMessage> {
+        let mut rx = self.msg_sender.subscribe();
+        self.send(cmd).await?;
+        let t = timeout_val.unwrap_or(self.timeout);
+        let res = timeout(t, async move {
+            loop {
+                // let msg = self.msg_sender.subscribe().recv().await?;
+                let msg = rx.recv().await?;
+                if let Some(val) = msg.data.get("id") {
+                    if val.as_u64() == Some(id) {
+                        return Ok(msg);
+                    }
+                };
+            }
+        }).await.map_err(|_f| anyhow!("调用接口响应超时,cmd_id:{}",id))?;
+        if let Err(e) = &res {
+            error!("await_result error:{}", e);
+            //将状态改成断开
+        };
+        res
+    }
+
     async fn send<'a>(&'a self, cmd: &'a str) -> anyhow::Result<()> {
         let msg = self.build_message(cmd).await?;
         let data = msg.pack_to_vec();

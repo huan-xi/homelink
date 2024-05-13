@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use anyhow::anyhow;
 use bimap::BiMap;
-use log::{info, warn};
+use log::{debug, info, warn};
 
 use hl_integration::JsonValue;
 use miot_proto::device::miot_spec_device::{AsMiotDevice, MiotDeviceArc};
@@ -68,10 +68,10 @@ impl HapModelExt for ModelExt {
             .collect();
         info!("read_chars_value:{:?}", types);
         let mut result = vec![];
-        let mut cids = vec![];
+        let mut read_params = vec![];
         let mut ids = vec![];
         for param in params.into_iter() {
-            let stag = param.stag;
+            let stag = param.stag.clone();
             let cid = CharIdentifier::new(stag.clone(), param.ctag);
             match self.mapping.get_by_left(&cid) {
                 None => {
@@ -84,48 +84,48 @@ impl HapModelExt for ModelExt {
                     });
                 }
                 Some(aid) => {
-                    cids.push((param.cid, param.format, cid, param.sid));
+                    read_params.push(param);
                     ids.push(aid.clone());
                 }
             }
         }
 
         if !ids.is_empty() {
-            let results = self.dev
-                .as_miot_device()?
+            if !self.dev.is_running().await? {
+                //全部失败
+                debug!("device is not running");
+                for param in read_params.into_iter() {
+                    result.push(CharReadResult::fail(&param));
+                }
+                return Ok(result);
+            }
+
+            let results = self
+                .dev
                 .read_properties(ids).await?;
-            if results.len() != cids.len() {
+
+            if results.len() != read_params.len() {
                 return Err(anyhow!("update result length not equal to cids length"));
             }
-            for (i, cid) in cids.into_iter().enumerate() {
+            for (i, param) in read_params.into_iter().enumerate() {
                 match results.get(i) {
                     None => {
-                        result.push(CharReadResult {
-                            cid: cid.0,
-                            sid: cid.3,
-                            success: false,
-                            value: None,
-                        });
+                        result.push(CharReadResult::fail(&param));
                     }
                     Some(val) => {
                         let value = val.value.clone();
                         //格式化
-                        let mut value = value.map(|v| CharacteristicValue::format(cid.1, v).value);
+                        let mut value = value
+                            .map(|v| CharacteristicValue::format(param.format, v).value);
                         //转换
                         if let Some(val) = value.clone() {
-                            if let Some(c) = self.ctx.convertor_map.get(&cid.2) {
+                            if let Some(c) = self.ctx.convertor_map.get(&CharIdentifier::new(param.stag.clone(), param.ctag)) {
                                 if let Ok(val) = c.ext.from(val) {
                                     value = Some(val);
                                 }
                             }
                         }
-
-                        result.push(CharReadResult {
-                            sid: cid.3,
-                            cid: cid.0,
-                            success: true,
-                            value,
-                        });
+                        result.push(CharReadResult::success(&param, value));
                     }
                 }
             }

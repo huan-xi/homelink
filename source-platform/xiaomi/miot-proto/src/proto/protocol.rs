@@ -121,7 +121,7 @@ impl Message {
 }
 
 
-#[derive(Debug)]
+#[derive(Debug,)]
 pub enum ExitError {
     /// 连接信息为空
     ConnectEmpty,

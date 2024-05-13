@@ -1,10 +1,6 @@
-apt-get install protobuf-compiler libavahi-client-dev
+macos 
 
-cross compile
-
-apt-get install musl-tools
-sudo apt install libdbus-1-dev pkg-config
-
+brew install dbus
 
 hap
 https://github.com/ewilken/hap-rs/issues/77

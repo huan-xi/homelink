@@ -22,6 +22,10 @@ impl MiotSpecProtocol for CloudMiioProto {
         todo!()
     }
 
+    async fn request<'a>(&'a self, id: u64, cmd: &'a str, timeout_val: Option<Duration>) -> anyhow::Result<JsonMessage> {
+        todo!()
+    }
+
     async fn send<'a>(&'a self, _cmd: &'a str) -> anyhow::Result<()> {
         todo!("can not send")
     }

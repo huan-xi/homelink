@@ -41,7 +41,7 @@ loggers:
   libmdns:
     level: info
   hap:
-    level: debug
+    level: info
   paho_mqtt_c:
     level: info
   paho_mqtt:

@@ -65,6 +65,24 @@ impl MiotSpecProtocol for OpenMiIOMqttSpecProtocol {
     fn incr_cmd_id(&self) -> u64 {
         self.id.fetch_add(1, Ordering::SeqCst)
     }
+
+    async fn request<'a>(&'a self, id: u64, cmd: &'a str, timeout_val: Option<Duration>) -> anyhow::Result<JsonMessage> {
+        let mut rx = self.msg_sender.subscribe();
+        self.send(cmd).await?;
+        let t = timeout_val.unwrap_or(self.timeout);
+        timeout(t, async move {
+            loop {
+                let msg = rx.recv().await?;
+                if let Some(val) = msg.data.get("id") {
+                    if val.as_u64() == Some(id) {
+                        debug!("await_result:{:?}", msg.data);
+                        return Ok(msg);
+                    }
+                };
+            }
+        }).await.map_err(|_e| anyhow!("执行命令超时"))?
+    }
+
     async fn send<'a>(&'a self, cmd: &'a str) -> anyhow::Result<()> {
         self.client.publish("miio/command", QoS::AtLeastOnce, false, cmd).await?;
         Ok(())

@@ -1,0 +1,11 @@
+[package]
+name = "dbus-avahi"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tokio.workspace=true
+dbus-tokio = "0.7.6"
+dbus = "0.9.7"

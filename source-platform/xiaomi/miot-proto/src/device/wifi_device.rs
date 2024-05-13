@@ -1,4 +1,4 @@
-use std::cmp::{max, min};
+use std::cmp::{max};
 use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
@@ -12,7 +12,7 @@ use tokio::sync::RwLock;
 use hl_integration::JsonValue;
 
 use crate::device::common::utils::get_poll_func;
-use crate::device::miot_spec_device::{BaseMiotSpecDevice, DeviceInfo, MiotDeviceType, MiotSpecDevice, MiotSpecDeviceWrapper};
+use crate::device::miot_spec_device::{BaseMiotSpecDevice, DeviceInfo, DeviceStatus, MiotDeviceType, MiotSpecDevice, MiotSpecDeviceWrapper};
 use crate::proto::miio_proto::{MiotSpecId, MiotSpecProtocolPointer};
 use crate::proto::protocol::ExitError;
 use crate::proto::protocol::ExitError::ConnectErr;
@@ -57,12 +57,16 @@ impl MiotSpecDevice for WifiDeviceInner {
         let listen = proto.start_listen();
         // 开启轮询
         let poll = get_poll_func(self, self.info.did.as_str(), self.interval);
+        // 心跳
+
+        *self.base.status.write().await = DeviceStatus::Running;
         loop {
             select! {
                     _ = listen => break,
                     _ = poll => break,
                 }
         }
+        *self.base.status.write().await = DeviceStatus::Disconnect;
         self.proto.write().await.take();
         Err(ExitError::Disconnect)
         // 该表当前设备的状态
@@ -117,12 +121,13 @@ impl WifiDevice {
             },
             info,
             proto: Arc::new(RwLock::new(None)),
-            interval: Duration::from_secs(wifi_param.interval
-                .map(|i| max(i, 1))
-                .unwrap_or(120)),
+            interval: Duration::from_millis(wifi_param.interval
+                .map(|i| max(i, 200))
+                .unwrap_or(2000)),
 
             timeout: Duration::from_millis(wifi_param.timeout.unwrap_or(2_000)),
         };
+        // info!("param:{:?},{:?}",inner.interval,inner.timeout);
         Ok(MiotSpecDeviceWrapper(Box::new(inner), MiotDeviceType::Wifi))
     }
 }

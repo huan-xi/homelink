@@ -346,7 +346,7 @@ impl MiCloud {
             Some(i) => !i.service_token.is_empty()
         };
 
-        let location = if !sign.starts_with("http") || !has_info {
+        let location = if !sign.starts_with("hap") || !has_info {
             info!("start login step2");
             self.login_step2(sign.as_str()).await?
         } else {

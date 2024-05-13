@@ -3,6 +3,7 @@ use anyhow::anyhow;
 use axum::body::HttpBody;
 use log::error;
 use sea_orm::{ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, JsonValue, QueryFilter};
+use tokio::sync::RwLock;
 
 use hap::accessory::{AccessoryInformation, HapAccessory};
 use hap::accessory::bridge::BridgeAccessory;
@@ -52,7 +53,7 @@ pub async fn add_hap_bridge(conn: &DatabaseConnection, bridge: HapBridgeModel, m
         .ok_or(anyhow!("未找到桥接器:{:?}", bid))?;
     let is_single_accessory = bridge_model.single_accessory;
 
-    let mut storage = DbBridgesStorage::new(bid, conn.clone());
+    let mut storage = DbBridgesStorage::new(bid, conn.clone(),RwLock::new(None));
     //config
     let mut hap_config = storage.load_config().await?;
     hap_config.redetermine_local_ip();
